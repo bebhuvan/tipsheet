@@ -55,8 +55,9 @@ jobs:
       - name: Download seed DB from release
         if: steps.db-cache.outputs.cache-hit != 'true'
         run: |
+          mkdir -p data
           gh release download --pattern 'filings.db.gz' -R ${{ github.repository }} || true
-          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv filings.db data/; fi
+          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
         env:
           GH_TOKEN: ${{ github.token }}
 
