@@ -1,5 +1,19 @@
 # Cloudflare Pages custom headers
 # https://developers.cloudflare.com/pages/configuration/headers/
+#
+# NOTE: assets are served directly by Cloudflare (no run_worker_first in
+# wrangler.toml), so the cache rules in worker-entry.js never run for static
+# paths — THIS file is the source of truth for caching. Cloudflare COMBINES the
+# headers of every matching rule (it does NOT let the most-specific rule win), so
+# a "/*" catch-all must NOT set Cache-Control — it would concatenate a second
+# max-age onto every asset and corrupt the immutable rules below. HTML page
+# caching therefore can't be expressed here; it needs the request to route
+# through the Worker (run_worker_first).
+
+# Astro content-hashed bundles (filename changes on every content change) —
+# safe to cache forever. No other rule matches /_assets/, so this stays clean.
+/_assets/*
+  Cache-Control: public, max-age=31536000, immutable
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
