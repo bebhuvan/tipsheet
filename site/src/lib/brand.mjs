@@ -18,6 +18,9 @@ export const BRAND_NAME           = 'Tipsheet';
 export const BRAND_NAME_POSSESSIVE = "Tipsheet's";
 export const BRAND_TAGLINE        = 'What matters at India’s listed companies';
 
+// Public Telegram channel (shown in the masthead). Set to the real handle.
+export const BRAND_TELEGRAM_URL   = 'https://t.me/tipsheetalerts';
+
 // What a single article is called. Editorial term used in copy.
 // Kept as 'Story'/'Stories' to avoid the operator-tips connotation if we'd used "tip".
 export const ARTICLE_TYPE         = 'Story';
