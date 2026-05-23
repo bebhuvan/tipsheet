@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Restore DB from cache (keyed by date so it rolls daily)
+      # Restore DB from cache (rolls daily by run number)
       - name: Restore DB cache
         uses: actions/cache/restore@v4
         id: db-cache
@@ -50,6 +50,15 @@ jobs:
           key: filings-db-${{ github.run_number }}
           restore-keys: |
             filings-db-
+
+      # If cache missed, download the seed DB from latest release
+      - name: Download seed DB from release
+        if: steps.db-cache.outputs.cache-hit != 'true'
+        run: |
+          gh release download --pattern 'filings.db.gz' -R ${{ github.repository }} || true
+          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv filings.db data/; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Ensure data directory
         run: mkdir -p data
@@ -153,11 +162,20 @@ jobs:
       - name: Restore DB from cache (rebuild-only)
         if: ${{ inputs.skip_pipeline }}
         uses: actions/cache/restore@v4
+        id: build-cache
         with:
           path: data/filings.db
           key: filings-db-
           restore-keys: |
             filings-db-
+
+      - name: Download seed DB from release (rebuild-only, no cache)
+        if: ${{ inputs.skip_pipeline && steps.build-cache.outputs.cache-hit != 'true' }}
+        run: |
+          gh release download --pattern 'filings.db.gz' -R ${{ github.repository }} || true
+          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv filings.db data/; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Install site deps
         run: cd site && npm ci

@@ -9,3 +9,6 @@ dist/
 data/
 __pycache__/
 *.pyc
+bakeoff/
+.claude/
+site/dist/
