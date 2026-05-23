@@ -45,7 +45,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--db", default=str(DEFAULT_DB), help="Path to Tipsheet SQLite DB.")
     parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="Tijori SDK cache directory.")
-    parser.add_argument("--limit", type=int, default=80, help="Recent distinct companies to process.")
+    parser.add_argument("--limit", type=int, default=5000, help="Candidate companies to EXPORT from cache (covers the whole archive).")
+    parser.add_argument("--max-fetch", type=int, default=200, help="Max companies to FETCH from Tijori per run (un-cached first, then refresh recent). Coverage accumulates daily.")
     parser.add_argument("--symbols", nargs="*", help="Optional explicit NSE symbols to process.")
     parser.add_argument("--cache-only", action="store_true", help="Do not refresh Tijori; only export existing cache.")
     parser.add_argument("--workers", type=int, default=8)
@@ -58,6 +59,22 @@ def connect(db_path: str) -> sqlite3.Connection:
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
     return db
+
+
+def cached_slugs(data_dir: str) -> set[str]:
+    """Slugs already present in the persisted SDK cache (so we don't re-fetch them)."""
+    cat = Path(data_dir) / "catalog.duckdb"
+    if not cat.exists():
+        return set()
+    try:
+        import duckdb
+
+        con = duckdb.connect(str(cat), read_only=True)
+        rows = con.execute("SELECT DISTINCT slug FROM article_widgets WHERE slug IS NOT NULL").fetchall()
+        con.close()
+        return {r[0] for r in rows}
+    except Exception:
+        return set()
 
 
 def load_companies(db: sqlite3.Connection, limit: int, symbols: list[str] | None) -> list[sqlite3.Row]:
@@ -133,12 +150,22 @@ def main() -> int:
         print("[tijori-widgets] no companies to process")
         return 0
 
-    slugs = [row["slug"] for row in rows]
-    print(f"[tijori-widgets] companies={len(rows)} data_dir={args.data_dir}")
+    # Fetch budget per run: prioritise companies NOT yet in the cache (backfill
+    # coverage), then spend any leftover quota refreshing the most-recent ones
+    # (freshness). EXPORT every candidate from the cache. With the cache
+    # persisted across runs, coverage reaches the whole archive in a few days.
+    have = cached_slugs(args.data_dir)
+    uncached = [row["slug"] for row in rows if row["slug"] not in have]
+    to_fetch = uncached[: args.max_fetch]
+    if len(to_fetch) < args.max_fetch:
+        for row in rows[: args.max_fetch - len(to_fetch)]:
+            if row["slug"] not in to_fetch:
+                to_fetch.append(row["slug"])
+    print(f"[tijori-widgets] candidates={len(rows)} cached={len(have)} fetch={len(to_fetch)} data_dir={args.data_dir}")
 
-    if not args.cache_only:
+    if not args.cache_only and to_fetch:
         issues = download(
-            slugs,
+            to_fetch,
             data_dir=args.data_dir,
             workers=args.workers,
             min_interval=args.min_interval,

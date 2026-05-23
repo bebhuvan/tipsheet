@@ -124,6 +124,15 @@ jobs:
         continue-on-error: true
 
       # ─── Tijori SDK ingest (once daily / manual): Alerts + financial box ───
+      - name: Restore + persist Tijori widget cache
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 1 * * *' }}
+        uses: actions/cache@v4
+        with:
+          path: data/tijori-cache
+          key: tijori-cache-${{ github.run_number }}
+          restore-keys: |
+            tijori-cache-
+
       - name: Set up Python (Tijori SDK)
         if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 1 * * *' }}
         uses: actions/setup-python@v5
