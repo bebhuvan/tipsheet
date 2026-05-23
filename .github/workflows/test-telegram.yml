@@ -16,10 +16,13 @@ jobs:
           key: filings-db-
           restore-keys: |
             filings-db-
-      - name: Download seed DB from release (fallback)
+      - name: Get seed DB if cache missed
         run: |
-          gh release download --pattern 'filings.db.gz' -R ${{ github.repository }} || true
-          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv filings.db data/; fi
+          mkdir -p data
+          if [ ! -f data/filings.db ]; then
+            gh release download --pattern 'filings.db.gz' -R ${{ github.repository }} || true
+            if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Install pipeline deps
