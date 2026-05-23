@@ -49,7 +49,13 @@ function cacheControlFor(pathname) {
       return `public, max-age=${rule.maxAge}${extra}`;
     }
   }
-  if (pathname.endsWith('.html') || pathname === '/') {
+  // Treat clean/extensionless URLs as HTML pages. Articles are served at "/slug/"
+  // (trailing slash), which matches neither ".html" nor "/", so previously they fell
+  // through to null and inherited the asset server's "max-age=0, must-revalidate" —
+  // forcing a revalidation on every visit. A path whose last segment has no "." is a
+  // page (covers "/", "/slug/", "/slug"); real assets were already matched above.
+  const lastSegment = pathname.slice(pathname.lastIndexOf('/') + 1);
+  if (pathname.endsWith('.html') || !lastSegment.includes('.')) {
     return `public, max-age=${DEFAULT_PAGE_MAX_AGE}, stale-while-revalidate=3600`;
   }
   return null;
