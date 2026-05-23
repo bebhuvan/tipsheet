@@ -849,3 +849,43 @@ export function listAllForStaticPaths(limit = 20000) {
     LIMIT ?
   `).all(limit).map(row => ({ id: buildSlug(row.symbol, row.headline, row.record_id), record_id: row.record_id }));
 }
+
+// Market signals (Tijori dashboard cards) for /alerts/. Snapshot table; refreshed
+// daily by the pipeline. Returns groups in editorial priority order.
+const SIGNAL_ORDER = ['Rating Upgrades', 'Promoter Buying', 'Whales Buying'];
+
+export function getMarketSignals() {
+  let rows;
+  try {
+    rows = db().prepare(`
+      SELECT category_label, company_name, symbol, metric_name, metric_value, sector, source_url, fetched_at
+      FROM market_signals ORDER BY category_label, row_index
+    `).all();
+  } catch {
+    return { groups: [], fetched_at: null }; // table absent (older DB) — page renders empty-state
+  }
+  if (!rows.length) return { groups: [], fetched_at: null };
+
+  const byCat = new Map();
+  for (const r of rows) {
+    const bad = r.metric_value == null || r.metric_value === 'None%' || r.metric_value === 'null' || r.metric_value === '';
+    if (!byCat.has(r.category_label)) byCat.set(r.category_label, []);
+    byCat.get(r.category_label).push({
+      company: r.company_name,
+      symbol: r.symbol,
+      metric: r.metric_name,
+      value: bad ? null : r.metric_value,
+      sector: r.sector,
+      url: r.source_url,
+    });
+  }
+  const rank = (c) => { const i = SIGNAL_ORDER.indexOf(c); return i === -1 ? 99 : i; };
+  const groups = [...byCat.entries()]
+    .map(([label, cards]) => ({
+      label,
+      slug: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      cards,
+    }))
+    .sort((a, b) => rank(a.label) - rank(b.label));
+  return { groups, fetched_at: rows[0].fetched_at };
+}

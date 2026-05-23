@@ -253,3 +253,22 @@ CREATE TABLE IF NOT EXISTS radar_items (
 );
 CREATE INDEX IF NOT EXISTS idx_radar_status_score ON radar_items(status, radar_score DESC);
 CREATE INDEX IF NOT EXISTS idx_radar_symbol       ON radar_items(symbol);
+
+-- Market signals — Tijori dashboard idea-cards (promoter/whale buying, corporate
+-- actions, capex, fundamentals, trending). Snapshot table, replaced each refresh.
+CREATE TABLE IF NOT EXISTS market_signals (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_slug  TEXT,
+  category_label TEXT,
+  company_name   TEXT,
+  symbol         TEXT,
+  metric_name    TEXT,
+  metric_value   TEXT,
+  sector         TEXT,
+  market_cap     TEXT,
+  source_url     TEXT,
+  raw_text       TEXT,
+  row_index      INTEGER,
+  fetched_at     INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_market_signals_cat ON market_signals(category_slug, row_index);

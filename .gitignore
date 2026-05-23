@@ -15,6 +15,7 @@ site/_snapshot_preview/
 site/_mark_proto/
 site/_*.mjs
 site/_local_d1_seed.sql
+brand-icon/
 data/
 __pycache__/
 *.pyc

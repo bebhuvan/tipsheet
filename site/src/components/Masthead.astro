@@ -1,5 +1,5 @@
 ---
-import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
+import { BRAND_NAME, BRAND_TAGLINE, BRAND_TELEGRAM_URL } from '../lib/brand.mjs';
 
 interface Props {
   weekday?: string;
@@ -27,6 +27,7 @@ const navItems = [
   { id: 'briefings',   label: 'Briefings',   href: '/briefings/' },
   { id: 'filings',     label: 'Latest',      href: '/filings/' },
   { id: 'radar',       label: 'Radar',       href: '/radar/' },
+  { id: 'alerts',      label: 'Alerts',      href: '/alerts/' },
   { id: 'concalls',    label: 'Concalls',    href: '/concalls/' },
   { id: 'markets',     label: 'Markets',     href: '/markets/' },
 ];
@@ -34,6 +35,10 @@ const navItems = [
 <header class="masthead">
   <div class="masthead-util">
     <a href="/search/" class="masthead-search" aria-label="Search">Search <span class="kbd-hint">⌘K</span></a>
+    <a href={BRAND_TELEGRAM_URL} target="_blank" rel="noopener" class="masthead-tg" aria-label="Tipsheet on Telegram" title="Follow on Telegram">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71l-4.07-3.01-1.96 1.91c-.21.21-.4.39-.74.39z"/></svg>
+      <span>Telegram</span>
+    </a>
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle colour scheme">
       <span class="dot"></span><span id="themeLabel">Light</span>
     </button>
