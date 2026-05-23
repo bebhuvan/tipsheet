@@ -1,0 +1,28 @@
+{
+  "name": "filings-pipeline",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "poll": "node --env-file=../.env run.mjs poll",
+    "enrich": "node --env-file=../.env run.mjs enrich",
+    "both": "node --env-file=../.env run.mjs both",
+    "fundamentals": "node --env-file=../.env run.mjs fetch-fundamentals",
+    "slugs": "node --env-file=../.env run.mjs resolve-tijori-slugs",
+    "radar": "node --env-file=../.env run.mjs generate-radar",
+    "concalls": "node --env-file=../.env run.mjs concalls",
+    "concalls:poll": "node --env-file=../.env run.mjs poll-concalls",
+    "concalls:enrich": "node --env-file=../.env run.mjs enrich-concalls",
+    "macro": "node --env-file=../.env run.mjs poll-macro-calendar",
+    "briefing:open": "node --env-file=../.env run.mjs briefing-open",
+    "briefing:close": "node --env-file=../.env run.mjs briefing-close",
+    "stats": "node --env-file=../.env run.mjs stats",
+    "loop": "node --env-file=../.env loop.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0"
+  }
+}

@@ -1,0 +1,13 @@
+COMPANY:    {company} ({symbol})
+SECTOR:     {sector}
+MARKET CAP: {market_cap}
+TRIGGER:    {trigger_type} — {trigger_label}
+
+FUNDAMENTAL FLAGS
+Quality:    {quality_flags}
+Risk:       {risk_flags}
+
+EVIDENCE (most recent first)
+{evidence_block}
+
+Write the why_now line for this Radar entry. Return only the JSON object.

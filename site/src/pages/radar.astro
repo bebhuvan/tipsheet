@@ -1,0 +1,744 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { listRadarItems } from '../lib/queries.mjs';
+
+const items = listRadarItems({ limit: 80 });
+const generatedAt = items[0]?.updated_at ? new Date(items[0].updated_at) : null;
+
+// Five wedges, in clockwise order starting from the top (12 o'clock).
+const WEDGES = [
+  { key: 'filing_cluster',    label: 'Filing cluster',   center: -90 },
+  { key: 'order_win',         label: 'Order flow',       center: -18 },
+  { key: 'smart_money',       label: 'Ownership',        center:  54 },
+  { key: 'concall_watch',     label: 'Call watch',       center: 126 },
+  { key: 'quality_breakout',  label: 'Quality overlap',  center: 198 },
+];
+const WEDGE_WIDTH = 360 / WEDGES.length;
+const wedgeByKey = new Map(WEDGES.map(w => [w.key, w]));
+
+// Market-cap tiers (values stored in crores). Round Indian conventions.
+function capTier(mcap) {
+  if (mcap == null) return 'sm';
+  if (mcap >= 50000) return 'lg';
+  if (mcap >= 10000) return 'md';
+  return 'sm';
+}
+function capLabel(tier) {
+  return tier === 'lg' ? 'Large-cap' : tier === 'md' ? 'Mid-cap' : 'Small-cap';
+}
+
+// Van der Corput low-discrepancy sequence: gives a well-spaced 0..1 value for
+// any integer n. Used to fan dots across a wedge without random clumping.
+function vdc(n, base) {
+  let q = 0, bk = 1 / base;
+  while (n > 0) { q += (n % base) * bk; n = Math.floor(n / base); bk /= base; }
+  return q;
+}
+
+function radiusFromScore(score) {
+  const s = Math.max(0, Math.min(100, Number(score) || 0));
+  const inner = 9;
+  const outer = 38;
+  return inner + ((100 - s) / 100) * (outer - inner);
+}
+
+// Place dots per-wedge. Sort each wedge's items by score so the strongest
+// gets the cleanest central placement; spread the rest with a Halton sequence
+// across the wedge's angular range.
+const placement = new Map();
+const buckets = new Map(WEDGES.map(w => [w.key, []]));
+items.forEach(it => {
+  const w = wedgeByKey.get(it.trigger_type) || WEDGES[0];
+  buckets.get(w.key).push(it);
+});
+for (const w of WEDGES) {
+  const list = buckets.get(w.key);
+  list.sort((a, b) => (Number(b.radar_score) || 0) - (Number(a.radar_score) || 0));
+  const halfWidth = (WEDGE_WIDTH / 2) - 4;
+  list.forEach((it, idx) => {
+    // Index 0 sits dead-centre on the wedge axis; subsequent items fan out
+    // symmetrically using a low-discrepancy sequence.
+    const angleOffset = idx === 0 ? 0 : (vdc(idx, 2) - 0.5) * 2 * halfWidth;
+    const radiusJitter = (vdc(idx + 1, 3) - 0.5) * 3.5;
+    const angleDeg = w.center + angleOffset;
+    const angleRad = angleDeg * Math.PI / 180;
+    const radius = radiusFromScore(it.radar_score) + radiusJitter;
+    placement.set(it.id, {
+      x: 50 + Math.cos(angleRad) * radius,
+      y: 50 + Math.sin(angleRad) * radius,
+    });
+  });
+}
+
+const signals = items.map(it => ({
+  ...it,
+  ...(placement.get(it.id) || { x: 50, y: 50 }),
+  tier: capTier(it.market_cap),
+  wedge_key: (wedgeByKey.get(it.trigger_type) || WEDGES[0]).key,
+}));
+
+// Only the top five score-95+ dots get always-on labels. Keeps the dial calm.
+const labelledIds = new Set(
+  [...signals]
+    .filter(s => Number(s.radar_score) >= 90)
+    .sort((a, b) => (b.radar_score || 0) - (a.radar_score || 0))
+    .slice(0, 5)
+    .map(s => s.id)
+);
+
+const triggerCounts = WEDGES.map(w => ({
+  ...w,
+  count: items.filter(it => it.trigger_type === w.key).length,
+}));
+const tierCounts = ['lg', 'md', 'sm'].map(t => ({
+  tier: t,
+  label: capLabel(t),
+  count: signals.filter(s => s.tier === t).length,
+}));
+
+function fmtDate(d) {
+  if (!d) return 'Not generated yet';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} IST`;
+}
+
+function scoreClass(score) {
+  if (score >= 90) return 'hot';
+  if (score >= 75) return 'warm';
+  return 'watch';
+}
+
+function rowId(item) {
+  return `radar-${String(item.symbol || item.id).toLowerCase()}`;
+}
+---
+<Base
+  title="Radar"
+  description="Radar surfaces listed-company situations worth researching from Tipsheet filings, concalls, and fundamentals."
+>
+  <Masthead activeNav="radar" />
+
+  <main>
+    <article class="radar-page">
+      <header class="radar-header">
+        <div class="kicker"><span>Radar</span></div>
+        <h1 class="page-title">Worth a closer look.</h1>
+        <p class="page-dek">Indian-listed companies whose filings, calls or fundamentals are starting to do something interesting. Treat each name as a starting point for your own research — not a tip, not a recommendation. Open the evidence and follow the trail.</p>
+      </header>
+
+      <section class="radar-dial-wrap" aria-label="Radar signal map">
+        <div class="radar-dial" data-dial>
+          <svg class="dial-svg" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+            <!-- concentric rings (score bands) -->
+            <circle cx="50" cy="50" r="38" class="ring ring-outer"/>
+            <circle cx="50" cy="50" r="28" class="ring"/>
+            <circle cx="50" cy="50" r="18" class="ring"/>
+            <circle cx="50" cy="50" r="9" class="ring ring-bullseye"/>
+            <circle cx="50" cy="50" r="0.8" class="bull-mark"/>
+
+            <!-- wedge dividers (5 spokes at the wedge boundaries) -->
+            {WEDGES.map(w => {
+              const a = (w.center - WEDGE_WIDTH / 2) * Math.PI / 180;
+              const x2 = 50 + Math.cos(a) * 38;
+              const y2 = 50 + Math.sin(a) * 38;
+              return <line x1="50" y1="50" x2={x2.toFixed(3)} y2={y2.toFixed(3)} class="spoke"/>;
+            })}
+
+            <!-- ring score ticks on the right edge -->
+            <g class="ring-ticks">
+              <line x1="38"   y1="50" x2="39.2" y2="50" class="ring-tick"/>
+              <line x1="28"   y1="50" x2="29.2" y2="50" class="ring-tick"/>
+              <line x1="18"   y1="50" x2="19.2" y2="50" class="ring-tick"/>
+              <text x="40.4" y="50.6" class="ring-label">60</text>
+              <text x="30.4" y="50.6" class="ring-label">75</text>
+              <text x="20.4" y="50.6" class="ring-label">90</text>
+            </g>
+
+            <!-- sweep -->
+            <g class="sweep">
+              <line x1="50" y1="50" x2="86" y2="50" class="sweep-line"/>
+            </g>
+          </svg>
+
+          <!-- wedge labels around the perimeter (outside the outer ring) -->
+          {WEDGES.map(w => {
+            const rad = w.center * Math.PI / 180;
+            const lx = 50 + Math.cos(rad) * 45;
+            const ly = 50 + Math.sin(rad) * 45;
+            return (
+              <span
+                class="wedge-label"
+                data-trigger={w.key}
+                style={`left: ${lx.toFixed(2)}%; top: ${ly.toFixed(2)}%;`}
+              >{w.label}</span>
+            );
+          })}
+
+          <!-- dots -->
+          {signals.map(s => (
+            <a
+              href={`#${rowId(s)}`}
+              class:list={['dot', `tier-${s.tier}`, scoreClass(s.radar_score)]}
+              data-trigger={s.wedge_key}
+              data-symbol={s.symbol}
+              data-row={rowId(s)}
+              style={`left: ${s.x.toFixed(2)}%; top: ${s.y.toFixed(2)}%;`}
+              title={`${s.symbol} · ${s.title} · ${Math.round(s.radar_score)}`}
+              aria-label={`${s.symbol}: ${s.title}`}
+            >
+              <span class:list={['dot-label', labelledIds.has(s.id) && 'always']}>{s.symbol}</span>
+            </a>
+          ))}
+        </div>
+
+        <div class="dial-meta">
+          <span><b>{items.length}</b> active situations</span>
+          <span class="dial-meta-sep" aria-hidden="true">·</span>
+          <span>updated {fmtDate(generatedAt)}</span>
+        </div>
+
+        <div class="dial-legend">
+          <div class="legend-block legend-tiers">
+            {tierCounts.map(t => (
+              <span class="tier-row">
+                <i class:list={['tier-mark', `tier-${t.tier}`]} aria-hidden="true"></i>
+                <b>{t.count}</b><span>{t.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <nav class="radar-filters" aria-label="Filter radar">
+        <button class="filter-pill is-active" data-filter="all" type="button">All <b>{items.length}</b></button>
+        {triggerCounts.map(t => (
+          <button class="filter-pill" data-filter={t.key} type="button">{t.label} <b>{t.count}</b></button>
+        ))}
+      </nav>
+
+      <div class="radar-list">
+        {signals.map(item => (
+          <section class="radar-row" id={rowId(item)} data-trigger={item.wedge_key}>
+            <div class="radar-score">
+              <span class:list={['score-pill', scoreClass(item.radar_score)]}>{Math.round(item.radar_score)}</span>
+              <span>{wedgeByKey.get(item.trigger_type)?.label || item.trigger_type}</span>
+            </div>
+
+            <div class="radar-main">
+              <div class="radar-meta">
+                <a href={item.company_url} class="ticker">{item.symbol}</a>
+                {item.sector && <span>{item.sector}</span>}
+                <span class:list={['cap-chip', `tier-${item.tier}`]}>{capLabel(item.tier)}</span>
+              </div>
+              <h2>{item.title}</h2>
+              <p>{item.why_now}</p>
+
+              {(item.quality_flags.length > 0 || item.risk_flags.length > 0) && (
+                <div class="radar-flags">
+                  {item.quality_flags.map(flag => <span class="quality">{flag}</span>)}
+                  {item.risk_flags.map(flag => <span class="risk">{flag}</span>)}
+                </div>
+              )}
+
+              {item.evidence.length > 0 && (
+                <ol class="radar-evidence">
+                  {item.evidence.slice(0, 3).map(f => (
+                    <li>
+                      <a href={f.canonical_url}>{f.headline}</a>
+                      <span>{f.canonical_category || f.event_type}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
+            <div class="radar-actions">
+              <a href={item.company_url}>Tipsheet timeline</a>
+              {item.tijori_url && <a href={item.tijori_url} target="_blank" rel="noopener">Tijori Finance</a>}
+            </div>
+          </section>
+        ))}
+      </div>
+    </article>
+  </main>
+
+  <SiteFooter />
+</Base>
+
+<script>
+  // Filter pills + dial wedge labels + URL hash sync + click-to-highlight.
+  const KNOWN = new Set(['all','filing_cluster','order_win','smart_money','concall_watch','quality_breakout']);
+
+  function applyFilter(trigger) {
+    const t = KNOWN.has(trigger) ? trigger : 'all';
+    document.querySelectorAll('.filter-pill').forEach(el => {
+      el.classList.toggle('is-active', el.dataset.filter === t);
+    });
+    document.querySelectorAll('.wedge-label').forEach(el => {
+      el.classList.toggle('is-active', t !== 'all' && el.dataset.trigger === t);
+    });
+    document.querySelectorAll('.dot').forEach(el => {
+      const match = t === 'all' || el.dataset.trigger === t;
+      el.classList.toggle('is-dim', !match);
+    });
+    document.querySelectorAll('.radar-row').forEach(el => {
+      const match = t === 'all' || el.dataset.trigger === t;
+      el.hidden = !match;
+    });
+    const url = new URL(window.location.href);
+    if (t === 'all') url.searchParams.delete('trigger'); else url.searchParams.set('trigger', t);
+    history.replaceState(null, '', url);
+  }
+
+  function flash(rowId) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    row.classList.remove('is-flash');
+    // force reflow so the animation restarts on repeat clicks
+    void row.offsetWidth;
+    row.classList.add('is-flash');
+  }
+
+  document.addEventListener('click', (e) => {
+    const pill = e.target.closest('.filter-pill');
+    if (pill && pill.dataset.filter) {
+      e.preventDefault();
+      applyFilter(pill.dataset.filter);
+      return;
+    }
+    const dot = e.target.closest('.dot');
+    if (dot && dot.dataset.row) {
+      // Let the anchor jump happen, then flash.
+      requestAnimationFrame(() => flash(dot.dataset.row));
+    }
+  });
+
+  // Honour ?trigger=… on initial load.
+  const initial = new URL(window.location.href).searchParams.get('trigger') || 'all';
+  applyFilter(initial);
+</script>
+
+<style>
+  .radar-page {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 56px var(--gutter) 96px;
+  }
+  .radar-header {
+    max-width: 820px;
+    margin: 0 auto 40px;
+    text-align: center;
+  }
+  .radar-header .kicker {
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .radar-header .page-title {
+    max-width: 26ch;
+    margin-left: auto;
+    margin-right: auto;
+    text-wrap: balance;
+  }
+  .radar-header .page-dek {
+    max-width: 60ch;
+    margin-left: auto;
+    margin-right: auto;
+    text-wrap: balance;
+  }
+
+  /* ── Dial ─────────────────────────────────────────────────────────── */
+  .radar-dial-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    margin: 0 auto 56px;
+    padding-bottom: 56px;
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+  .radar-dial {
+    position: relative;
+    width: min(100%, 820px);
+    aspect-ratio: 1;
+    overflow: visible;
+    margin-top: 12px;
+  }
+  .dial-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .dial-svg .ring {
+    fill: none;
+    stroke: var(--hairline);
+    stroke-width: 0.16;
+    vector-effect: non-scaling-stroke;
+  }
+  .dial-svg .ring-outer { stroke: var(--hairline-strong); stroke-width: 0.22; }
+  .dial-svg .ring-bullseye {
+    stroke: var(--text-faint);
+    stroke-dasharray: 0.4 0.8;
+    opacity: 0.6;
+  }
+  .dial-svg .bull-mark {
+    fill: var(--text-muted);
+  }
+  .dial-svg .spoke {
+    stroke: var(--hairline);
+    stroke-width: 0.14;
+    vector-effect: non-scaling-stroke;
+  }
+  .dial-svg .ring-label {
+    font-family: var(--mono);
+    font-size: 1.9px;
+    letter-spacing: 0.18em;
+    fill: var(--text-faint);
+    text-transform: uppercase;
+    dominant-baseline: middle;
+  }
+  .dial-svg .ring-tick {
+    stroke: var(--text-faint);
+    stroke-width: 0.18;
+    vector-effect: non-scaling-stroke;
+  }
+  .dial-svg .sweep {
+    transform-origin: 50px 50px;
+    animation: dial-sweep 16s linear infinite;
+  }
+  .dial-svg .sweep-line {
+    stroke: var(--accent);
+    stroke-width: 0.22;
+    stroke-linecap: round;
+    opacity: 0.45;
+    vector-effect: non-scaling-stroke;
+  }
+  @keyframes dial-sweep {
+    to { transform: rotate(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dial-svg .sweep { animation: none; transform: rotate(28deg); }
+  }
+
+  .wedge-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text);
+    background: var(--bg);
+    padding: 4px 10px;
+    white-space: nowrap;
+    transition: color 160ms ease;
+    z-index: 4;
+  }
+  .wedge-label.is-active { color: var(--accent); }
+
+  .dot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--text-soft);
+    transition: opacity 200ms ease, transform 160ms ease, box-shadow 160ms ease;
+    text-decoration: none;
+    z-index: 2;
+  }
+  .dot.tier-lg { width: 16px; height: 16px; }
+  .dot.tier-md { width: 11px; height: 11px; }
+  .dot.tier-sm { width: 7px;  height: 7px;  }
+  .dot.hot {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .dot.hot.tier-lg { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent); }
+  .dot.hot.tier-md { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
+  .dot.hot.tier-sm { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+  .dot.warm {
+    border-color: var(--text);
+    background: var(--text);
+  }
+  .dot.watch {
+    border-color: var(--text-muted);
+  }
+  .dot:hover, .dot:focus-visible {
+    transform: translate(-50%, -50%) scale(1.35);
+    z-index: 5;
+    outline: none;
+  }
+  .dot.is-dim { opacity: 0.1; pointer-events: none; }
+
+  .dot-label {
+    position: absolute;
+    left: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+  .dot-label.always { opacity: 0.9; }
+  .dot:hover .dot-label, .dot:focus-visible .dot-label { opacity: 1; }
+
+  /* ── Dial meta + legend (below the dial) ──────────────────────────── */
+  .dial-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+  .dial-meta b {
+    font-family: var(--data);
+    color: var(--text);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0;
+  }
+  .dial-meta-sep { color: var(--text-faint); }
+
+  .dial-legend {
+    display: flex;
+    justify-content: center;
+  }
+  .legend-tiers {
+    display: flex;
+    gap: 28px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .legend-tiers .tier-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tier-mark {
+    display: inline-block;
+    border-radius: 50%;
+    background: var(--text);
+  }
+  .tier-mark.tier-lg { width: 14px; height: 14px; }
+  .tier-mark.tier-md { width: 10px; height: 10px; }
+  .tier-mark.tier-sm { width: 6px;  height: 6px;  }
+  .legend-tiers b {
+    font-family: var(--data);
+    color: var(--text);
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+
+  /* ── Filter pills ─────────────────────────────────────────────────── */
+  .radar-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 28px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .filter-pill {
+    appearance: none;
+    background: var(--bg);
+    border: 1px solid var(--hairline-strong);
+    color: var(--text-soft);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  }
+  .filter-pill b {
+    font-family: var(--data);
+    font-weight: 500;
+    margin-left: 8px;
+    color: var(--text-muted);
+  }
+  .filter-pill:hover { color: var(--text); border-color: var(--text-soft); }
+  .filter-pill.is-active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 5%, var(--bg));
+  }
+  .filter-pill.is-active b { color: var(--accent); }
+
+  /* ── List ─────────────────────────────────────────────────────────── */
+  .radar-list { border-top: 1px solid var(--hairline-strong); }
+  .radar-row {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr) 160px;
+    gap: 32px;
+    padding: 30px 0;
+    border-bottom: 1px solid var(--hairline);
+    scroll-margin-top: 90px;
+    position: relative;
+  }
+  .radar-row.is-flash::before {
+    content: '';
+    position: absolute;
+    inset: -6px -12px;
+    border: 1px solid var(--accent);
+    pointer-events: none;
+    animation: row-flash 2.2s ease forwards;
+  }
+  @keyframes row-flash {
+    0%   { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .radar-score {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    line-height: 1.3;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .score-pill {
+    width: 52px; height: 52px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid var(--hairline-strong);
+    border-radius: 50%;
+    font-family: var(--data);
+    font-size: 18px;
+    color: var(--text);
+    background: var(--bg);
+  }
+  .score-pill.hot { border-color: var(--accent); color: var(--accent); }
+  .score-pill.warm { border-color: var(--text-soft); }
+  .radar-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    align-items: center;
+  }
+  .radar-meta .ticker { color: var(--accent); font-weight: 500; }
+  .cap-chip {
+    border: 1px solid var(--hairline);
+    padding: 2px 8px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+  .radar-main h2 {
+    font-family: var(--serif);
+    font-size: clamp(26px, 3.2vw, 42px);
+    line-height: 1.08;
+    font-weight: 400;
+    margin: 0 0 12px;
+    font-variation-settings: "opsz" 38;
+  }
+  .radar-main p {
+    max-width: 68ch;
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.58;
+    color: var(--text-soft);
+  }
+  .radar-flags {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px;
+  }
+  .radar-flags span {
+    border: 1px solid var(--hairline);
+    padding: 6px 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .radar-flags .quality { color: var(--up); }
+  .radar-flags .risk { color: var(--down); }
+  .radar-evidence {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0 0;
+    display: grid;
+    gap: 8px;
+  }
+  .radar-evidence li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: baseline;
+    font-size: 14px;
+    border-top: 1px solid var(--hairline);
+    padding-top: 8px;
+  }
+  .radar-evidence a { color: var(--text); }
+  .radar-evidence span {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .radar-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .radar-actions a { color: var(--text); text-align: right; }
+  .radar-actions a[target="_blank"]::after {
+    content: ' ↗';
+    color: var(--text-muted);
+  }
+
+  /* ── Responsive ───────────────────────────────────────────────────── */
+  @media (max-width: 860px) {
+    .radar-row {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    .radar-score { flex-direction: row; align-items: center; }
+    .radar-actions {
+      align-items: flex-start;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    .radar-actions a { text-align: left; }
+    .wedge-label { font-size: 9px; letter-spacing: 0.16em; padding: 3px 6px; }
+    .dot-label.always { font-size: 9px; }
+    .legend-tiers { gap: 18px; }
+  }
+  @media (max-width: 560px) {
+    .radar-page { padding-inline: 22px; }
+    .radar-evidence li { grid-template-columns: 1fr; gap: 4px; }
+    .dot-label.always { opacity: 0; }
+    .dial-meta { flex-wrap: wrap; justify-content: center; text-align: center; }
+    .dial-meta-sep { display: none; }
+  }
+</style>
+</Base>

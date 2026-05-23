@@ -1,0 +1,79 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Masthead from '../../../components/Masthead.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { distinctSectorsWithFilings, sectorBySlug, sectorSlug, filingsForSector, companiesInSector, tierFor } from '../../../lib/queries.mjs';
+
+export async function getStaticPaths() {
+  const sectors = distinctSectorsWithFilings();
+  return sectors.map(s => ({ params: { slug: sectorSlug(s.sector) } }));
+}
+
+const { slug } = Astro.params;
+const sector = sectorBySlug(slug);
+if (!sector) return Astro.redirect('/404');
+
+const items = filingsForSector(sector, 60);
+const companies = companiesInSector(sector, 20);
+
+function timeOf(iso) { const m = String(iso || '').match(/(\d{2}:\d{2})/); return m ? `${m[1]} IST` : ''; }
+function dateOf(iso) {
+  const d = new Date(String(iso).replace(' ', 'T'));
+  if (Number.isNaN(d.valueOf())) return iso;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]}`;
+}
+function fmtCr(n) {
+  if (n == null) return '—';
+  if (n >= 100000) return `₹${(n/100000).toFixed(2)} lakh cr`;
+  return `₹${Math.round(n).toLocaleString('en-IN')} cr`;
+}
+---
+<Base
+  title={`${sector} — sector activity`}
+  description={`Notes from companies in the ${sector} sector. Editorial coverage of every consequential disclosure, with company-level fundamentals snapshot.`}
+>
+  <Masthead activeNav="filings" />
+
+  <main>
+    <article class="archive-page">
+      <header class="archive-header">
+        <div class="kicker"><a href="/filings/">Notes</a> <span class="sep">/</span> <span>Sector</span></div>
+        <h1 class="page-title">{sector}</h1>
+        <p class="page-dek">{items.length} recent {items.length === 1 ? 'note' : 'notes'} from companies in this sector. {companies.length} companies tracked.</p>
+      </header>
+
+      <section class="sector-companies">
+        <div class="block-title">Anchor companies · by market cap</div>
+        <div class="company-chips">
+          {companies.slice(0, 16).map(c => (
+            <a href={`/company/${String(c.symbol).toLowerCase()}/`} class="chip">
+              <span class="chip-sym mono">{c.symbol}</span>
+              <span class="chip-mcap mono">{fmtCr(c.market_cap)}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section class="sector-activity">
+        <div class="block-title">Recent activity</div>
+        <div class="archive-list">
+          {items.length === 0 && <p style="font-style: italic; color: var(--text-muted); padding: 24px 0;">No notes from this sector yet.</p>}
+          {items.map(f => (
+            <a href={f.canonical_url} class="archive-row">
+              <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
+              <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
+              <div class="archive-body">
+                <div class="kicker">{tierFor(f.score)} · {f.canonical_category}</div>
+                <h3>{f.headline}</h3>
+              </div>
+              <span class="archive-ticker">{f.symbol}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <SiteFooter />
+</Base>

@@ -1,0 +1,1368 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Filings · An editorial reading of Indian exchange filings</title>
+<meta name="description" content="A curated daily edition of the most consequential filings on the BSE and NSE — scored, contextualised, and stripped of clickbait." />
+<link rel="canonical" href="https://example.com/" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Filings · India ▸ Equities" />
+<meta property="og:description" content="A curated daily edition of the most consequential filings on the BSE and NSE." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Filings",
+  "url": "https://example.com/",
+  "description": "An editorial reading of Indian exchange filings",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Filings",
+    "logo": { "@type": "ImageObject", "url": "https://example.com/logo.png" }
+  },
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://example.com/search?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #111111;
+    --text-soft: #2a2a2a;
+    --text-muted: #6a6a6a;
+    --text-faint: #9a9a9a;
+    --hairline: #ececec;
+    --hairline-strong: #d8d8d8;
+    --up: #1f5a3f;
+    --down: #872a1a;
+    --accent: #b5341e;
+    --selection: #111111;
+    --selection-text: #ffffff;
+  }
+  [data-theme="dark"] {
+    --bg: #0e0e0e;
+    --text: #ebe8e2;
+    --text-soft: #c8c5bf;
+    --text-muted: #8a8680;
+    --text-faint: #5f5c56;
+    --hairline: #1f1f1f;
+    --hairline-strong: #2a2a2a;
+    --up: #6aa382;
+    --down: #c97a6d;
+    --accent: #d45842;
+    --selection: #ebe8e2;
+    --selection-text: #0e0e0e;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  ::selection { background: var(--selection); color: var(--selection-text); }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Newsreader', 'Source Serif Pro', Georgia, serif;
+    font-size: 19px;
+    line-height: 1.65;
+    font-variation-settings: "opsz" 16;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    transition: background-color 220ms ease, color 220ms ease;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  a { color: inherit; text-decoration: none; }
+  a.headline-link {
+    display: block;
+    transition: color 200ms ease;
+  }
+  a.headline-link:hover { color: var(--text-soft); }
+  a.inline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 100% 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size 280ms cubic-bezier(.2,.7,.2,1);
+    padding-bottom: 1px;
+  }
+  a.inline:hover { background-size: 100% 2px; }
+
+  .mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-feature-settings: "tnum" 1, "zero" 1;
+  }
+  .smcap {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* ───────────────────────── masthead */
+  .masthead {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 40px 56px 28px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 24px;
+    position: relative;
+  }
+  .masthead::after {
+    content: '';
+    position: absolute;
+    left: 56px; right: 56px; bottom: -1px;
+    height: 2px;
+    background: var(--accent);
+  }
+  .masthead .edition {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+  }
+  .live-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-right: 12px;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.32; transform: scale(0.78); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .live-dot { animation: none; }
+  }
+  .masthead .wordmark-block {
+    text-align: center;
+    line-height: 0.95;
+  }
+  .masthead .word {
+    font-family: 'Newsreader', serif;
+    font-weight: 600;
+    font-size: clamp(48px, 6vw, 78px);
+    letter-spacing: -0.028em;
+    font-variation-settings: "opsz" 72;
+    display: block;
+  }
+  .masthead .tagline {
+    font-family: 'Newsreader', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 14px;
+    letter-spacing: 0.01em;
+  }
+  .masthead-right {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 14px;
+    text-align: right;
+  }
+  .masthead-right .stamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .theme-toggle {
+    background: none;
+    border: 1px solid var(--hairline-strong);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 7px 11px 6px;
+    cursor: pointer;
+    line-height: 1;
+    transition: border-color 180ms ease;
+  }
+  .theme-toggle:hover { border-color: var(--text); }
+  .theme-toggle .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text);
+    margin-right: 8px;
+    vertical-align: 1px;
+  }
+
+  /* nav */
+  .site-nav {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 13px 56px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .site-nav ul {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; gap: 32px;
+  }
+  .site-nav a {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-soft);
+    font-weight: 500;
+  }
+  .site-nav a:hover { color: var(--text); }
+  .site-nav a.active { color: var(--text); }
+  .site-nav a.active::before {
+    content: '';
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--text);
+    margin-right: 9px;
+    vertical-align: 2px;
+  }
+  .nav-search {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* ───────────────────────── shell */
+  main { max-width: 1240px; margin: 0 auto; padding: 0 56px; }
+
+  /* ── LEAD */
+  section.lead {
+    padding: 96px 0 80px;
+    display: grid;
+    grid-template-columns: 132px 1fr 300px;
+    gap: 64px;
+    align-items: start;
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+  .lead-score {
+    text-align: left;
+  }
+  .lead-score .num {
+    font-family: 'Newsreader', serif;
+    font-weight: 200;
+    font-size: 144px;
+    line-height: 0.85;
+    letter-spacing: -0.045em;
+    font-variation-settings: "opsz" 72;
+    color: var(--accent);
+    display: block;
+  }
+  .lead-score .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .lead-score .label .of { color: var(--text-faint); }
+  .lead-kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .lead-kicker .sep { color: var(--text-faint); }
+  .lead-headline {
+    font-family: 'Newsreader', serif;
+    font-weight: 400;
+    font-size: clamp(38px, 4.4vw, 56px);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    margin: 0 0 24px;
+    max-width: 18ch;
+    font-variation-settings: "opsz" 48;
+    text-wrap: balance;
+  }
+  .lead-dek {
+    font-family: 'Newsreader', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(18px, 1.55vw, 21px);
+    line-height: 1.45;
+    color: var(--text-soft);
+    margin: 0 0 32px;
+    max-width: 38ch;
+    font-variation-settings: "opsz" 22;
+    text-wrap: balance;
+  }
+  .lead-meta {
+    display: flex;
+    gap: 22px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .lead-meta .ticker {
+    color: var(--text);
+    font-weight: 500;
+    letter-spacing: 0.1em;
+  }
+  .lead-meta .read {
+    color: var(--text);
+    margin-left: auto;
+  }
+  .lead-meta .read::after {
+    content: '→';
+    margin-left: 10px;
+    display: inline-block;
+    transition: transform 220ms ease;
+  }
+  .lead-meta .read:hover::after { transform: translateX(3px); }
+
+  .lead-aside {
+    border-left: 1px solid var(--hairline);
+    padding-left: 32px;
+    font-size: 14px;
+  }
+  .lead-aside h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 18px;
+    font-weight: 500;
+  }
+  .lead-aside dl { margin: 0; }
+  .lead-aside dt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 18px;
+    font-weight: 500;
+  }
+  .lead-aside dt:first-of-type { margin-top: 0; }
+  .lead-aside dd {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: "tnum" 1;
+    font-size: 14px;
+    margin: 4px 0 0;
+  }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+
+  /* ── SECONDARY ROW */
+  section.secondary {
+    padding: 56px 0;
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    gap: 56px;
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+  .secondary-divider { background: var(--hairline); width: 1px; }
+  .sec-item { display: grid; grid-template-columns: 72px 1fr; gap: 24px; align-items: start; }
+  .sec-score .num {
+    font-family: 'Newsreader', serif;
+    font-weight: 200;
+    font-size: 72px;
+    line-height: 0.85;
+    letter-spacing: -0.04em;
+    font-variation-settings: "opsz" 48;
+    display: block;
+  }
+  .sec-score .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 10px;
+  }
+  .sec-kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .sec-headline {
+    font-family: 'Newsreader', serif;
+    font-weight: 400;
+    font-size: clamp(22px, 2.1vw, 28px);
+    line-height: 1.15;
+    letter-spacing: -0.014em;
+    margin: 0 0 14px;
+    font-variation-settings: "opsz" 28;
+    text-wrap: balance;
+    max-width: 24ch;
+  }
+  .sec-dek {
+    font-family: 'Newsreader', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: 16px;
+    line-height: 1.45;
+    color: var(--text-soft);
+    margin: 0 0 18px;
+    max-width: 36ch;
+  }
+  .sec-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    display: flex;
+    gap: 16px;
+  }
+  .sec-meta .ticker { color: var(--text); font-weight: 500; letter-spacing: 0.12em; }
+
+  /* ── BY SECTION */
+  section.briefs {
+    padding: 72px 0 56px;
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+  .briefs-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 36px;
+  }
+  .briefs-head h2 {
+    font-family: 'Newsreader', serif;
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1.1;
+    letter-spacing: -0.018em;
+    margin: 0;
+    font-variation-settings: "opsz" 32;
+  }
+  .briefs-head .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .briefs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 56px 48px;
+  }
+  .brief {
+    display: flex;
+    flex-direction: column;
+  }
+  .brief-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--text);
+    margin-bottom: 4px;
+  }
+  .brief-head h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin: 0;
+    font-weight: 500;
+  }
+  .brief-head .ct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0.12em;
+  }
+  .brief-item {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--hairline);
+    display: block;
+    transition: opacity 180ms ease;
+  }
+  .brief-item:last-child { border-bottom: 0; }
+  .brief-item:hover { opacity: 0.72; }
+  .brief-item .top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .brief-item .tk { color: var(--text); font-weight: 500; letter-spacing: 0.12em; }
+  .brief-item .top .score-hi { color: var(--accent); font-weight: 500; }
+  .brief-item .hl {
+    font-family: 'Newsreader', serif;
+    font-size: 16px;
+    line-height: 1.32;
+    color: var(--text);
+    letter-spacing: -0.008em;
+    text-wrap: balance;
+  }
+
+  /* ── THE WIRE */
+  section.wire-section {
+    padding: 72px 0 96px;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 80px;
+  }
+  .wire-head {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .wire-head h2 {
+    font-family: 'Newsreader', serif;
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1.1;
+    letter-spacing: -0.018em;
+    margin: 0;
+    font-variation-settings: "opsz" 32;
+  }
+  .wire-head .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .wire-list {
+    border-top: 1px solid var(--hairline-strong);
+  }
+  .wire-row {
+    display: grid;
+    grid-template-columns: 82px 32px 1fr 120px;
+    gap: 24px;
+    align-items: baseline;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--hairline);
+    transition: background 180ms ease;
+  }
+  .wire-row:hover { background: rgba(0,0,0,0.012); }
+  [data-theme="dark"] .wire-row:hover { background: rgba(255,255,255,0.02); }
+  .wire-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .wire-score {
+    font-family: 'Newsreader', serif;
+    font-weight: 200;
+    font-size: 32px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variation-settings: "opsz" 32;
+    color: var(--text);
+    text-align: center;
+  }
+  .wire-score.accent { color: var(--accent); }
+  .wire-body { min-width: 0; }
+  .wire-body .kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .wire-body h3 {
+    font-family: 'Newsreader', serif;
+    font-weight: 400;
+    font-size: 20px;
+    line-height: 1.3;
+    letter-spacing: -0.012em;
+    margin: 0;
+    font-variation-settings: "opsz" 22;
+    max-width: 60ch;
+  }
+  .wire-row a { display: contents; }
+  .wire-ticker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--text);
+    font-weight: 500;
+    text-align: right;
+  }
+  .wire-ticker .change {
+    display: block;
+    font-weight: 400;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    margin-top: 3px;
+  }
+
+  .wire-more {
+    margin-top: 32px;
+    text-align: center;
+  }
+  .wire-more a {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text);
+    border-bottom: 1px solid var(--text);
+    padding-bottom: 3px;
+  }
+
+  /* ── right rail */
+  aside.rail {
+    position: sticky;
+    top: 32px;
+    align-self: start;
+    font-size: 14px;
+  }
+  .rail-card { margin-bottom: 48px; }
+  .rail-card h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 18px;
+    font-weight: 500;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+  .markets-list { display: flex; flex-direction: column; gap: 14px; }
+  .market-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: baseline;
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: "tnum" 1;
+    font-size: 13px;
+  }
+  .market-row .name { font-size: 11px; letter-spacing: 0.06em; color: var(--text); font-weight: 500; }
+  .market-row .val { color: var(--text); }
+  .market-row .chg { font-size: 11px; letter-spacing: 0.04em; }
+
+  .concall-list { display: flex; flex-direction: column; gap: 14px; }
+  .concall-row {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 14px;
+    align-items: baseline;
+    font-size: 14px;
+  }
+  .concall-row .t {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .concall-row .co {
+    font-family: 'Newsreader', serif;
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.3;
+  }
+
+  .dist { display: flex; flex-direction: column; gap: 8px; }
+  .dist-row {
+    display: grid;
+    grid-template-columns: 18px 1fr 22px;
+    gap: 14px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: "tnum" 1;
+    font-size: 11px;
+    color: var(--text);
+  }
+  .dist-row .s { color: var(--text-muted); letter-spacing: 0.04em; }
+  .dist-row .ct { color: var(--text); text-align: right; }
+  .dist-row .b {
+    height: 6px;
+    background: var(--hairline);
+    position: relative;
+    overflow: hidden;
+  }
+  .dist-row .b > i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--text);
+    display: block;
+  }
+  .dist-row.hi .b > i { background: var(--accent); }
+  .dist-foot {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--hairline);
+  }
+
+  /* footer */
+  footer.site-footer {
+    max-width: 1240px;
+    margin: 64px auto 48px;
+    padding: 32px 56px 0;
+    border-top: 1px solid var(--hairline-strong);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 48px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+  footer.site-footer h5 {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin: 0 0 16px;
+    font-weight: 500;
+  }
+  footer.site-footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  footer.site-footer a { color: var(--text-muted); }
+  footer.site-footer a:hover { color: var(--text); }
+  footer.site-footer .col-about {
+    font-family: 'Newsreader', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: 15px;
+    letter-spacing: 0.005em;
+    text-transform: none;
+    line-height: 1.5;
+    color: var(--text-soft);
+  }
+  .site-footer-bottom {
+    max-width: 1240px;
+    margin: 24px auto 32px;
+    padding: 0 56px;
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  /* ── responsive */
+  @media (max-width: 1100px) {
+    section.lead { grid-template-columns: 108px 1fr; }
+    .lead-aside { grid-column: 1 / -1; border-left: 0; padding-left: 0; border-top: 1px solid var(--hairline); padding-top: 32px; margin-top: 32px; }
+    section.wire-section { grid-template-columns: 1fr; }
+    aside.rail { position: static; }
+    .briefs-grid { grid-template-columns: repeat(2, 1fr); gap: 48px 40px; }
+  }
+  @media (max-width: 800px) {
+    .masthead, .site-nav, main, footer.site-footer, .site-footer-bottom { padding-left: 24px; padding-right: 24px; }
+    .masthead { grid-template-columns: 1fr; text-align: left; }
+    .masthead .wordmark-block { text-align: left; }
+    .masthead-right { justify-content: flex-start; }
+    section.secondary { grid-template-columns: 1fr; gap: 32px; }
+    .secondary-divider { display: none; }
+    section.lead { grid-template-columns: 88px 1fr; gap: 32px; padding: 56px 0; }
+    .lead-score .num { font-size: 96px; }
+    .wire-row { grid-template-columns: 64px 28px 1fr; }
+    .wire-ticker { display: none; }
+    footer.site-footer { grid-template-columns: 1fr; gap: 32px; }
+    .site-nav ul { gap: 18px; overflow-x: auto; }
+    .briefs-grid { grid-template-columns: 1fr; gap: 40px; }
+  }
+
+  /* reveal */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .reveal { opacity: 0; animation: fade-in 700ms cubic-bezier(.2,.7,.2,1) forwards; }
+  .reveal.d1 { animation-delay: 60ms; }
+  .reveal.d2 { animation-delay: 140ms; }
+  .reveal.d3 { animation-delay: 240ms; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { animation: none; opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead reveal">
+  <span class="edition"><span class="live-dot" aria-hidden="true"></span>Live · Edition №&nbsp;145 · Thursday</span>
+  <div class="wordmark-block">
+    <span class="word">Filings</span>
+    <div class="tagline">Indian exchange filings, read editorially.</div>
+  </div>
+  <div class="masthead-right">
+    <span class="stamp">21 May 2026 · 15:24 IST</span>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle colour scheme">
+      <span class="dot"></span><span id="themeLabel">Light</span>
+    </button>
+  </div>
+</header>
+
+<nav class="site-nav" aria-label="Sections">
+  <ul>
+    <li><a href="#" class="active">Today</a></li>
+    <li><a href="#">Filings</a></li>
+    <li><a href="#">Concalls</a></li>
+    <li><a href="#">Order Wins</a></li>
+    <li><a href="#">Smart Money</a></li>
+    <li><a href="#">Methodology</a></li>
+  </ul>
+  <span class="nav-search">Search · ⌘K</span>
+</nav>
+
+<main>
+
+  <!-- LEAD -->
+  <section class="lead reveal d1">
+    <div class="lead-score">
+      <span class="num">8</span>
+      <div class="label"><span>Filing score</span><span class="of">/ 10</span></div>
+    </div>
+
+    <div class="lead-main">
+      <div class="lead-kicker">
+        <span>Lead</span><span class="sep">/</span>
+        <span>Major Order</span><span class="sep">/</span>
+        <span>Engineering · Capital Goods</span>
+      </div>
+      <h1 class="lead-headline">
+        <a class="headline-link" href="mock-filing.html">
+          DEE Development locks in $15.27M annual capacity reservation from European nuclear client.
+        </a>
+      </h1>
+      <p class="lead-dek">
+        A binding multi-year offtake — the company's second European nuclear order this quarter, and the first to specify recurring revenue rather than a transactional purchase.
+      </p>
+      <div class="lead-meta">
+        <span class="ticker">DEEDEV</span>
+        <span>BSE 544027</span>
+        <span>13:44 IST</span>
+        <a class="read inline" href="mock-filing.html">Read the filing</a>
+      </div>
+    </div>
+
+    <aside class="lead-aside">
+      <h4>At a glance</h4>
+      <dl>
+        <dt>Last price</dt>
+        <dd>₹342.10 <span class="up">+2.4%</span></dd>
+        <dt>52-week range</dt>
+        <dd>198.40 — 412.00</dd>
+        <dt>Market cap</dt>
+        <dd>₹1,420 Cr</dd>
+        <dt>P/E (TTM)</dt>
+        <dd>22.4×</dd>
+        <dt>Promoter holding</dt>
+        <dd>58.2%</dd>
+      </dl>
+    </aside>
+  </section>
+
+  <!-- SECONDARY -->
+  <section class="secondary reveal d2">
+    <article class="sec-item">
+      <div class="sec-score">
+        <span class="num">8</span>
+        <div class="label smcap">Score / 10</div>
+      </div>
+      <div>
+        <div class="sec-kicker">Annual Results · Pharmaceuticals</div>
+        <h2 class="sec-headline">
+          <a class="headline-link" href="#">Alembic Pharma swings to net profit on 280 bps margin expansion.</a>
+        </h2>
+        <p class="sec-dek">
+          Stable raw-material costs and a richer US-generics mix carry the quarter; management calls out three pipeline filings in the H1 window.
+        </p>
+        <div class="sec-meta">
+          <span class="ticker">APLLTD</span>
+          <span>14:08 IST</span>
+          <span class="up">+1.8%</span>
+        </div>
+      </div>
+    </article>
+
+    <div class="secondary-divider"></div>
+
+    <article class="sec-item">
+      <div class="sec-score">
+        <span class="num">7</span>
+        <div class="label smcap">Score / 10</div>
+      </div>
+      <div>
+        <div class="sec-kicker">Concall Summary · IT Services</div>
+        <h2 class="sec-headline">
+          <a class="headline-link" href="#">Tata Elxsi flags slower auto-OEM spending; FY27 guidance band narrows.</a>
+        </h2>
+        <p class="sec-dek">
+          Headline growth held, but commentary is markedly more cautious on Europe and Japan; medical-devices segment now &gt;15% of mix and growing fastest.
+        </p>
+        <div class="sec-meta">
+          <span class="ticker">TATAELXSI</span>
+          <span>13:32 IST</span>
+          <span class="down">−2.1%</span>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- BY SECTION -->
+  <section class="briefs">
+    <div class="briefs-head">
+      <h2>By section</h2>
+      <span class="meta">Top items today · ranked by score</span>
+    </div>
+
+    <div class="briefs-grid">
+
+      <div class="brief">
+        <div class="brief-head"><h3>Earnings</h3><span class="ct">12 today</span></div>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">APLLTD</span><span><span class="score-hi">8</span> · 14:08</span></div>
+          <div class="hl">Alembic Pharma swings to net profit on 280 bps margin expansion.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">PERSISTENT</span><span>7 · 12:54</span></div>
+          <div class="hl">Persistent Systems books strong Q4 with deal pipeline at all-time high.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">HONASA</span><span>6 · 14:32</span></div>
+          <div class="hl">Honasa FY26 EBITDA margin contracts on heavier brand investment.</div>
+        </a>
+      </div>
+
+      <div class="brief">
+        <div class="brief-head"><h3>Order Wins</h3><span class="ct">6 today</span></div>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">DEEDEV</span><span><span class="score-hi">8</span> · 13:44</span></div>
+          <div class="hl">DEE Development locks in $15.27M annual capacity reservation.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">BEL</span><span><span class="score-hi">8</span> · 13:32</span></div>
+          <div class="hl">Bharat Electronics receives ₹2,840 cr radar systems order from MoD.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">KEC</span><span>7 · 14:48</span></div>
+          <div class="hl">KEC International bags ₹1,210 cr EPC order from Saudi grid operator.</div>
+        </a>
+      </div>
+
+      <div class="brief">
+        <div class="brief-head"><h3>Concalls</h3><span class="ct">9 today</span></div>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">TATAELXSI</span><span>7 · 13:32</span></div>
+          <div class="hl">Tata Elxsi flags slower auto-OEM spending; FY27 guidance band narrows.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">WELSPUNIND</span><span>7 · 15:24</span></div>
+          <div class="hl">Welspun India signals domestic-demand recovery in Q1 FY27.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">PAGEIND</span><span>6 · 14:15</span></div>
+          <div class="hl">Page Industries calls out store-productivity gains, holds FY27 guidance.</div>
+        </a>
+      </div>
+
+      <div class="brief">
+        <div class="brief-head"><h3>M&amp;A · Corporate</h3><span class="ct">4 today</span></div>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">PERSISTENT</span><span>7 · 12:54</span></div>
+          <div class="hl">Persistent Systems announces $48M acquisition of US analytics consultancy.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">MARICO</span><span>6 · 15:18</span></div>
+          <div class="hl">Marico completes acquisition of organic-foods brand for ₹240 crore.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">BOSCHLTD</span><span>5 · 12:38</span></div>
+          <div class="hl">Bosch India approves ₹680 cr capex for new powertrain facility in Hosur.</div>
+        </a>
+      </div>
+
+      <div class="brief">
+        <div class="brief-head"><h3>Credit Actions</h3><span class="ct">5 today</span></div>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">AARTIIND</span><span><span class="score-hi">8</span> · 13:58</span></div>
+          <div class="hl">ICRA places Aarti Industries on rating watch on weak export realisations.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">CUMMINSIND</span><span>6 · 15:01</span></div>
+          <div class="hl">CRISIL upgrades Cummins India to AA+ on improving demand visibility.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">RBLBANK</span><span>6 · 11:42</span></div>
+          <div class="hl">Moody's affirms RBL Bank rating; outlook revised to positive from stable.</div>
+        </a>
+      </div>
+
+      <div class="brief">
+        <div class="brief-head"><h3>Regulatory</h3><span class="ct">3 today</span></div>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">GLENMARK</span><span>6 · 13:11</span></div>
+          <div class="hl">Glenmark receives USFDA approval for generic psoriasis treatment.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">SUNPHARMA</span><span>6 · 10:24</span></div>
+          <div class="hl">Sun Pharma receives Form 483 with two observations at Halol facility.</div>
+        </a>
+        <a href="#" class="brief-item">
+          <div class="top"><span class="tk">DIVISLAB</span><span>5 · 11:08</span></div>
+          <div class="hl">Divi's Laboratories submits DMF for new oncology API to USFDA.</div>
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- THE WIRE -->
+  <section class="wire-section">
+    <div class="wire-head">
+      <h2>The Wire</h2>
+      <span class="meta">47 filings today · 6 at score ≥ 8</span>
+    </div>
+
+    <div>
+      <div class="wire-list">
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">15:24 IST</span>
+          <span class="wire-score">7</span>
+          <div class="wire-body">
+            <div class="kicker">Concall · Textiles</div>
+            <h3>Welspun India signals domestic-demand recovery in Q1 FY27 on Q4 commentary.</h3>
+          </div>
+          <span class="wire-ticker">WELSPUNIND<span class="change up">+1.1%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">15:18 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Acquisition · FMCG</div>
+            <h3>Marico completes acquisition of organic-foods brand for ₹240 crore.</h3>
+          </div>
+          <span class="wire-ticker">MARICO<span class="change up">+0.6%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">15:01 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Credit Rating · Capital Goods</div>
+            <h3>CRISIL upgrades Cummins India to AA+ citing improving demand visibility.</h3>
+          </div>
+          <span class="wire-ticker">CUMMINSIND<span class="change up">+0.9%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">14:48 IST</span>
+          <span class="wire-score">7</span>
+          <div class="wire-body">
+            <div class="kicker">Major Order · Power Transmission</div>
+            <h3>KEC International bags ₹1,210 crore EPC order from Saudi grid operator.</h3>
+          </div>
+          <span class="wire-ticker">KEC<span class="change up">+3.2%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">14:32 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Annual Results · Consumer</div>
+            <h3>Honasa Consumer FY26 EBITDA margin contracts on heavier brand investment.</h3>
+          </div>
+          <span class="wire-ticker">HONASA<span class="change down">−4.4%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">14:15 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Concall · Apparel</div>
+            <h3>Page Industries calls out store-productivity gains, holds FY27 guidance.</h3>
+          </div>
+          <span class="wire-ticker">PAGEIND<span class="change up">+0.3%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">13:58 IST</span>
+          <span class="wire-score accent">8</span>
+          <div class="wire-body">
+            <div class="kicker">Credit Rating · Specialty Chemicals</div>
+            <h3>ICRA places Aarti Industries on rating watch, citing weakening export realisations.</h3>
+          </div>
+          <span class="wire-ticker">AARTIIND<span class="change down">−3.1%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">13:32 IST</span>
+          <span class="wire-score accent">8</span>
+          <div class="wire-body">
+            <div class="kicker">Major Order · Defence Electronics</div>
+            <h3>Bharat Electronics receives ₹2,840 crore radar systems order from MoD.</h3>
+          </div>
+          <span class="wire-ticker">BEL<span class="change up">+2.7%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">13:11 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Regulatory · Pharmaceuticals</div>
+            <h3>Glenmark receives USFDA approval for generic version of psoriasis treatment.</h3>
+          </div>
+          <span class="wire-ticker">GLENMARK<span class="change up">+1.2%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">12:54 IST</span>
+          <span class="wire-score">7</span>
+          <div class="wire-body">
+            <div class="kicker">Acquisition · IT Services</div>
+            <h3>Persistent Systems announces $48M acquisition of US-based analytics consultancy.</h3>
+          </div>
+          <span class="wire-ticker">PERSISTENT<span class="change up">+0.8%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">12:38 IST</span>
+          <span class="wire-score">5</span>
+          <div class="wire-body">
+            <div class="kicker">Board Meeting · Auto Components</div>
+            <h3>Bosch India approves ₹680 crore capex for new powertrain facility in Hosur.</h3>
+          </div>
+          <span class="wire-ticker">BOSCHLTD<span class="change up">+1.4%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">12:14 IST</span>
+          <span class="wire-score">7</span>
+          <div class="wire-body">
+            <div class="kicker">Annual Results · Banking</div>
+            <h3>ICICI Bank posts Q4 net profit of ₹12,142 cr, NIM holds at 4.4% on stable deposit costs.</h3>
+          </div>
+          <span class="wire-ticker">ICICIBANK<span class="change up">+1.6%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">11:58 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Promoter · Real Estate</div>
+            <h3>DLF promoter group acquires additional 1.2% via market purchase over past month.</h3>
+          </div>
+          <span class="wire-ticker">DLF<span class="change up">+2.4%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">11:42 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Credit Rating · Private Banking</div>
+            <h3>Moody's affirms RBL Bank rating; outlook revised to positive from stable.</h3>
+          </div>
+          <span class="wire-ticker">RBLBANK<span class="change up">+1.9%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">11:24 IST</span>
+          <span class="wire-score">5</span>
+          <div class="wire-body">
+            <div class="kicker">Investor Presentation · Specialty Chemicals</div>
+            <h3>SRF outlines fluorochemicals capacity expansion roadmap through FY29.</h3>
+          </div>
+          <span class="wire-ticker">SRF<span class="change up">+0.7%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">11:08 IST</span>
+          <span class="wire-score">5</span>
+          <div class="wire-body">
+            <div class="kicker">Regulatory · Pharmaceuticals</div>
+            <h3>Divi's Laboratories submits DMF for new oncology API to USFDA.</h3>
+          </div>
+          <span class="wire-ticker">DIVISLAB<span class="change up">+0.4%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">10:46 IST</span>
+          <span class="wire-score">7</span>
+          <div class="wire-body">
+            <div class="kicker">Annual Results · Industrial Gases</div>
+            <h3>Linde India FY26 PAT up 22%; cites onshore-manufacturing tailwinds and richer mix.</h3>
+          </div>
+          <span class="wire-ticker">LINDEINDIA<span class="change up">+3.1%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">10:24 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Regulatory · Pharmaceuticals</div>
+            <h3>Sun Pharma receives Form 483 with two observations at Halol facility.</h3>
+          </div>
+          <span class="wire-ticker">SUNPHARMA<span class="change down">−1.8%</span></span>
+        </a>
+
+        <a href="#" class="wire-row">
+          <span class="wire-time">09:58 IST</span>
+          <span class="wire-score">6</span>
+          <div class="wire-body">
+            <div class="kicker">Concall · Cement</div>
+            <h3>UltraTech Cement holds FY27 volume guidance; flags pricing discipline in east region.</h3>
+          </div>
+          <span class="wire-ticker">ULTRACEMCO<span class="change up">+0.5%</span></span>
+        </a>
+
+      </div>
+
+      <div class="wire-more">
+        <a href="#">See all 47 filings →</a>
+      </div>
+    </div>
+
+    <!-- right rail -->
+    <aside class="rail">
+
+      <div class="rail-card">
+        <h4>Markets · 15:24 IST</h4>
+        <div class="markets-list">
+          <div class="market-row"><span class="name">NIFTY 50</span><span class="val">24,128.40</span><span class="chg up">+0.42%</span></div>
+          <div class="market-row"><span class="name">SENSEX</span><span class="val">79,452.10</span><span class="chg up">+0.38%</span></div>
+          <div class="market-row"><span class="name">BANK NIFTY</span><span class="val">52,140.20</span><span class="chg up">+0.51%</span></div>
+          <div class="market-row"><span class="name">NIFTY IT</span><span class="val">37,820.65</span><span class="chg down">−0.62%</span></div>
+          <div class="market-row"><span class="name">USD / INR</span><span class="val">84.21</span><span class="chg down">−0.08%</span></div>
+          <div class="market-row"><span class="name">10Y G-SEC</span><span class="val">6.84%</span><span class="chg">+1bp</span></div>
+        </div>
+      </div>
+
+      <div class="rail-card">
+        <h4>Concalls · Today</h4>
+        <div class="concall-list">
+          <div class="concall-row"><span class="t">14:00</span><span class="co">Aditya Birla Capital · Q4 FY26</span></div>
+          <div class="concall-row"><span class="t">15:00</span><span class="co">Polycab India · Q4 FY26</span></div>
+          <div class="concall-row"><span class="t">16:00</span><span class="co">LTIMindtree · Q4 FY26</span></div>
+          <div class="concall-row"><span class="t">17:00</span><span class="co">Coforge · Q4 FY26</span></div>
+          <div class="concall-row"><span class="t">18:30</span><span class="co">Mahindra &amp; Mahindra · Q4 FY26</span></div>
+        </div>
+      </div>
+
+      <div class="rail-card">
+        <h4>Today's score distribution</h4>
+        <div class="dist">
+          <div class="dist-row"><span class="s">5</span><span class="b"><i style="width: 47%;"></i></span><span class="ct">14</span></div>
+          <div class="dist-row"><span class="s">6</span><span class="b"><i style="width: 100%;"></i></span><span class="ct">30</span></div>
+          <div class="dist-row"><span class="s">7</span><span class="b"><i style="width: 73%;"></i></span><span class="ct">22</span></div>
+          <div class="dist-row hi"><span class="s">8</span><span class="b"><i style="width: 47%;"></i></span><span class="ct">14</span></div>
+          <div class="dist-row hi"><span class="s">9</span><span class="b"><i style="width: 20%;"></i></span><span class="ct">6</span></div>
+          <div class="dist-row hi"><span class="s">10</span><span class="b"><i style="width: 0%;"></i></span><span class="ct">0</span></div>
+        </div>
+        <div class="dist-foot"><span>47 filings · median 6</span><span>20 hi-score</span></div>
+      </div>
+
+    </aside>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="col-about">
+    Filings is an editorial reading of every consequential disclosure made to the Bombay and National Stock Exchanges. We publish what matters; we don't write what doesn't. No clickbait. No filler. No paid placements.
+  </div>
+  <div>
+    <h5>Sections</h5>
+    <ul>
+      <li><a href="#">Today</a></li>
+      <li><a href="#">Filings archive</a></li>
+      <li><a href="#">Concalls</a></li>
+      <li><a href="#">Order wins</a></li>
+      <li><a href="#">Smart money</a></li>
+    </ul>
+  </div>
+  <div>
+    <h5>About</h5>
+    <ul>
+      <li><a href="#">Methodology</a></li>
+      <li><a href="#">RSS feed</a></li>
+      <li><a href="#">Public API</a></li>
+      <li><a href="#">Contact</a></li>
+      <li><a href="#">Editorial policy</a></li>
+    </ul>
+  </div>
+</footer>
+
+<div class="site-footer-bottom">
+  <span>© 2026 Filings</span>
+  <span>Published continuously, IST · No clickbait, ever</span>
+</div>
+
+<script>
+(function () {
+  const root = document.documentElement;
+  const stored = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const initial = stored || (prefersDark ? 'dark' : 'light');
+  root.setAttribute('data-theme', initial);
+
+  const label = document.getElementById('themeLabel');
+  const btn = document.getElementById('themeToggle');
+  const setLabel = (t) => { label.textContent = t === 'dark' ? 'Dark' : 'Light'; };
+  setLabel(initial);
+
+  btn.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    setLabel(next);
+  });
+})();
+</script>
+</body>
+</html>

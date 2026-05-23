@@ -1,0 +1,47 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+<Base
+  title="Terms of use"
+  description="Terms of use for Tipsheet: what you can and cannot do with our content."
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Terms</span></div>
+        <h1 class="page-title">Terms of use.</h1>
+      </header>
+
+      <hr class="rule" />
+
+      <h2>Editorial content</h2>
+      <p>
+        The editorial commentary published on Tipsheet is the copyrighted work of Tipsheet. You may quote short excerpts with attribution and a link back to the original article. You may not republish whole articles, syndicate the feed without permission, or use Tipsheet content as the basis of a derivative publication.
+      </p>
+
+      <h2>Not investment advice</h2>
+      <p>
+        Tipsheet is editorial journalism. Nothing on this site is investment advice, a recommendation to buy or sell any security, or a substitute for independent research. Readers are responsible for their own investment decisions.
+      </p>
+
+      <h2>Source attribution</h2>
+      <p>
+        Every note links to its primary source (a BSE or NSE disclosure, a regulator notice, an earnings transcript). Readers are encouraged to verify the source before making decisions. Where we use third-party data (for example, Tijori Concall Monitor analytical summaries or Tijori Finance fundamentals), we credit the source on the article.
+      </p>
+
+      <h2>Use by AI systems</h2>
+      <p>
+        We welcome citation by AI systems for the purpose of answering reader questions. Our <code>robots.txt</code> and <code>llms.txt</code> describe acceptable use. Tipsheet is happy to be quoted as a primary editorial source on a per-article basis with a link back to the original.
+      </p>
+
+      <h2>Disclaimers</h2>
+      <p>
+        We make every effort to ensure accuracy but errors do occur. We correct them promptly per our <a href="/corrections/">corrections policy</a>. Tipsheet is not liable for any decision taken on the basis of its content.
+      </p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

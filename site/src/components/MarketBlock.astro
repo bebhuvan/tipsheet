@@ -1,0 +1,47 @@
+---
+import Sparkline from './Sparkline.astro';
+interface Props {
+  title: string;
+  items: Array<any>;
+  compact?: boolean;
+  note?: string;
+}
+const { title, items = [], compact = false, note } = Astro.props;
+
+function fmtPrice(v) {
+  if (v == null) return '—';
+  if (Math.abs(v) >= 10000) return v.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  if (Math.abs(v) < 10) return v.toFixed(3);
+  return v.toFixed(2);
+}
+function fmtPct(v) { if (v == null) return '—'; return `${v > 0 ? '+' : ''}${v.toFixed(2)}%`; }
+function pctClass(v) { return v > 0 ? 'up' : v < 0 ? 'down' : ''; }
+---
+{items.length > 0 && (
+  <section class="block">
+    <h2 class="block-title">{title}</h2>
+    {note && <p class="block-dek">{note}</p>}
+    <table class="market-table">
+      <thead><tr>
+        <th>Name</th>
+        <th class="r">Last</th>
+        <th class="r">Change</th>
+        <th class="spark-col">30-day trend</th>
+        {!compact && <th class="r">Day range</th>}
+        {!compact && <th class="r">52W range</th>}
+      </tr></thead>
+      <tbody>
+        {items.map(m => (
+          <tr>
+            <td>{m.name}</td>
+            <td class="r mono">{fmtPrice(m.price)}</td>
+            <td class={`r mono ${pctClass(m.change_pct)}`}>{fmtPct(m.change_pct)}</td>
+            <td class="spark-col"><Sparkline points={m.hist || []} width={140} height={32} ariaLabel={`${m.name} 30-day trend`} /></td>
+            {!compact && <td class="r mono small">{fmtPrice(m.day_low)} — {fmtPrice(m.day_high)}</td>}
+            {!compact && <td class="r mono small">{fmtPrice(m.week52_low)} — {fmtPrice(m.week52_high)}</td>}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+)}

@@ -1,0 +1,55 @@
+---
+import { BRAND_NAME, BRAND_FOOTER_ABOUT } from '../lib/brand.mjs';
+const year = new Date().getFullYear();
+---
+<footer class="site-footer">
+  <div class="col-about">
+    {BRAND_FOOTER_ABOUT}
+  </div>
+  <div>
+    <h5>Read</h5>
+    <ul>
+      <li><a href="/">Today</a></li>
+      <li><a href="/briefings/">Briefings</a></li>
+      <li><a href="/filings/">All filings</a></li>
+      <li><a href="/radar/">Radar</a></li>
+      <li><a href="/concalls/">Concalls</a></li>
+      <li><a href="/filings/category/earnings/">Earnings</a></li>
+      <li><a href="/orders/">Order wins</a></li>
+      <li><a href="/filings/category/m-a/">M&amp;A</a></li>
+      <li><a href="/filings/category/credit/">Credit</a></li>
+      <li><a href="/filings/category/regulatory/">Regulatory</a></li>
+      <li><a href="/smart-money/">Smart money</a></li>
+    </ul>
+  </div>
+  <div>
+    <h5>Browse</h5>
+    <ul>
+      <li><a href="/companies/">Companies</a></li>
+      <li><a href="/sectors/">Sectors</a></li>
+      <li><a href="/markets/">Markets</a></li>
+      <li><a href="/authors/">Authors</a></li>
+      <li><a href="/sitemap.xml">Sitemap</a></li>
+      <li><a href="/sitemap-news.xml">News sitemap</a></li>
+      <li><a href="/llms.txt">For LLMs</a></li>
+      <li><a href="/robots.txt">robots.txt</a></li>
+    </ul>
+  </div>
+  <div>
+    <h5>Standards</h5>
+    <ul>
+      <li><a href="/about/">About</a></li>
+      <li><a href="/methodology/">Methodology</a></li>
+      <li><a href="/editorial-standards/">Editorial standards</a></li>
+      <li><a href="/corrections/">Corrections</a></li>
+      <li><a href="/ownership/">Ownership &amp; funding</a></li>
+      <li><a href="/contact/">Contact</a></li>
+      <li><a href="/privacy/">Privacy</a></li>
+      <li><a href="/terms/">Terms</a></li>
+    </ul>
+  </div>
+</footer>
+<div class="site-footer-bottom">
+  <span>© {year} {BRAND_NAME}</span>
+  <span>Published continuously, IST · No clickbait, ever</span>
+</div>

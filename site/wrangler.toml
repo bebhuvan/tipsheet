@@ -1,0 +1,7 @@
+name = "tipsheet"
+main = "worker-entry.js"
+compatibility_date = "2026-05-01"
+assets = { directory = "./dist", binding = "ASSETS" }
+
+[vars]
+SITE_URL = "https://tipsheet.markets"

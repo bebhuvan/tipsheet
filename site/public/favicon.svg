@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!--
+    Tipsheet mark. The triangle is the "tip"; the rule is the "sheet".
+    Echoes the section-rule pattern (accent bullet above a hairline) used in
+    every section heading on the publication. Theme-aware: the sheet flips
+    from near-black to ivory in dark mode; the tip stays brick-red in both.
+  -->
+  <style>
+    .tip   { fill: #b5341e; }
+    .sheet { fill: #111111; }
+    @media (prefers-color-scheme: dark) {
+      .sheet { fill: #ebe8e2; }
+    }
+  </style>
+  <path class="tip"   d="M 16 7 L 22.5 18 L 9.5 18 Z"/>
+  <rect class="sheet" x="6" y="22" width="20" height="2"/>
+</svg>

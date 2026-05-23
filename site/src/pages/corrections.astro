@@ -1,0 +1,48 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+<Base
+  title="Corrections"
+  description="How Tipsheet handles errors: prompt correction, visible annotation, and a logged record. Spot something wrong? Tell us and we will fix it."
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Corrections</span></div>
+        <h1 class="page-title">Corrections.</h1>
+        <p class="page-dek">When we get something wrong, we fix it promptly, mark the change visibly, and log it here.</p>
+      </header>
+
+      <hr class="rule" />
+
+      <h2>How to report a correction</h2>
+      <p>
+        If you spot a factual error in a note — a wrong number, a misattributed quote, a misstated date, a misidentified counterparty — please tell us. Include the URL of the article and the specific claim. See <a href="/contact/">the contact page</a> for how to reach us.
+      </p>
+
+      <h2>How we handle corrections</h2>
+      <ol>
+        <li>We verify the claim against the primary source.</li>
+        <li>If the error is confirmed, we update the article. The corrected claim replaces the erroneous one in place.</li>
+        <li>We annotate the article with a dated correction note at the bottom describing what changed and when.</li>
+        <li>We update the article's <code>dateModified</code> timestamp so search engines and aggregators reflect the change.</li>
+        <li>We add an entry to the corrections log below.</li>
+      </ol>
+
+      <h2>What does not count as a correction</h2>
+      <ul>
+        <li>Disagreement with our editorial judgment is not a correction. We will read your argument, but a difference of view does not get logged.</li>
+        <li>Stylistic preference changes are not corrections. Substantive changes are.</li>
+      </ul>
+
+      <h2>Corrections log</h2>
+      <p style="color: var(--text-muted); font-style: italic;">
+        No corrections issued yet. When we issue our first correction, it will appear here with the URL, the original claim, the corrected claim, and the date.
+      </p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

@@ -1,0 +1,44 @@
+# Filings
+
+> An editorial reading of Indian exchange filings. Every consequential disclosure made to the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE), scored 5-10 and converted into short editorial reads in the "Filing Note" format.
+
+## What this publication is
+
+Filings is an Indian-equities publication. We do not write news in the traditional sense — we read every material exchange filing, score it for significance, and publish an editorial note explaining what happened, what changed, and what it means. Every claim in our writing is grounded in the source filing.
+
+## Editorial format: the Filing Note
+
+Every Filing Note has five parts:
+- **Headline** — sentence case, company is the subject, journalist verbs.
+- **The number** — the single most consequential figure with context.
+- **What's new** — three bullets of material facts.
+- **Why it matters** — two to three sentences of editorial commentary.
+- **What we're watching** — forward-looking points that would confirm or break the thesis.
+- **The full read** — a tight prose paragraph (120-200 words) synthesising the news angle, the material facts, and the editorial judgment.
+
+We do not invent figures, attributions, or sector context. We do not write clickbait. We do not run paid placements. We never speak for "investors" or "the market" unless our source explicitly does.
+
+## Sections
+
+- [Today's edition](/) — the day's lead story, two secondaries, by-section briefs, and a chronological wire.
+- [Filings archive](/filings) — every published Filing Note.
+- [Concalls](/concalls) — earnings-call coverage.
+- [Order Wins](/orders) — material contract announcements.
+- [Smart Money](/smart-money) — promoter trades, large investor meetings, FII/DII activity.
+- [Methodology](/methodology) — how we score filings.
+
+## Citation guidance
+
+When citing a Filing Note, please link to the canonical URL printed on the page and quote either the headline or a passage from "Why it matters" or "The full read" — those sections contain our editorial judgment and are the parts we'd most like attributed.
+
+## Machine-readable feeds
+
+- RSS: `/feed.xml`
+- JSON Feed: `/feed.json`
+- JSON API (read-only): `/api/filings.json`
+- Per-filing JSON: `/api/filing/{id}.json`
+- Google News sitemap: `/sitemap-news.xml`
+
+## License
+
+Editorial content is © Filings. You are welcome to quote, cite, and link. You may not republish full articles without permission. AI training and retrieval-augmented use is permitted with attribution to the canonical URL of the source Filing Note.

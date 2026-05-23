@@ -1,0 +1,70 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+<Base
+  title="Editorial standards"
+  description="The editorial standards every Tipsheet article is held to: voice, evidence and fidelity, banned moves, and what we do when a filing is thin."
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Editorial standards</span></div>
+        <h1 class="page-title">Editorial standards.</h1>
+        <p class="page-dek">These are the rules every note and Concall Note is held to. They are also the standard our editors and tools are calibrated against.</p>
+      </header>
+
+      <hr class="rule" />
+
+      <h2>Voice</h2>
+      <p>
+        Our voice is calibrated to FT Lex, Buttonwood, and Heard on the Street: short, confident, analytical editorial. Sentence case. Plain English. Active voice. Named subjects.
+      </p>
+      <p>
+        We take a position. Hedging is worse than being wrong. One idea per sentence. Em-dashes are for emphasis only — never as comma substitutes.
+      </p>
+
+      <h2>Evidence and fidelity</h2>
+      <p>
+        Every concrete claim — every number, date, name, percentage, quote, attribution — must trace to the primary source. The source is the entire universe of facts available to the writer. No invented sector context. No words in management's mouth without source attribution. No narrative arcs not in evidence.
+      </p>
+      <p>
+        Editorial framing is permitted only when it is a fair characterisation of facts already in the source. The test: would a careful reader of the source agree with this framing without needing additional context they do not have?
+      </p>
+      <p>
+        If we cannot find supporting evidence for a claim, we delete the claim. A short note is better than a long one with manufactured claims.
+      </p>
+
+      <h2>What we do not write</h2>
+      <ul>
+        <li>We do not speak for "investors", "the market", "the Street", "shareholders", or "analysts" unless the source explicitly attributes the view to a named source.</li>
+        <li>We do not write predictive narrative arcs ("the worst is over", "back on track", "regained its footing") unless the source establishes one.</li>
+        <li>We do not put words in management's mouth.</li>
+        <li>We do not use generic corporate filler ("leverage", "transformative", "robust", "comprehensive", "seamless", "pivotal", "delve into", "tapestry", "ever-evolving landscape") because it adds no information.</li>
+        <li>We do not write the "underscores / highlights / showcases / emphasizes" family of verbs that lets abstractions act as agents.</li>
+        <li>We do not write recommendations. We do not predict prices.</li>
+      </ul>
+
+      <h2>Thin-filing discipline</h2>
+      <p>
+        Many filings are routine — already-disclosed results, procedural transcripts, standard board approvals. When that is true, we say so plainly and write a short note. We do not manufacture analytical depth from routine material. A thin filing deserves a thin note.
+      </p>
+
+      <h2>How this is enforced</h2>
+      <p>
+        Every note runs through a validator that scans for the patterns above before publication: 100+ banned-phrase regexes, structural rules (em-dash density, sentence-length variance, paragraph-opening adverbs, parallel-construction templates), and a number-fidelity check against the source. Anything that fails is rewritten before it appears on the site.
+      </p>
+      <p>
+        Our full validator rules and prompt design are documented in <a href="/methodology/">the methodology page</a>.
+      </p>
+
+      <h2>Corrections</h2>
+      <p>
+        We correct mistakes promptly and visibly. The corrections policy is at <a href="/corrections/">/corrections</a>.
+      </p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

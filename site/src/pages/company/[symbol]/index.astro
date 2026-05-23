@@ -1,0 +1,152 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Masthead from '../../../components/Masthead.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { distinctSymbolsWithFilings, filingsForCompany, getFundamentals, sectorSlug, tierFor, tijoriCompanyUrl } from '../../../lib/queries.mjs';
+
+export async function getStaticPaths() {
+  const symbols = distinctSymbolsWithFilings();
+  return symbols.map(s => ({ params: { symbol: String(s.symbol).toLowerCase() } }));
+}
+
+const { symbol } = Astro.params;
+const SYMBOL = String(symbol).toUpperCase();
+
+const filings = filingsForCompany(SYMBOL, 100);
+const fund = getFundamentals(SYMBOL);
+const tijoriUrl = tijoriCompanyUrl(fund);
+const companyName = filings[0]?.company || fund?.symbol || SYMBOL;
+
+if (filings.length === 0 && !fund) return Astro.redirect('/404');
+
+function timeOf(iso) { const m = String(iso || '').match(/(\d{2}:\d{2})/); return m ? `${m[1]} IST` : ''; }
+function dateOf(iso) {
+  const d = new Date(String(iso).replace(' ', 'T'));
+  if (Number.isNaN(d.valueOf())) return iso;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
+}
+function fmtCr(n) {
+  if (n == null) return '—';
+  if (n >= 100000) return `₹${(n/100000).toFixed(2)} lakh cr`;
+  return `₹${Number(n).toLocaleString('en-IN')} cr`;
+}
+function fmtNum(n, d = 2) { return n == null ? '—' : Number(n).toFixed(d); }
+function fmtPct(n) { return n == null ? '—' : `${Number(n).toFixed(2)}%`; }
+
+// Group filings by month for the timeline visualisation
+const groups = new Map();
+for (const f of filings) {
+  const d = new Date(String(f.created_on).replace(' ', 'T'));
+  const key = isNaN(d.valueOf()) ? 'Unknown' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  if (!groups.has(key)) groups.set(key, []);
+  groups.get(key).push(f);
+}
+const grouped = [...groups.entries()].map(([key, items]) => {
+  const [y, m] = key.split('-');
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const label = key === 'Unknown' ? 'Earlier' : `${months[Number(m)-1]} ${y}`;
+  return { key, label, items };
+});
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'Corporation',
+  name: companyName,
+  tickerSymbol: SYMBOL,
+  identifier: fund?.isin ? `ISIN:${fund.isin}` : undefined,
+  sameAs: [
+    `https://www.nseindia.com/get-quotes/equity?symbol=${SYMBOL}`,
+    `https://www.bseindia.com/corporates/ann.html?scrip=${filings[0]?.scripcode || ''}&dur=A`,
+    tijoriUrl,
+  ].filter(Boolean).filter(u => !u.endsWith('=')),
+  mainEntityOfPage: new URL(`/company/${symbol}/`, Astro.site).toString(),
+  subjectOf: filings.slice(0, 10).map(f => ({
+    '@type': 'NewsArticle',
+    headline: f.headline,
+    url: new URL(f.canonical_url, Astro.site).toString(),
+    datePublished: String(f.created_on).replace(' ', 'T') + '+05:30',
+  })),
+};
+---
+<Base
+  title={`${companyName} (${SYMBOL}) — notes timeline`}
+  description={`Every note published about ${companyName}, newest first. Editorial reads on exchange filings with fundamentals snapshot from primary sources.`}
+  schema={schema}
+>
+  <Masthead activeNav="filings" />
+
+  <main>
+    <article class="company-page">
+
+      <header class="company-header">
+        <div class="company-id">
+          <div class="kicker"><a href="/filings/">Notes</a> <span class="sep">/</span> <span>Company</span></div>
+          <h1 class="company-name">{companyName}</h1>
+          <div class="company-meta mono">
+            <span class="ticker">{SYMBOL}</span>
+            {filings[0]?.scripcode && <span>BSE {filings[0].scripcode}</span>}
+            {fund?.isin && <span>ISIN {fund.isin}</span>}
+            {fund?.sector && <a href={`/sector/${sectorSlug(fund.sector)}/`} class="sector-link">{fund.sector}</a>}
+          </div>
+        </div>
+
+        {fund && (
+          <div class="company-fund">
+            <h4>Fundamentals</h4>
+            <dl class="facts">
+              {fund.market_cap != null && <><dt>Market cap</dt><dd>{fmtCr(fund.market_cap)}</dd></>}
+              {fund.pe != null && <><dt>P/E</dt><dd>{fmtNum(fund.pe)}×</dd></>}
+              {fund.roe != null && <><dt>ROE</dt><dd>{fmtPct(fund.roe)}</dd></>}
+              {fund.debt_to_equity != null && <><dt>Debt / equity</dt><dd>{fmtNum(fund.debt_to_equity)}</dd></>}
+              {fund.dividend_yield != null && <><dt>Div yield</dt><dd>{fmtPct(fund.dividend_yield)}</dd></>}
+              {(fund.low_52w != null || fund.high_52w != null) && <>
+                <dt>52-week range</dt>
+                <dd>{fmtNum(fund.low_52w)} — {fmtNum(fund.high_52w)}</dd>
+              </>}
+            </dl>
+            {tijoriUrl && <a href={tijoriUrl} target="_blank" rel="noopener" class="inline">Research on Tijori Finance</a>}
+          </div>
+        )}
+      </header>
+
+      <hr class="rule" />
+
+      <section class="company-timeline">
+        <h2 class="timeline-title">The timeline — {filings.length} {filings.length === 1 ? 'note' : 'notes'} on {companyName}</h2>
+
+        {filings.length === 0 ? (
+          <p class="timeline-empty">No notes published yet. Add the company to your watchlist (coming soon) to be notified when something is.</p>
+        ) : grouped.map(g => (
+          <div class="timeline-group">
+            <h3 class="timeline-month">{g.label}</h3>
+            <ol class="company-list">
+              {g.items.map(f => (
+                <li>
+                  <a href={f.canonical_url} class="archive-row">
+                    <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
+                    <span class:list={['archive-tier', f.score >= 9 ? 'score-hi' : f.score >= 7 ? 'score-mid' : 'score-low']}>{tierFor(f.score)}</span>
+                    <div class="archive-body">
+                      <div class="kicker">{tierFor(f.score)}{f.canonical_category && f.canonical_category !== 'Other' ? ` · ${f.canonical_category}` : ''}</div>
+                      <h4 class="row-headline">{f.headline}</h4>
+                      <p class="row-dek">{f.dek}</p>
+                    </div>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))}
+      </section>
+
+      <section class="company-sources">
+        <span class="label">Verify on exchange</span>
+        {filings[0]?.scripcode && <a href={`https://www.bseindia.com/corporates/ann.html?scrip=${filings[0].scripcode}&dur=A`} target="_blank" rel="noopener">BSE filings for {SYMBOL}</a>}
+        <a href={`https://www.nseindia.com/companies-listing/corporate-filings-announcements?symbol=${encodeURIComponent(SYMBOL)}`} target="_blank" rel="noopener">NSE filings for {SYMBOL}</a>
+        {tijoriUrl && <a href={tijoriUrl} target="_blank" rel="noopener">Tijori Finance company page</a>}
+      </section>
+    </article>
+  </main>
+
+  <SiteFooter />
+</Base>

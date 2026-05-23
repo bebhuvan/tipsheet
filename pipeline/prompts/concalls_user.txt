@@ -1,0 +1,16 @@
+INPUT CONCALL
+- Company: {company}
+- Symbol: {symbol}
+- Sector: {sector}
+- Date of call: {event_time}
+- Tijori summary highlight (the one-phrase angle Tijori already identified): {summary_highlight}
+
+MANAGEMENT CONSISTENCY CHECK (the most editorially valuable field — flags where management said different things in different calls. If non-trivial, lead with this):
+"""
+{management_consistency}
+"""
+
+AI SUMMARY EXTRACTS (from Tijori's full analytical block — Key Quote, Sentiment, Guidance — use these for additional facts; do not republish in full):
+"""
+{ai_summary_extracts}
+"""

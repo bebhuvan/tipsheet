@@ -1,0 +1,170 @@
+---
+import '../styles/global.css';
+import { BRAND_NAME, BRAND_TAGLINE, BRAND_DESCRIPTION, BRAND_FOUNDING_DATE } from '../lib/brand.mjs';
+
+interface Props {
+  title: string;
+  description: string;
+  canonical?: string;
+  ogImage?: string;
+  schema?: object | null;
+  publishedTime?: string;
+  modifiedTime?: string;
+}
+
+const {
+  title,
+  description,
+  canonical,
+  ogImage,
+  schema = null,
+  publishedTime,
+  modifiedTime,
+} = Astro.props;
+
+// Auto-append brand name to the title unless the title already contains it.
+// This means every page only needs to pass its page-specific title; the brand
+// suffix is added centrally — change BRAND_NAME in lib/brand.mjs and every
+// document title updates.
+const fullTitle = String(title || '').includes(BRAND_NAME)
+  ? String(title)
+  : `${title} · ${BRAND_NAME}`;
+
+const canonicalUrl = canonical || new URL(Astro.url.pathname, Astro.site).toString();
+// Default OG: brand card. Per-article pages override via the `ogImage` prop.
+const resolvedOgImage = ogImage
+  ? (ogImage.startsWith('http') ? ogImage : new URL(ogImage, Astro.site).toString())
+  : new URL('/og/brand.png', Astro.site).toString();
+
+// Site-wide NewsMediaOrganization schema. This is the canonical entity for Stories
+// and is referenced by every NewsArticle via `publisher` and every Person/author via
+// `worksFor`. Centralises trust-page links (editorialStandards, corrections, etc.)
+// which Google's Quality Rater Guidelines explicitly look for on YMYL finance sites.
+const ORG_ID = (Astro.site?.toString() || '') + '#org';
+const orgSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'NewsMediaOrganization',
+  '@id': ORG_ID,
+  name: BRAND_NAME,
+  alternateName: `${BRAND_NAME} — ${BRAND_TAGLINE.replace(/\.$/, '')}`,
+  url: Astro.site?.toString() || '/',
+  logo: {
+    '@type': 'ImageObject',
+    url: new URL('/logo.png', Astro.site).toString(),
+    width: 1000,
+    height: 1000,
+  },
+  description: BRAND_DESCRIPTION,
+  foundingDate: BRAND_FOUNDING_DATE,
+  ethicsPolicy:                    new URL('/editorial-standards/', Astro.site).toString(),
+  correctionsPolicy:               new URL('/corrections/',         Astro.site).toString(),
+  verificationFactCheckingPolicy:  new URL('/methodology/',         Astro.site).toString(),
+  missionCoveragePrioritiesPolicy: new URL('/about/',               Astro.site).toString(),
+  masthead:                        new URL('/about/#team',          Astro.site).toString(),
+  ownershipFundingInfo:            new URL('/ownership/',           Astro.site).toString(),
+  actionableFeedbackPolicy:        new URL('/contact/',             Astro.site).toString(),
+  sameAs: [],  // TODO: add LinkedIn, X, Wikidata once we publish them
+};
+---
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{fullTitle}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonicalUrl} />
+
+  <!-- Indian-English locale signal for Google. We are an India-focused publication.
+       Both en-IN and x-default point at the same canonical URL since we serve one locale. -->
+  <link rel="alternate" hreflang="en-IN" href={canonicalUrl} />
+  <link rel="alternate" hreflang="x-default" href={canonicalUrl} />
+
+  <!-- Discoverable feeds. RSS for traditional readers + aggregators; JSON Feed for
+       LLM-friendly structured access. -->
+  <link rel="alternate" type="application/rss+xml" title="Tipsheet — RSS" href={new URL('/feed.xml', Astro.site).toString()} />
+  <link rel="alternate" type="application/feed+json" title="Tipsheet — JSON Feed" href={new URL('/feed.json', Astro.site).toString()} />
+
+  <meta property="og:type" content={publishedTime ? 'article' : 'website'} />
+  <meta property="og:title" content={fullTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:image" content={resolvedOgImage} />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:image" content={resolvedOgImage} />
+  {publishedTime && <meta property="article:published_time" content={publishedTime} />}
+  {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Discover gate per Google's image-preview policy (300% Discover-traffic uplift in
+       documented case studies). Opts the site into large-image previews in Search + Discover. -->
+  <meta name="robots" content="max-image-preview:large" />
+
+  <!-- Self-hosted fonts. Preloads cover the basic-latin subsets (italic + roman Newsreader)
+       so the wordmark + dek + body render without a font-fallback flash. -->
+  <link rel="preload" href="/fonts/cY9CfjOCX1hbuyalUrK439vCjohC.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/cY9AfjOCX1hbuyalUrK4397yjA.woff2"   as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/fonts.css" />
+
+  <!-- Icon system: SVG favicon (theme-aware), 192/512 PNG for Android + PWA,
+       180x180 for Apple touch, web manifest for installability. -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="/icon-192.png" type="image/png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <meta name="theme-color" content="#b5341e" />
+
+  <!-- Site-wide org schema: ensures every page carries the NewsMediaOrganization entity,
+       which is the trust signal Google's Quality Rater Guidelines look for on YMYL finance. -->
+  <script type="application/ld+json" set:html={JSON.stringify(orgSchema)} />
+  {schema && <script type="application/ld+json" set:html={JSON.stringify(schema)} />}
+
+  <script is:inline>
+    (function () {
+      try {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', stored || (prefersDark ? 'dark' : 'light'));
+      } catch (_) {}
+    })();
+  </script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to content</a>
+  <div id="main-content">
+    <slot />
+  </div>
+  <script is:inline>
+    (function () {
+      const btn = document.getElementById('themeToggle');
+      if (!btn) return;
+      const lbl = document.getElementById('themeLabel');
+      const setLbl = (t) => { if (lbl) lbl.textContent = t === 'dark' ? 'Dark' : 'Light'; };
+      setLbl(document.documentElement.getAttribute('data-theme'));
+      btn.addEventListener('click', () => {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem('theme', next); } catch (_) {}
+        setLbl(next);
+      });
+    })();
+  </script>
+  <script is:inline>
+    // Global ⌘K / Ctrl+K shortcut → /search/. Skips when typing in an input.
+    (function () {
+      document.addEventListener('keydown', (e) => {
+        const isMeta = e.metaKey || e.ctrlKey;
+        if (!isMeta || (e.key !== 'k' && e.key !== 'K')) return;
+        const t = e.target;
+        const inField = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+        // On /search/ let the input handle focus; otherwise navigate.
+        if (location.pathname.replace(/\/$/, '') === '/search') return;
+        if (inField) return;
+        e.preventDefault();
+        location.assign('/search/');
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+BRIEFING REQUEST
+- briefing_type: {briefing_type}
+- date (IST): {date}
+
+LATEST MARKET SNAPSHOT
+{market_snapshot}
+
+TOP FILINGS FROM THE LAST {window_hours}h (highest score first):
+{top_filings}
+
+CONCALL MANAGEMENT-CONSISTENCY FLAGS (recent flip-flops worth surfacing):
+{mgmt_consistency_flags}
+
+MACRO EVENTS — scheduled for today, India-relevant first:
+{macro_events_today}

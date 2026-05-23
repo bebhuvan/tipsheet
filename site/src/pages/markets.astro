@@ -1,0 +1,423 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Sparkline from '../components/Sparkline.astro';
+import MarketBlock from '../components/MarketBlock.astro';
+import YieldCurve from '../components/YieldCurve.astro';
+import { getLatestMarketSnapshots, sectorAggregates, getMarketHistoryBulk } from '../lib/queries.mjs';
+
+// ─── pull data ────────────────────────────────────────────────────────
+const broad     = getLatestMarketSnapshots('broad');
+const sectors   = getLatestMarketSnapshots('sector');
+const thematic  = getLatestMarketSnapshots('thematic');
+const intlAm    = getLatestMarketSnapshots('intl_americas');
+const intlEu    = getLatestMarketSnapshots('intl_europe');
+const intlAp    = getLatestMarketSnapshots('intl_apac');
+const intl      = [...intlAm, ...intlEu, ...intlAp];  // unified list for ratio sp500 lookup
+const fxInr     = getLatestMarketSnapshots('fx');
+const fxCross   = getLatestMarketSnapshots('fxcross');
+const energy    = getLatestMarketSnapshots('energy');
+const metal     = getLatestMarketSnapshots('metal');
+const agri      = getLatestMarketSnapshots('agri');
+const usBonds   = getLatestMarketSnapshots('us_bond');
+// New groups (v2)
+const risk         = getLatestMarketSnapshots('risk');
+const offshore     = getLatestMarketSnapshots('offshore');
+const crypto       = getLatestMarketSnapshots('crypto');
+const usFactor     = getLatestMarketSnapshots('us_factor');
+const bcom         = getLatestMarketSnapshots('commodity_index');
+const country      = getLatestMarketSnapshots('country');
+const region       = getLatestMarketSnapshots('region');
+const indiaFactor  = getLatestMarketSnapshots('india_factor');
+const sectorAgg    = sectorAggregates({ limit: 20, minMcap: 1000 });
+
+const allSymbols = [...broad, ...sectors, ...thematic, ...intlAm, ...intlEu, ...intlAp, ...fxInr, ...fxCross, ...energy, ...metal, ...agri, ...usBonds, ...risk, ...offshore, ...crypto, ...usFactor, ...bcom, ...country, ...region, ...indiaFactor].map(s => s.symbol);
+const histMap = getMarketHistoryBulk(allSymbols, 30);
+
+const lastUpdate = Math.max(0, ...broad.map(b => b.fetched_at || 0));
+const ago = lastUpdate ? Math.round((Date.now() - lastUpdate) / 60000) : null;
+
+// Hero — the breadth-of-listed-universe story: large-cap (Nifty 500) → mid (Midcap 150)
+// → small (Smallcap 250). Tells the reader at a glance which size segment is leading or
+// lagging today, which is editorially more useful than three large-cap indices.
+// Note: Nifty Microcap 250 and Nifty Total Market should be added when we wire
+// a licensed or explicitly permitted market-data source.
+const HERO_ORDER = ['NIFTY_500.NS', 'NIFTY_MIDCAP_150.NS', 'NIFTY_SMLCAP_250.NS'];
+const hero = HERO_ORDER.map(s => broad.find(b => b.symbol === s)).filter(Boolean);
+const heroSet = new Set(HERO_ORDER);
+const indiaVix = broad.find(b => b.symbol === '^INDIAVIX');
+const otherBroad = broad.filter(b => !heroSet.has(b.symbol) && b.symbol !== '^INDIAVIX');
+
+const indianRanked = [...otherBroad, ...sectors, ...thematic]
+  .filter(x => x.change_pct != null)
+  .sort((a, b) => (b.change_pct ?? -Infinity) - (a.change_pct ?? -Infinity));
+const maxAbsPct = Math.max(0.5, ...indianRanked.map(x => Math.abs(x.change_pct || 0)));
+
+const TENORS = { '^IRX': { years: 0.25, label: '3M' }, '^FVX': { years: 5, label: '5Y' }, '^TNX': { years: 10, label: '10Y' }, '^TYX': { years: 30, label: '30Y' } };
+const ycPoints = usBonds
+  .filter(b => TENORS[b.symbol])
+  .map(b => ({ tenor_years: TENORS[b.symbol].years, label: TENORS[b.symbol].label, yield: b.price }));
+
+// ─── ratios ──────────────────────────────────────────────────────────
+// Three macro ratios computed at render: Gold/Oil (risk-off gauge), Copper/Gold
+// (risk-on gauge), Nifty/SP500 (India relative outperformance). Sparkline derived
+// from the 30d history of the underlying pair.
+function findBySymbol(arr, sym) { return arr.find(x => x.symbol === sym); }
+function ratioSparkline(numSym, denSym) {
+  const num = histMap.get(numSym) || [];
+  const den = histMap.get(denSym) || [];
+  const denMap = new Map(den.map(p => [p.date, p.close]));
+  return num
+    .map(p => denMap.has(p.date) && denMap.get(p.date) ? { date: p.date, close: p.close / denMap.get(p.date) } : null)
+    .filter(Boolean);
+}
+const gold   = findBySymbol([...metal], 'GC=F');
+const oil    = findBySymbol([...energy], 'CL=F');
+const copper = findBySymbol([...metal], 'HG=F');
+const nifty  = findBySymbol([...broad], '^NSEI');
+const sp500  = findBySymbol([...intl], '^GSPC');
+
+const ratios = [
+  gold && oil    ? { label: 'Gold / Oil',     value: gold.price / oil.price,   hint: 'Risk-off when rising — gold outperforms when growth stalls.', spark: ratioSparkline('GC=F', 'CL=F') } : null,
+  copper && gold ? { label: 'Copper / Gold',  value: copper.price / gold.price * 100, hint: 'Risk-on when rising. Copper as a growth proxy vs gold as fear gauge.', spark: ratioSparkline('HG=F', 'GC=F') } : null,
+  nifty && sp500 ? { label: 'Nifty / S&P 500', value: nifty.price / sp500.price, hint: "India's relative outperformance vs the US benchmark.", spark: ratioSparkline('^NSEI', '^GSPC') } : null,
+].filter(Boolean);
+
+// Country sort + heatmap intensity. Most signal in showing what moved most today.
+const countrySorted = [...country].filter(c => c.change_pct != null)
+  .sort((a, b) => (b.change_pct ?? -Infinity) - (a.change_pct ?? -Infinity));
+const countryMaxAbs = Math.max(0.5, ...countrySorted.map(c => Math.abs(c.change_pct || 0)));
+function heatBg(pct) {
+  if (pct == null) return 'transparent';
+  const intensity = Math.min(1, Math.abs(pct) / countryMaxAbs);
+  const alpha = 0.08 + intensity * 0.30;  // 0.08-0.38
+  return pct > 0
+    ? `rgba(26, 127, 60, ${alpha.toFixed(2)})`
+    : `rgba(180, 50, 30, ${alpha.toFixed(2)})`;
+}
+
+// ─── format helpers ──────────────────────────────────────────────────
+function fmtPrice(v) {
+  if (v == null) return '—';
+  if (Math.abs(v) >= 10000) return v.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  if (Math.abs(v) < 10) return v.toFixed(3);
+  return v.toFixed(2);
+}
+function fmtPct(v) { if (v == null) return '—'; return `${v > 0 ? '+' : ''}${v.toFixed(2)}%`; }
+function pctClass(v) { return v > 0 ? 'up' : v < 0 ? 'down' : ''; }
+function fmtMcap(n) {
+  if (n == null) return '—';
+  if (n >= 100000) return `₹${(n/100000).toFixed(2)} lakh cr`;
+  return `₹${Math.round(n).toLocaleString('en-IN')} cr`;
+}
+function rowsFor(items) {
+  return items.map(m => ({ ...m, hist: histMap.get(m.symbol) || [] }));
+}
+function barWidth(pct) {
+  if (pct == null) return 0;
+  return Math.min(100, (Math.abs(pct) / maxAbsPct) * 100);
+}
+---
+<Base
+  title="Markets — global macro, Indian indices, risk gauges, FX, commodities, yield curve"
+  description="A live macro view: global risk gauges (VIX, MOVE, DXY, credit spreads), India seen from offshore (INDA, ADRs), 25 Indian indices ranked, three macro ratios, FX, commodities, US yield curve and sector aggregates from 5,500+ companies."
+>
+  <Masthead activeNav="markets" />
+
+  <main>
+    <article class="markets-page">
+
+      <header class="markets-header">
+        <div>
+          <div class="kicker">
+            <span>Markets</span>
+            <span class="sep">/</span>
+            <span>Macro snapshot</span>
+          </div>
+          <h1 class="page-title">Macro, one view.</h1>
+          <p class="page-dek">
+            Global risk gauges, India seen from offshore, three macro ratios, 25 Indian indices ranked by today's move, FX, commodities, the US Treasury yield curve, and sector aggregates from 5,500+ listed companies. Sparklines show 30-day trend on every instrument.
+          </p>
+        </div>
+        <div class="markets-update">
+          <span class="lbl">Last update</span>
+          <span class="val">{ago != null ? (ago === 0 ? 'just now' : `${ago} min ago`) : '—'}</span>
+        </div>
+      </header>
+
+      <hr class="rule" />
+
+      {/* ─── INDIAN HERO ─────────────────────────────────────────────────── */}
+      {hero.length > 0 && (
+        <section class="hero-indices">
+          {hero.map(b => (
+            <div class={`hero-card ${pctClass(b.change_pct)}`}>
+              <div class="hero-name">{b.name}</div>
+              <div class="hero-price">{fmtPrice(b.price)}</div>
+              <div class="hero-meta">
+                <span class={`hero-pct ${pctClass(b.change_pct)}`}>{fmtPct(b.change_pct)}</span>
+                <span class="hero-abs">{b.change_abs != null ? `${b.change_abs > 0 ? '+' : ''}${b.change_abs.toFixed(2)}` : ''}</span>
+              </div>
+              <div class="hero-spark">
+                <Sparkline points={histMap.get(b.symbol) || []} width={260} height={56} ariaLabel={`${b.name} 30-day trend`} />
+              </div>
+              <div class="hero-range">
+                <span>D {fmtPrice(b.day_low)} — {fmtPrice(b.day_high)}</span>
+                <span>52W {fmtPrice(b.week52_low)} — {fmtPrice(b.week52_high)}</span>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* ─── GLOBAL RISK GAUGES (new in v2) ──────────────────────────────── */}
+      {(risk.length > 0 || indiaVix) && (
+        <section class="block">
+          <h2 class="block-title">Global risk gauges</h2>
+          <p class="block-dek">The three signals macro investors watch first: equity volatility (VIX, India VIX), rate volatility (MOVE), and the dollar (DXY). HYG vs LQD spread reads credit stress without a credit market subscription.</p>
+          <div class="risk-grid">
+            {indiaVix && (
+              <div class={`risk-card ${pctClass(indiaVix.change_pct)}`}>
+                <div class="risk-name">India VIX</div>
+                <div class="risk-price">{fmtPrice(indiaVix.price)}</div>
+                <div class={`risk-pct ${pctClass(indiaVix.change_pct)}`}>{fmtPct(indiaVix.change_pct)}</div>
+                <Sparkline points={histMap.get('^INDIAVIX') || []} width={160} height={36} ariaLabel="India VIX 30d" />
+              </div>
+            )}
+            {risk.map(r => (
+              <div class={`risk-card ${pctClass(r.change_pct)}`}>
+                <div class="risk-name">{r.name}</div>
+                <div class="risk-price">{fmtPrice(r.price)}</div>
+                <div class={`risk-pct ${pctClass(r.change_pct)}`}>{fmtPct(r.change_pct)}</div>
+                <Sparkline points={histMap.get(r.symbol) || []} width={160} height={36} ariaLabel={`${r.name} 30d`} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─── MACRO RATIOS (new in v2) ────────────────────────────────────── */}
+      {ratios.length > 0 && (
+        <section class="block">
+          <h2 class="block-title">Macro ratios</h2>
+          <p class="block-dek">Three pair-trades that read more than the components alone.</p>
+          <div class="ratio-grid">
+            {ratios.map(r => (
+              <div class="ratio-card">
+                <div class="ratio-name">{r.label}</div>
+                <div class="ratio-value">{r.value.toFixed(2)}</div>
+                <Sparkline points={r.spark} width={200} height={40} ariaLabel={`${r.label} 30d`} />
+                <div class="ratio-hint">{r.hint}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─── INDIA OFFSHORE (new in v2) ──────────────────────────────────── */}
+      {offshore.length > 0 && (
+        <section class="block">
+          <h2 class="block-title">India seen from offshore</h2>
+          <p class="block-dek">The US-traded India ETF and Indian ADRs. Move overnight while Mumbai sleeps; useful sentiment read before market open.</p>
+          <MarketBlock title="" items={rowsFor(offshore)} compact />
+        </section>
+      )}
+
+      {/* ─── COUNTRY & REGION RETURNS (new) ──────────────────────────────── */}
+      {countrySorted.length > 0 && (
+        <section class="block">
+          <h2 class="block-title">Country returns · today</h2>
+          <p class="block-dek">
+            Ten country ETFs ranked by today's move. All USD-denominated and US-listed, so returns include local-currency effects — an INDA -2% on an INR -1% Nifty -1% setup means dollar strength compounded the loss. Low-volume tiles (KSA, EZA, VNM) read as noise on quiet days; treat them lightly.
+          </p>
+          <div class="country-heatmap">
+            {countrySorted.map(c => (
+              <a href={`/markets/`} class="country-tile" style={`background: ${heatBg(c.change_pct)};`} title={`${c.name} (${c.symbol})`}>
+                <div class="ct-name">{c.name}</div>
+                <div class={`ct-pct ${pctClass(c.change_pct)}`}>{fmtPct(c.change_pct)}</div>
+                <div class="ct-spark"><Sparkline points={histMap.get(c.symbol) || []} width={120} height={22} ariaLabel={`${c.name} 30d`} /></div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {region.length > 0 && (
+        <section class="block">
+          <h2 class="block-title">Regional aggregates</h2>
+          <p class="block-dek">From world (ACWI) down to peer blocs. Lets you read whether a move is India-specific, Asia-wide, or global.</p>
+          <MarketBlock title="" items={rowsFor(region)} compact />
+        </section>
+      )}
+
+      {/* ─── INDIA FACTOR INDICES (new) ──────────────────────────────────── */}
+      {indiaFactor.length > 0 && (
+        <section class="block">
+          <h2 class="block-title">India factor indices</h2>
+          <p class="block-dek">
+            Style and factor reads from cached market data. Add the broader NSE factor set when we wire a licensed or explicitly permitted source.
+          </p>
+          <MarketBlock title="" items={rowsFor(indiaFactor)} compact />
+        </section>
+      )}
+
+      {/* ─── INDIAN INDICES RANKED (kept) ────────────────────────────────── */}
+      {indianRanked.length > 0 && (
+        <section class="block">
+          <h2 class="block-title">Today · ranked by move · {indianRanked.length} Indian indices</h2>
+          <p class="block-dek">Broad, sectoral and thematic combined. Bar width reflects move size relative to the day's biggest move; colour reflects direction.</p>
+          <div class="perf-rows">
+            {indianRanked.map(m => (
+              <div class="perf-row">
+                <span class="pr-name">{m.name}</span>
+                <span class="pr-bar">
+                  <span class={`pr-fill ${pctClass(m.change_pct)}`} style={`width: ${barWidth(m.change_pct)}%; ${m.change_pct < 0 ? 'margin-left: auto;' : ''}`}></span>
+                </span>
+                <span class={`pr-pct mono ${pctClass(m.change_pct)}`}>{fmtPct(m.change_pct)}</span>
+                <span class="pr-price mono">{fmtPrice(m.price)}</span>
+                <span class="pr-spark"><Sparkline points={histMap.get(m.symbol) || []} width={100} height={28} ariaLabel={`${m.name} 30d`} /></span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─── INTERNATIONAL INDICES — restructured into 3 sub-regions ──── */}
+      <h2 class="block-title" style="margin-bottom: 0;">International indices · native benchmarks</h2>
+      <p class="block-dek">
+        Local-currency authoritative indices for {intlAm.length + intlEu.length + intlAp.length} markets — the equity benchmark each market trades on its home exchange. Pair this with the Country returns heatmap above (USD-denominated ETFs) to separate equity moves from currency moves.
+      </p>
+
+      <MarketBlock title="Americas" items={rowsFor(intlAm)} />
+
+      <section class="two-col">
+        <MarketBlock title="Europe" items={rowsFor(intlEu)} compact />
+        <MarketBlock title="Asia-Pacific & MENA" items={rowsFor(intlAp)} compact />
+      </section>
+
+      <section class="two-col">
+        <MarketBlock title="Currencies · vs INR" items={rowsFor(fxInr)} compact />
+        <MarketBlock title="Major crosses" items={rowsFor(fxCross)} compact />
+      </section>
+
+      <h2 class="block-title" style="margin-bottom: 0;">Commodities</h2>
+      <p class="block-dek">Energy · metals · agri. Cached futures snapshots; refresh is disabled until we wire a permitted market-data source.</p>
+      <section class="three-col">
+        <MarketBlock title="Energy" items={rowsFor(energy)} compact />
+        <MarketBlock title="Metals" items={rowsFor(metal)} compact />
+        <MarketBlock title="Agriculture" items={rowsFor(agri)} compact />
+      </section>
+
+      {/* ─── CRYPTO + US FACTOR + BCOM (new in v2, compact) ──────────────── */}
+      {(crypto.length > 0 || usFactor.length > 0 || bcom.length > 0) && (
+        <section class="two-col">
+          {crypto.length > 0 && <MarketBlock title="Crypto" items={rowsFor(crypto)} compact />}
+          {(usFactor.length > 0 || bcom.length > 0) && (
+            <MarketBlock title="Other macro" items={rowsFor([...usFactor, ...bcom])} compact />
+          )}
+        </section>
+      )}
+
+      {ycPoints.length >= 2 && (
+        <section class="block">
+          <h2 class="block-title">Fixed income · US Treasury yield curve</h2>
+          <p class="block-dek">3-month, 5-year, 10-year and 30-year on a single curve. Indian sovereign yields coming when we source permitted CCIL, RBI, NSE, or provider data.</p>
+          <YieldCurve points={ycPoints} title="US Treasury yield curve" />
+        </section>
+      )}
+
+      <MarketBlock title="US Treasury yields · table view" items={rowsFor(usBonds)} compact />
+
+      {sectorAgg.length > 0 && (
+        <section class="block">
+          <h2 class="block-title">Sector aggregates · from 5,500+ listed companies</h2>
+          <p class="block-dek">Computed from per-company fundamentals (P/E, ROE, debt/equity, market cap).</p>
+          <table class="market-table">
+            <thead><tr><th>Sector</th><th class="r">Companies</th><th class="r">Total m-cap</th><th class="r">Avg P/E</th><th class="r">Avg ROE</th><th class="r">Avg D/E</th></tr></thead>
+            <tbody>
+              {sectorAgg.map(s => (
+                <tr>
+                  <td><a href={`/sector/${String(s.sector).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}/`} class="inline">{s.sector}</a></td>
+                  <td class="r mono">{s.company_count}</td>
+                  <td class="r mono">{fmtMcap(s.total_mcap)}</td>
+                  <td class="r mono">{s.avg_pe != null ? `${s.avg_pe.toFixed(1)}×` : '—'}</td>
+                  <td class="r mono">{s.avg_roe != null ? `${s.avg_roe.toFixed(1)}%` : '—'}</td>
+                  <td class="r mono">{s.avg_de != null ? s.avg_de.toFixed(2) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+    </article>
+  </main>
+
+  <SiteFooter />
+</Base>
+
+<style>
+  /* Risk gauges grid — equal-height cards in a responsive grid */
+  .risk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .risk-card {
+    padding: 14px 16px;
+    border: 1px solid var(--hairline-strong);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .risk-card.up   { border-left: 3px solid #1a7f3c; }
+  .risk-card.down { border-left: 3px solid #b4321e; }
+  .risk-name  { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+  .risk-price { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 500; color: var(--text); }
+  .risk-pct   { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-bottom: 6px; }
+  .risk-pct.up   { color: #1a7f3c; }
+  .risk-pct.down { color: #b4321e; }
+
+  /* Macro ratios — three-up grid */
+  .ratio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .ratio-card {
+    padding: 16px 18px;
+    border: 1px solid var(--hairline-strong);
+    border-radius: 4px;
+    background: var(--bg-soft, transparent);
+  }
+  .ratio-name { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 4px; }
+  .ratio-value { font-family: 'Newsreader', serif; font-size: 28px; font-weight: 500; line-height: 1; margin-bottom: 8px; color: var(--text); }
+  .ratio-hint { font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-top: 6px; font-style: italic; }
+
+  /* Country heatmap — coloured tiles ranked by today's move */
+  .country-heatmap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .country-tile {
+    display: block;
+    padding: 12px 14px;
+    border: 1px solid var(--hairline-strong);
+    border-radius: 4px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 120ms;
+  }
+  .country-tile:hover { border-color: var(--text); }
+  .ct-name { font-family: 'Newsreader', serif; font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .ct-pct  { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .ct-pct.up   { color: #1a7f3c; }
+  .ct-pct.down { color: #b4321e; }
+  .ct-spark { opacity: 0.7; }
+</style>

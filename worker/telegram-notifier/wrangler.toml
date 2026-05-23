@@ -1,0 +1,11 @@
+name = "tipsheet-telegram-notifier"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+
+[vars]
+SITE_URL = "https://tipsheet.markets"
+
+# Secrets (set via `wrangler secret put`):
+#   BOT_TOKEN      — from @BotFather
+#   CHANNEL_ID     — e.g. "@tipsheet_updates" or numeric chat ID
+#   NOTIFY_SECRET  — shared secret for pipeline auth

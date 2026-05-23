@@ -1,0 +1,254 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Masthead from '../../../components/Masthead.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { listAllConcallsForStaticPaths, getConcall, priorConcallsForIsin, getFundamentals } from '../../../lib/queries.mjs';
+
+export async function getStaticPaths() {
+  const all = listAllConcallsForStaticPaths();
+  return all.map(p => ({ params: { symbol: p.symbol, date: p.date } }));
+}
+
+const { symbol, date } = Astro.params;
+const concall = getConcall(symbol, date);
+if (!concall) return Astro.redirect('/404');
+
+const prior = priorConcallsForIsin(concall.isin, concall.event_time, 3);
+const fund = concall.symbol ? getFundamentals(concall.symbol) : null;
+
+function fmtCr(n) {
+  if (n == null) return '—';
+  if (n >= 100000) return `₹${(n/100000).toFixed(2)} lakh cr`;
+  return `₹${Number(n).toLocaleString('en-IN')} cr`;
+}
+function fmtNum(n, d = 2) { return n == null ? '—' : Number(n).toFixed(d); }
+function fmtPct(n) { return n == null ? '—' : `${Number(n).toFixed(2)}%`; }
+function dateOf(iso) {
+  const d = new Date(String(iso).replace(' ', 'T'));
+  if (Number.isNaN(d.valueOf())) return iso;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'NewsArticle',
+  headline: concall.headline,
+  alternativeHeadline: concall.dek,
+  datePublished: concall.event_time,
+  dateModified: concall.event_time,
+  author: [{ '@type': 'Organization', name: 'Tipsheet Editorial', url: Astro.site?.toString() + 'about' }],
+  publisher: {
+    '@type': 'Organization',
+    name: 'Tipsheet',
+    logo: { '@type': 'ImageObject', url: new URL('/logo.png', Astro.site).toString(), width: 600, height: 60 },
+  },
+  description: concall.dek,
+  mainEntityOfPage: { '@type': 'WebPage', '@id': new URL(concall.canonical_url, Astro.site).toString() },
+  articleSection: 'Concalls',
+  about: concall.symbol ? {
+    '@type': 'Corporation',
+    name: concall.company_name,
+    tickerSymbol: concall.symbol,
+    identifier: concall.isin ? `ISIN:${concall.isin}` : undefined,
+  } : undefined,
+  isBasedOn: [
+    concall.transcript_url,
+    concall.recording_url,
+    concall.tijori_concall_monitor_url,
+  ].filter(Boolean),
+  citation: [
+    concall.transcript_url && { '@type': 'CreativeWork', name: 'Original transcript', url: concall.transcript_url },
+    concall.recording_url  && { '@type': 'CreativeWork', name: 'Original recording',  url: concall.recording_url  },
+    { '@type': 'CreativeWork', name: 'Tijori Concall Monitor', url: concall.tijori_concall_monitor_url },
+  ].filter(Boolean),
+  isAccessibleForFree: true,
+};
+---
+<Base
+  title={`${concall.headline} — Concall Note`}
+  description={concall.dek}
+  schema={schema}
+  publishedTime={concall.event_time}
+  modifiedTime={concall.event_time}
+>
+  <Masthead activeNav="concalls" />
+
+  <main>
+    <article class="concall">
+      <div class="kicker reveal">
+        <span style="color: var(--accent); font-weight: 500;">Concall Note</span>
+        <span class="sep">/</span>
+        <span>{concall.sector}</span>
+        {concall.symbol && (
+          <>
+            <span class="sep">/</span>
+            <a href={`/company/${String(concall.symbol).toLowerCase()}/`} class="inline">{concall.symbol}</a>
+          </>
+        )}
+      </div>
+
+      <h1 class="headline reveal d1">{concall.headline}</h1>
+      <p class="dek reveal d2">{concall.dek}</p>
+
+      <hr class="rule" />
+
+      <div class="dateline reveal d3">
+        {concall.symbol && <span><strong>{concall.symbol}</strong></span>}
+        {concall.isin && <span class="mono">ISIN {concall.isin}</span>}
+        <span>{dateOf(concall.event_time)}</span>
+        <span>
+          Powered by <a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener" class="inline">Tijori Concall Monitor</a>
+        </span>
+      </div>
+
+      {concall.inconsistency_flag && (
+        <div class="inconsistency-block">
+          <div class="ib-label">Management consistency flag</div>
+          <div class="ib-body">{concall.inconsistency_flag}</div>
+        </div>
+      )}
+
+      <div class="content">
+        <aside class="gutter">
+          {fund && (
+            <div class="fund-block">
+              <h3>At a glance · <a href={`/company/${String(concall.symbol).toLowerCase()}/`} class="inline" style="color: var(--accent);">all notes on {concall.symbol}</a></h3>
+              <dl class="facts">
+                {fund.sector && <><dt>Sector</dt><dd>{fund.sector}</dd></>}
+                {fund.market_cap != null && <><dt>Market cap</dt><dd>{fmtCr(fund.market_cap)}</dd></>}
+                {fund.pe != null && <><dt>P/E</dt><dd>{fmtNum(fund.pe)}×</dd></>}
+                {fund.roe != null && <><dt>ROE</dt><dd>{fmtPct(fund.roe)}</dd></>}
+                {fund.debt_to_equity != null && <><dt>Debt / equity</dt><dd>{fmtNum(fund.debt_to_equity)}</dd></>}
+                {(fund.low_52w != null || fund.high_52w != null) && <>
+                  <dt>52-week range</dt>
+                  <dd>{fmtNum(fund.low_52w)} — {fmtNum(fund.high_52w)}</dd>
+                </>}
+              </dl>
+            </div>
+          )}
+
+          <div class="primary-block">
+            <h3>Primary source</h3>
+            <ul class="primary-list">
+              {concall.transcript_url && (
+                <li><a href={concall.transcript_url} target="_blank" rel="noopener">Full transcript (PDF)</a></li>
+              )}
+              {concall.recording_url && (
+                <li><a href={concall.recording_url} target="_blank" rel="noopener">Listen to the recording</a></li>
+              )}
+              <li><a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener">Full analysis on Tijori Concall Monitor</a></li>
+            </ul>
+          </div>
+
+          {prior.length > 0 && (
+            <>
+              <h3>Prior calls</h3>
+              <ol class="timeline">
+                <li class="current">
+                  This call
+                  <time>{dateOf(concall.event_time)}</time>
+                </li>
+                {prior.map(p => (
+                  <li>
+                    <a href={p.canonical_url} class="headline-link" style="font-size: 14px;">{p.headline}</a>
+                    <time>{dateOf(p.event_time)}</time>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </aside>
+
+        <div class="body">
+          <h2>What's new</h2>
+          <ul class="bullets">
+            {concall.whats_new.map(w => <li>{w}</li>)}
+          </ul>
+
+          {concall.key_quotes.length > 0 && (
+            <>
+              <h2>Key quotes</h2>
+              <ul class="quotes">
+                {concall.key_quotes.map(q => (
+                  <li>
+                    <blockquote>"{q.quote}"</blockquote>
+                    <cite>— {q.attribution}</cite>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <h2>The brief</h2>
+          {String(concall.the_brief || '').split(/\n+/).filter(Boolean).map(para => <p>{para}</p>)}
+
+          {concall.the_take && (
+            <div class="take-block">
+              <span class="take-label">The take</span>
+              <p>{concall.the_take}</p>
+            </div>
+          )}
+
+          <div class="primary-source">
+            <span class="label">Sources</span>
+            {concall.transcript_url && <a href={concall.transcript_url} target="_blank" rel="noopener">Transcript</a>}
+            {concall.recording_url  && <a href={concall.recording_url}  target="_blank" rel="noopener">Recording</a>}
+            <a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener">Tijori Concall Monitor (full analysis)</a>
+            <span class="note">Our brief is derived from the Tijori Concall Monitor analysis. Read the full analysis on Tijori for the complete picture.</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  </main>
+
+  <SiteFooter />
+</Base>
+
+<style>
+  .concall { max-width: 1080px; margin: 0 auto; padding: 0 var(--gutter); }
+  .inconsistency-block {
+    margin: 20px 0 28px;
+    padding: 16px 20px;
+    background: rgba(180, 50, 30, 0.05);
+    border-left: 3px solid var(--accent);
+    border-radius: 2px;
+  }
+  .ib-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .ib-body {
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .quotes { list-style: none; padding: 0; margin: 0; }
+  .quotes li { margin: 16px 0; padding: 12px 16px; border-left: 2px solid var(--border); }
+  .quotes blockquote { margin: 0; font-family: var(--serif); font-size: 16px; line-height: 1.5; font-style: italic; }
+  .quotes cite { display: block; margin-top: 6px; font-size: 13px; color: var(--text-muted); font-style: normal; }
+  .take-block {
+    margin: 28px 0 0;
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .take-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .take-block p { margin: 0; font-family: var(--serif); font-size: 17px; font-style: italic; line-height: 1.45; }
+  .primary-block { margin-top: 24px; }
+  .primary-list { list-style: none; padding: 0; margin: 8px 0 0; }
+  .primary-list li { margin: 4px 0; font-size: 13px; }
+</style>

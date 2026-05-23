@@ -1,0 +1,32 @@
+# Cloudflare Pages custom headers
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/og/*
+  Cache-Control: public, max-age=86400
+
+/favicon.svg
+  Cache-Control: public, max-age=31536000, immutable
+
+/icon-*.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/apple-touch-icon.png
+  Cache-Control: public, max-age=31536000, immutable
+
+/search-index.json
+  Cache-Control: public, max-age=3600
+
+/feed.xml
+  Cache-Control: public, max-age=1800
+
+/feed.json
+  Cache-Control: public, max-age=1800
+
+/sitemap.xml
+  Cache-Control: public, max-age=3600
+
+/sitemap-news.xml
+  Cache-Control: public, max-age=1800

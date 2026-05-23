@@ -1,0 +1,278 @@
+// Briefings enricher: generates The Open / The Close twice-daily editorial digests.
+//
+// Pulls inputs from:
+//   - filings_enriched (top by score in the last 24h)
+//   - concalls_enriched (recent mgmt-consistency flags)
+//   - macro_calendar (today's India + high-impact global events)
+//   - market_snapshots (latest Nifty / Sensex / Bank Nifty / India VIX)
+//
+// Composes a single LLM call with structured input, validates output against the same
+// validator used for filings (PHRASE_PATTERNS + STRUCTURAL_RULES).
+
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { PHRASE_PATTERNS, STRUCTURAL_RULES } from './banned-patterns.mjs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SYSTEM_PATH = resolve(__dirname, 'prompts/briefings_system.txt');
+const USER_PATH   = resolve(__dirname, 'prompts/briefings_user.txt');
+export const BRIEFING_PROMPT_VERSION = 'briefing.v2';
+
+const CFG = {
+  baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
+  apiKey:      process.env.LLM_API_KEY  || process.env.GOOGLE_API_KEY,
+  model:       process.env.LLM_MODEL    || 'gemini-3.1-flash-lite',
+  maxTokens:   Number(process.env.LLM_MAX_TOKENS_BRIEFING || 2000),
+  temperature: Number(process.env.LLM_TEMPERATURE || 1.0),
+  timeoutMs:   Number(process.env.LLM_TIMEOUT_MS || 45000),
+};
+
+let _system, _user;
+async function loadPrompts() {
+  if (!_system) _system = await readFile(SYSTEM_PATH, 'utf8');
+  if (!_user)   _user   = await readFile(USER_PATH,   'utf8');
+  return { system: _system, userTemplate: _user };
+}
+
+/**
+ * Gather all input data the LLM needs. Caller passes the open DB handle.
+ *
+ * @param db better-sqlite3 Database
+ * @param type 'open' | 'close'
+ * @param dateYmd YYYY-MM-DD (IST)
+ * @param windowHours how far back to pull filings (default 24)
+ */
+export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 24 } = {}) {
+  // Top filings in the last N hours
+  const cutoff = new Date(dateYmd + 'T00:00:00+05:30');
+  cutoff.setHours(cutoff.getHours() - windowHours);
+  const cutoffIso = cutoff.toISOString().replace('T', ' ').slice(0, 19);
+
+  const topFilings = db.prepare(`
+    SELECT r.record_id, r.symbol, r.company, r.score, r.event_type,
+           r.event_category_canonical AS category, r.created_on,
+           e.headline, e.dek, e.the_number_value, e.the_number_label, e.why_it_matters,
+           f.sector, f.market_cap, f.pe, f.roe, f.debt_to_equity,
+           f.revenue_growth, f.pat_growth
+    FROM filings_raw r
+    JOIN filings_enriched e ON e.record_id = r.record_id
+    LEFT JOIN fundamentals f ON f.symbol = r.symbol
+    WHERE e.validation_ok = 1 AND r.created_on >= ?
+    ORDER BY r.score DESC, r.created_on DESC
+    LIMIT 6
+  `).all(cutoffIso);
+
+  // Recent mgmt-consistency flags (last 7 days)
+  const concallCutoff = new Date(dateYmd + 'T00:00:00+05:30');
+  concallCutoff.setDate(concallCutoff.getDate() - 7);
+  const concallCutoffIso = concallCutoff.toISOString();
+  const mgmtFlags = db.prepare(`
+    SELECT c.isin, c.symbol, c.company_name, c.event_time,
+           e.headline, e.inconsistency_flag, e.the_take
+    FROM concalls_raw c JOIN concalls_enriched e ON e.isin = c.isin AND e.event_time = c.event_time
+    WHERE e.validation_ok = 1 AND e.inconsistency_flag IS NOT NULL AND e.inconsistency_flag != ''
+      AND c.event_time >= ?
+    ORDER BY c.event_time DESC LIMIT 3
+  `).all(concallCutoffIso);
+
+  // Macro events scheduled for today (India + high-impact global)
+  const macroEvents = db.prepare(`
+    SELECT date, country_code, coverage, indicator, period, previous_val, forecast_val, actual_val,
+           category, unit, impact
+    FROM macro_calendar
+    WHERE substr(date, 1, 10) = ?
+      AND (country_code = 'IN' OR impact = 'H')
+    ORDER BY (country_code = 'IN') DESC, impact ASC, date ASC
+    LIMIT 8
+  `).all(dateYmd);
+
+  // Market snapshot — Nifty, Sensex, Bank Nifty, India VIX
+  const marketRows = db.prepare(`
+    SELECT s.symbol, s.name, s.price, s.change_abs, s.change_pct, s.prev_close
+    FROM market_snapshots s
+    INNER JOIN (
+      SELECT symbol, MAX(fetched_at) AS max_t FROM market_snapshots
+      WHERE symbol IN ('^NSEI', '^BSESN', '^NSEBANK', '^INDIAVIX')
+      GROUP BY symbol
+    ) latest ON latest.symbol = s.symbol AND latest.max_t = s.fetched_at
+  `).all();
+
+  return {
+    type, date: dateYmd, window_hours: windowHours,
+    top_filings: topFilings,
+    mgmt_consistency_flags: mgmtFlags,
+    macro_events_today: macroEvents,
+    market_snapshot: marketRows,
+  };
+}
+
+function renderTopFilings(rows) {
+  if (!rows.length) return '(none)';
+  const fmt = (value, suffix = '') => value == null ? 'n/a' : `${value}${suffix}`;
+  return rows.map(r => {
+    const financial = [
+      r.sector ? `sector ${r.sector}` : null,
+      r.market_cap != null ? `market cap ₹${Number(r.market_cap).toLocaleString('en-IN')} cr` : null,
+      r.pe != null ? `P/E ${r.pe}x` : null,
+      r.roe != null ? `ROE ${r.roe}%` : null,
+      r.debt_to_equity != null ? `debt/equity ${r.debt_to_equity}x` : null,
+      r.revenue_growth != null ? `revenue growth ${fmt(r.revenue_growth, '%')}` : null,
+      r.pat_growth != null ? `PAT growth ${fmt(r.pat_growth, '%')}` : null,
+    ].filter(Boolean).join(' · ');
+    return `- [${r.symbol || '?'} · score ${r.score} · ${r.category}] ${r.headline}\n  Dek: ${r.dek || ''}\n  Number: ${r.the_number_value || ''} (${r.the_number_label || ''})\n  Financial context: ${financial || 'n/a'}\n  Why: ${r.why_it_matters || ''}\n  URL: /filings/${(r.symbol || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${r.record_id}/  filing_id: ${r.record_id}`;
+  }).join('\n\n');
+}
+function renderMgmtFlags(rows) {
+  if (!rows.length) return '(none)';
+  return rows.map(r =>
+    `- ${r.company_name} (${r.symbol || '?'}) · ${r.event_time.slice(0,10)}\n  Flag: ${r.inconsistency_flag}\n  Take: ${r.the_take || ''}\n  URL: /concalls/${String(r.symbol||'').toLowerCase()}/${r.event_time.slice(0,10)}/`
+  ).join('\n\n');
+}
+function renderMacroEvents(rows) {
+  if (!rows.length) return '(none scheduled)';
+  return rows.map(e => {
+    const parts = [`${e.country_code || '??'} · ${e.indicator}`];
+    if (e.previous_val != null) parts.push(`prev ${e.previous_val}${e.unit ? ' '+e.unit : ''}`);
+    if (e.forecast_val != null) parts.push(`fcst ${e.forecast_val}${e.unit ? ' '+e.unit : ''}`);
+    if (e.actual_val != null)   parts.push(`actual ${e.actual_val}${e.unit ? ' '+e.unit : ''}`);
+    parts.push(`impact ${e.impact || '?'}`);
+    return '- ' + parts.join(' · ');
+  }).join('\n');
+}
+function renderMarketSnapshot(rows) {
+  if (!rows.length) return '(market data not available)';
+  return rows.map(r => {
+    const pct = r.change_pct == null ? '—' : `${r.change_pct > 0 ? '+' : ''}${r.change_pct.toFixed(2)}%`;
+    return `- ${r.name || r.symbol}: ${r.price?.toFixed(2) || '?'} (${pct}, prev ${r.prev_close?.toFixed(2) || '?'})`;
+  }).join('\n');
+}
+
+function buildUserMessage(template, inputs) {
+  return template
+    .replace('{briefing_type}', inputs.type)
+    .replace('{date}',          inputs.date)
+    .replace('{window_hours}',  String(inputs.window_hours))
+    .replace('{market_snapshot}',          renderMarketSnapshot(inputs.market_snapshot))
+    .replace('{top_filings}',              renderTopFilings(inputs.top_filings))
+    .replace('{mgmt_consistency_flags}',   renderMgmtFlags(inputs.mgmt_consistency_flags))
+    .replace('{macro_events_today}',       renderMacroEvents(inputs.macro_events_today));
+}
+
+export async function enrichBriefing(inputs, previousAttempt = null) {
+  if (!CFG.apiKey) return { ok: false, error: 'missing API key' };
+  const { system, userTemplate } = await loadPrompts();
+  const userMsg = buildUserMessage(userTemplate, inputs);
+
+  const messages = [
+    { role: 'system', content: system },
+    { role: 'user',   content: userMsg },
+  ];
+  if (previousAttempt?.parsed && previousAttempt?.validation?.issues?.length) {
+    messages.push(
+      { role: 'assistant', content: JSON.stringify(previousAttempt.parsed) },
+      { role: 'user',      content: buildFeedbackMessage(previousAttempt.validation) },
+    );
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CFG.timeoutMs);
+  const t0 = Date.now();
+  try {
+    const r = await fetch(`${CFG.baseUrl}/chat/completions`, {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Authorization': `Bearer ${CFG.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CFG.model,
+        messages,
+        response_format: { type: 'json_object' },
+        temperature: CFG.temperature,
+        max_tokens: CFG.maxTokens,
+      }),
+    });
+    const elapsed_ms = Date.now() - t0;
+    if (!r.ok) {
+      const body = await r.text();
+      return { ok: false, error: `HTTP ${r.status}`, raw_error: body.slice(0, 300), elapsed_ms };
+    }
+    const body = await r.json();
+    const content = body.choices?.[0]?.message?.content ?? '';
+    const start = content.indexOf('{');
+    const end   = content.lastIndexOf('}');
+    if (start === -1 || end <= start) return { ok: false, error: 'no_json', elapsed_ms };
+    let parsed;
+    try { parsed = JSON.parse(content.slice(start, end + 1)); }
+    catch (e) { return { ok: false, error: 'json_parse', raw_error: e.message, elapsed_ms }; }
+
+    const v = validate(parsed, inputs);
+    return {
+      ok: v.ok, parsed, validation: v,
+      model: CFG.model, promptVersion: BRIEFING_PROMPT_VERSION,
+      usage: body.usage || null, elapsed_ms,
+      user_message_sent: userMsg,
+    };
+  } catch (e) {
+    return { ok: false, error: e.name === 'AbortError' ? 'timeout' : e.message, elapsed_ms: Date.now() - t0 };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function buildFeedbackMessage(validation) {
+  const lines = ['Your previous briefing had these problems. Rewrite the entire JSON without them.'];
+  if (validation.banned?.length) {
+    lines.push('');
+    lines.push(`Banned phrases you used: ${validation.banned.map(b => `"${b}"`).join(', ')}`);
+    lines.push('Substitutions:');
+    lines.push('  - "underscore" / "highlight" / "showcase" / "emphasize" → name the human or the number ("Q3 sales of ₹420 cr show X").');
+    lines.push('  - "leverage" → use, draw on, tap.');
+    lines.push('  - "investors will" / "the market expects" → "the open question is" / "the next test is".');
+    lines.push('  - "transformative" → describe what specifically changes.');
+  }
+  if (validation.structural?.length) {
+    lines.push('');
+    lines.push('Structural problems detected — these need active rewriting:');
+    for (const s of validation.structural) {
+      lines.push(`  - ${s.name}: ${s.evidence}`);
+      if (s.name === 'monotone_sentence_lengths') {
+        lines.push('    FIX: Mix short (6-12 word) and long (20-30 word) sentences. Add a single-sentence fragment for emphasis.');
+      } else if (s.name === 'em_dash_overuse') {
+        lines.push('    FIX: Replace em-dashes with commas, periods, or parentheses. Maximum one em-dash in the whole briefing.');
+      }
+    }
+  }
+  lines.push('');
+  lines.push('Return the corrected JSON. Same schema. No commentary outside the JSON.');
+  return lines.join('\n');
+}
+
+function validate(parsed, inputs) {
+  const issues = [];
+  if (typeof parsed?.headline !== 'string' || parsed.headline.length === 0) issues.push('headline_missing');
+  else if (parsed.headline.length > 100) issues.push(`headline_too_long:${parsed.headline.length}`);
+  if (typeof parsed?.dek !== 'string') issues.push('dek_missing');
+  if (typeof parsed?.the_take !== 'string' || parsed.the_take.length < 15) issues.push('the_take_thin');
+  if (!Array.isArray(parsed?.sections) || parsed.sections.length === 0) issues.push('sections_empty');
+
+  // Collect all prose into one blob for the validator
+  const prose = [
+    parsed?.headline, parsed?.dek, parsed?.the_take,
+    ...((parsed?.sections || []).flatMap(s => [s?.label, s?.body, ...((s?.items || []).map(i => i?.text))])),
+  ].filter(Boolean).join(' ');
+
+  const banned = [];
+  for (const pat of PHRASE_PATTERNS) {
+    const m = prose.match(pat);
+    if (m) banned.push(m[0]);
+  }
+  if (banned.length) issues.push(`banned:${banned.slice(0, 5).join('|')}`);
+
+  const structural = [];
+  for (const rule of STRUCTURAL_RULES) {
+    const hit = rule(prose, { full_read: prose });  // briefings have no the_full_read; pass whole prose
+    if (hit) structural.push(hit);
+  }
+  if (structural.length) issues.push(`structural:${structural.map(s => s.name).join('|')}`);
+
+  return { ok: issues.length === 0, issues, banned, structural };
+}

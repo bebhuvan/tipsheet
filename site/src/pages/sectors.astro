@@ -1,0 +1,65 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { listAllSectors, sectorSlug } from '../lib/queries.mjs';
+
+const sectors = listAllSectors();
+const total = sectors.length;
+const totalArticles = sectors.reduce((s, x) => s + (x.article_count || 0), 0);
+
+function fmtCr(n) {
+  if (n == null) return '—';
+  if (n >= 100000) return `₹${(n/100000).toFixed(2)} lakh cr`;
+  return `₹${Math.round(n).toLocaleString('en-IN')} cr`;
+}
+
+// Group sectors by family (first word before the dash, e.g. "Engineering" from "Engineering - Construction")
+const families = new Map();
+for (const s of sectors) {
+  const family = String(s.sector).split(/\s*-\s*/)[0].trim();
+  if (!families.has(family)) families.set(family, []);
+  families.get(family).push(s);
+}
+const familyKeys = [...families.keys()].sort();
+---
+<Base
+  title={`Sectors — every Indian-equity sector we cover (${total})`}
+  description={`Browse every Indian-equity sector with published notes. ${total} sectors, ${totalArticles} articles. Sector aggregates and recent activity for each.`}
+>
+  <Masthead activeNav="sectors" />
+  <main>
+    <article class="index-page">
+      <header class="index-header">
+        <div class="kicker"><span>Sectors</span></div>
+        <h1 class="page-title">{total} sectors covered.</h1>
+        <p class="page-dek">{totalArticles} editorial reads across every sector represented in our coverage. Each sector page has anchor companies (by market cap) and recent activity.</p>
+      </header>
+
+      <div class="sector-families">
+        {familyKeys.map(family => (
+          <section class="sector-family">
+            <h2 class="family-name">{family}</h2>
+            <ul class="sector-rows">
+              {families.get(family).sort((a,b) => (b.total_mcap || 0) - (a.total_mcap || 0)).map(s => (
+                <li class="sector-row">
+                  <a href={`/sector/${sectorSlug(s.sector)}/`}>
+                    <span class="sr-name">{s.sector}</span>
+                    <span class="sr-meta mono">
+                      <span class="sr-count">{s.article_count} {s.article_count === 1 ? 'note' : 'notes'}</span>
+                      <span class="sep">·</span>
+                      <span>{s.company_count} {s.company_count === 1 ? 'co.' : 'cos.'}</span>
+                      <span class="sep">·</span>
+                      <span class="sr-mcap">{fmtCr(s.total_mcap)}</span>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

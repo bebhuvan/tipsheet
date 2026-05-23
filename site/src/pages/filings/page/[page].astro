@@ -1,0 +1,74 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Masthead from '../../../components/Masthead.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { listFilings } from '../../../lib/queries.mjs';
+
+export async function getStaticPaths() {
+  const PER_PAGE = 25;
+  const all = listFilings({ limit: 10000 });
+  const totalPages = Math.max(1, Math.ceil(all.length / PER_PAGE));
+  // Pages 2..N; page 1 is at /filings/
+  const paths = [];
+  for (let p = 2; p <= totalPages; p++) {
+    paths.push({
+      params: { page: String(p) },
+      props: {
+        page: p,
+        totalPages,
+        items: all.slice((p - 1) * PER_PAGE, p * PER_PAGE),
+      },
+    });
+  }
+  return paths;
+}
+
+const { page, totalPages, items } = Astro.props;
+function timeOf(iso) { const m = String(iso || '').match(/(\d{2}:\d{2})/); return m ? `${m[1]} IST` : ''; }
+function dateOf(iso) {
+  const d = new Date(String(iso).replace(' ', 'T'));
+  if (Number.isNaN(d.valueOf())) return iso;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]}`;
+}
+
+const prevHref = page === 2 ? '/filings/' : `/filings/page/${page - 1}/`;
+const nextHref = page < totalPages ? `/filings/page/${page + 1}/` : null;
+---
+<Base
+  title={`Notes archive · page ${page}`}
+  description={`Notes archive, page ${page} of ${totalPages}.`}
+>
+  <Masthead activeNav="filings" />
+
+  <main>
+    <article class="archive-page">
+      <header class="archive-header">
+        <div class="kicker"><span>Archive</span> <span class="sep">/</span> <span>Page {page}</span></div>
+        <h1 class="page-title">Notes archive.</h1>
+      </header>
+
+      <div class="archive-list">
+        {items.map(f => (
+          <a href={f.canonical_url} class="archive-row">
+            <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
+            <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
+            <div class="archive-body">
+              <div class="kicker">{f.canonical_category} · {f.sector}</div>
+              <h3>{f.headline}</h3>
+            </div>
+            <span class="archive-ticker">{f.symbol}</span>
+          </a>
+        ))}
+      </div>
+
+      <nav class="pagination" aria-label="Pagination">
+        <a href={prevHref} rel="prev">← Prev</a>
+        <span class="current">Page {page} of {totalPages}</span>
+        {nextHref && <a href={nextHref} rel="next">Next →</a>}
+      </nav>
+    </article>
+  </main>
+
+  <SiteFooter />
+</Base>

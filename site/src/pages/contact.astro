@@ -1,0 +1,42 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+<Base
+  title="Contact"
+  description="How to reach Tipsheet: tips, corrections, feedback, partnership enquiries."
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Contact</span></div>
+        <h1 class="page-title">Contact us.</h1>
+      </header>
+
+      <hr class="rule" />
+
+      <h2>Tips</h2>
+      <p>
+        If you have material non-public information about a listed Indian company, do not send it to us — it is unlawful for us to use and unlawful for you to share. If you have publicly available material we may have missed, or context that would improve a story, send it our way.
+      </p>
+
+      <h2>Corrections</h2>
+      <p>
+        Found a factual error in a note? See our <a href="/corrections/">corrections policy</a> and contact us with the article URL and the specific claim you are correcting.
+      </p>
+
+      <h2>How to reach us</h2>
+      <p style="color: var(--text-muted); font-style: italic;">
+        Email contact will be published here shortly. Until then, use the platforms listed on <a href="/about/#team">our about page</a>.
+      </p>
+
+      <h2>Press and partnership enquiries</h2>
+      <p>
+        We are open to partnerships with primary-source data providers, financial-information services, and other publications. We do not accept paid content placements or advertising.
+      </p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

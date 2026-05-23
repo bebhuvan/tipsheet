@@ -1,0 +1,70 @@
+---
+import Base from '../../layouts/Base.astro';
+import Masthead from '../../components/Masthead.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { BRAND_NAME, EDITORIAL_BYLINE, EDITORIAL_BYLINE_SLUG } from '../../lib/brand.mjs';
+
+const ORG_ID = (Astro.site?.toString() || '') + '#org';
+const PERSON_ID = (Astro.site?.toString() || '') + `authors/${EDITORIAL_BYLINE_SLUG}/#person`;
+
+const personSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': PERSON_ID,
+  name: EDITORIAL_BYLINE,
+  description: `The editorial team behind ${BRAND_NAME}. Covers Indian-equity disclosures with a focus on what is materially new in a filing and what it means.`,
+  url: (Astro.site?.toString() || '') + `authors/${EDITORIAL_BYLINE_SLUG}/`,
+  parentOrganization: { '@id': ORG_ID },
+  knowsAbout: [
+    { '@type': 'Thing', name: 'Indian equity markets',          sameAs: 'https://www.wikidata.org/wiki/Q1632779' },
+    { '@type': 'Thing', name: 'Corporate disclosures' },
+    { '@type': 'Thing', name: 'Earnings reports' },
+    { '@type': 'Thing', name: 'Credit ratings' },
+    { '@type': 'Thing', name: 'Mergers and acquisitions',       sameAs: 'https://www.wikidata.org/wiki/Q187420' },
+    { '@type': 'Thing', name: 'SEBI regulations',               sameAs: 'https://www.wikidata.org/wiki/Q1633596' },
+    { '@type': 'Thing', name: 'Bombay Stock Exchange',          sameAs: 'https://www.wikidata.org/wiki/Q165566' },
+    { '@type': 'Thing', name: 'National Stock Exchange of India', sameAs: 'https://www.wikidata.org/wiki/Q815464' },
+  ],
+};
+---
+<Base
+  title={EDITORIAL_BYLINE}
+  description={`The editorial team behind ${BRAND_NAME}. Covers Indian-equity disclosures with a focus on what is materially new in a filing and what it means.`}
+  schema={personSchema}
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Author</span></div>
+        <h1 class="page-title">Tipsheet Editorial.</h1>
+        <p class="page-dek">The editorial byline used for notes and Concall Notes produced by the central editorial team.</p>
+      </header>
+
+      <hr class="rule" />
+
+      <h2>About this byline</h2>
+      <p>
+        Articles bylined "Tipsheet Editorial" are produced by the central editorial team, under the standards documented at <a href="/editorial-standards/">/editorial-standards</a> and the methodology documented at <a href="/methodology/">/methodology</a>.
+      </p>
+
+      <h2>Beat</h2>
+      <p>
+        Indian-equity disclosures: earnings, concalls, order wins, M&amp;A, credit rating actions, regulatory filings, and material corporate events for companies listed on the Bombay Stock Exchange and the National Stock Exchange of India.
+      </p>
+
+      <h2>Editorial principles</h2>
+      <ul>
+        <li>Every concrete claim traces to a primary source.</li>
+        <li>The company is the subject; the document is the source.</li>
+        <li>Verbs are action, not procedure.</li>
+        <li>One position per piece, defended, not hedged.</li>
+        <li>Thin filing, thin note. Padding is the worst sin.</li>
+      </ul>
+
+      <h2>Contact</h2>
+      <p>See <a href="/contact/">the contact page</a> for tips, corrections, and feedback.</p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

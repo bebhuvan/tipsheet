@@ -1,0 +1,42 @@
+---
+import Base from '../../layouts/Base.astro';
+import Masthead from '../../components/Masthead.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+---
+<Base
+  title="Authors"
+  description="The editorial team behind Tipsheet."
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Authors</span></div>
+        <h1 class="page-title">Editorial team.</h1>
+        <p class="page-dek">Every Tipsheet article is published under an editorial byline. As we grow, individual reporters will be listed here with their beats and backgrounds.</p>
+      </header>
+
+      <hr class="rule" />
+
+      <div class="author-list">
+        <a href="/authors/filings-editorial/" class="author-card">
+          <h3>Tipsheet Editorial</h3>
+          <p>The byline used for editorial pieces produced by the central editorial team.</p>
+        </a>
+      </div>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>
+
+<style>
+  .author-list { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
+  .author-card {
+    display: block; padding: 18px 20px; border: 1px solid var(--border);
+    border-radius: 4px; text-decoration: none; color: inherit;
+    transition: border-color 120ms;
+  }
+  .author-card:hover { border-color: var(--text); }
+  .author-card h3 { font-family: var(--serif); font-weight: 500; margin: 0 0 4px; }
+  .author-card p { color: var(--text-muted); margin: 0; font-size: 14px; }
+</style>

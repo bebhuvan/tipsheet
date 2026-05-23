@@ -1,0 +1,46 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { smartMoneyFilings, tierFor } from '../lib/queries.mjs';
+
+const items = smartMoneyFilings(100);
+
+function timeOf(iso) { const m = String(iso || '').match(/(\d{2}:\d{2})/); return m ? `${m[1]} IST` : ''; }
+function dateOf(iso) {
+  const d = new Date(String(iso).replace(' ', 'T'));
+  if (Number.isNaN(d.valueOf())) return iso;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]}`;
+}
+---
+<Base
+  title="Smart Money — promoter, insider, M&A activity"
+  description="Promoter trades, pledges, warrants, insider deals, M&A and famous-investor activity — tracked across every Indian listed company."
+>
+  <Masthead activeNav="smartmoney" />
+  <main>
+    <article class="archive-page">
+      <header class="archive-header">
+        <div class="kicker"><span>Smart Money</span></div>
+        <h1 class="page-title">Smart Money.</h1>
+        <p class="page-dek">Promoter and insider activity — pledges, warrant issues, insider trades — plus M&amp;A and any filing where a famous investor's name appears. {items.length} tracked.</p>
+      </header>
+      <div class="archive-list">
+        {items.length === 0 && <p style="font-style: italic; color: var(--text-muted); padding: 24px 0;">Nothing to report yet — this view fills with promoter and insider activity as it's filed.</p>}
+        {items.map(f => (
+          <a href={f.canonical_url} class="archive-row">
+            <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
+            <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
+            <div class="archive-body">
+              <div class="kicker">{tierFor(f.score)} · {f.event_category_raw || f.canonical_category} · {f.sector}</div>
+              <h3>{f.headline}</h3>
+            </div>
+            <span class="archive-ticker">{f.symbol}</span>
+          </a>
+        ))}
+      </div>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

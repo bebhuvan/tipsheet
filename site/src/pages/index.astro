@@ -1,0 +1,226 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { getHomepageBundle, listBriefings } from '../lib/queries.mjs';
+import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
+
+const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalToday, hiScore } = getHomepageBundle();
+// Show every active section, ordered by editorial weight.
+const SECTION_ORDER = ['Earnings', 'Order Wins', 'M&A', 'Concalls', 'Credit', 'Regulatory', 'Capital Markets', 'Buybacks', 'Other'];
+const orderedBriefs = [...briefs].sort((a, b) => {
+  const ai = SECTION_ORDER.indexOf(a.name); const bi = SECTION_ORDER.indexOf(b.name);
+  return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+});
+
+// One Open + one Close, shown as a slim ribbon above the lead.
+const allBriefings   = listBriefings(8);
+const latestOpen     = allBriefings.find(b => b.type === 'open');
+const latestClose    = allBriefings.find(b => b.type === 'close');
+const briefingRibbon = [latestClose, latestOpen].filter(Boolean);
+
+function tierLabel(s) {
+  if (s >= 9) return 'Alert';
+  if (s >= 7) return 'Lead';
+  return 'Brief';
+}
+function scoreBand(s) {
+  if (s >= 9) return 'score-hi';
+  if (s >= 7) return 'score-mid';
+  return 'score-low';
+}
+function timeOf(iso) {
+  const m = String(iso || '').match(/(\d{2}:\d{2})/);
+  return m ? `${m[1]} IST` : '';
+}
+function pct(score, max) { return Math.round((score / max) * 100); }
+const maxDistCount = Math.max(1, ...dist.map(d => d.c));
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: BRAND_NAME,
+  url: Astro.site?.toString(),
+  description: 'An editorial reading of Indian exchange filings.',
+};
+---
+<Base
+  title={`${BRAND_NAME} · ${BRAND_TAGLINE.replace(/\.$/, '')}`}
+  description="A curated daily edition of the most consequential filings on the BSE and NSE — scored, contextualised, and stripped of clickbait."
+  schema={schema}
+>
+  <Masthead activeNav="today" />
+
+  <main>
+    {briefingRibbon.length > 0 && (
+      <section class="briefing-ribbon">
+        {briefingRibbon.map(b => (
+          <a href={b.canonical_url} class:list={['ribbon-card', b.type]}>
+            <div class="ribbon-meta">
+              <span class="ribbon-label">{b.label}</span>
+              <span class="ribbon-date">{b.date}</span>
+            </div>
+            <div class="ribbon-headline">{b.headline}</div>
+          </a>
+        ))}
+      </section>
+    )}
+
+    {lead && (
+      <section class="hero reveal d1">
+        <article class="hero-lead">
+          <div class:list={['lead-tier', scoreBand(lead.score)]}>
+            <span class="tier">{tierLabel(lead.score)}</span>
+            {lead.sector && <>
+              <span class="sep">·</span>
+              <span class="sector">{lead.sector}</span>
+            </>}
+          </div>
+
+          <h1 class="lead-headline">
+            <a class="headline-link" href={lead.canonical_url}>{lead.headline}</a>
+          </h1>
+          <p class="lead-dek">{lead.dek}</p>
+
+          <div class="lead-meta">
+            <span class="ticker">{lead.symbol}</span>
+            {lead.scripcode && <span>BSE {lead.scripcode}</span>}
+            <span>{timeOf(lead.created_on)}</span>
+            <a class="read inline" href={lead.canonical_url}>Read the filing</a>
+          </div>
+
+          {leadCompanions && leadCompanions.length > 0 && (
+            <div class="lead-companions">
+              {leadCompanions.map(f => (
+                <a href={f.canonical_url} class="lc-item">
+                  <div class:list={['lc-kicker', scoreBand(f.score)]}>
+                    <span class="lc-tier">{tierLabel(f.score)}</span>
+                    {f.sector && <>
+                      <span class="lc-dot">·</span>
+                      <span>{f.sector}</span>
+                    </>}
+                  </div>
+                  <h3 class="lc-headline">{f.headline}</h3>
+                  {f.dek && <p class="lc-dek">{f.dek}</p>}
+                  <div class="lc-meta">
+                    <span class="ticker">{f.symbol}</span>
+                    <span>{timeOf(f.created_on)}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </article>
+
+        {secondaries.length > 0 && (
+          <aside class="hero-rail">
+            {secondaries.map(f => (
+              <article class="hero-sec">
+                <div class:list={['sec-kicker', scoreBand(f.score)]}>
+                  <span class="sec-tier">{tierLabel(f.score)}</span>
+                  {f.sector && <>
+                    <span class="sec-dot">·</span>
+                    <span>{f.sector}</span>
+                  </>}
+                </div>
+                <h2 class="sec-headline">
+                  <a class="headline-link" href={f.canonical_url}>{f.headline}</a>
+                </h2>
+                <p class="sec-dek">{f.dek}</p>
+                <div class="sec-meta">
+                  <span class="ticker">{f.symbol}</span>
+                  <span>{timeOf(f.created_on)}</span>
+                </div>
+              </article>
+            ))}
+          </aside>
+        )}
+      </section>
+    )}
+
+    {midtier && midtier.length > 0 && (
+      <section class="midtier">
+        <div class="midtier-head">
+          <h2><em>Also today</em></h2>
+          <span class="meta">A wider net across the desks</span>
+        </div>
+        <div class="midtier-grid">
+          {midtier.map(f => (
+            <a href={f.canonical_url} class="mt-item">
+              <div class:list={['mt-kicker', scoreBand(f.score)]}>
+                <span class="mt-tier">{tierLabel(f.score)}</span>
+                {f.canonical_category && f.canonical_category !== 'Other' && <>
+                  <span class="mt-dot">·</span>
+                  <span>{f.canonical_category}</span>
+                </>}
+              </div>
+              <h3 class="mt-headline">{f.headline}</h3>
+              <div class="mt-meta">
+                <span class="ticker">{f.symbol}</span>
+                <span>{timeOf(f.created_on)}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {orderedBriefs.length > 0 && (
+      <section class="briefs">
+        <div class="briefs-head">
+          <h2><em>By section</em></h2>
+          <span class="meta">Today, top of each desk</span>
+        </div>
+        <div class="briefs-grid">
+          {orderedBriefs.map(b => {
+            const catSlug = b.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            return (
+            <section class="brief">
+              <header class="brief-head">
+                <h3>{b.name}</h3>
+                <span class="ct"><span class="ct-num">{b.total}</span> today</span>
+              </header>
+              <ol class="brief-list">
+                {b.items.slice(0, 4).map(item => (
+                  <li>
+                    <a href={item.canonical_url} class="brief-item">
+                      <span class:list={['bi-ticker', scoreBand(item.score)]}>{item.symbol}</span>
+                      <h4 class="bi-headline">{item.headline}</h4>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+              <a href={`/filings/category/${catSlug}/`} class="brief-more">All {b.name.toLowerCase()} →</a>
+            </section>
+            );
+          })}
+        </div>
+      </section>
+    )}
+
+    <section class="wire-section">
+      <div class="wire-head">
+        <h2><em>The Wire</em></h2>
+        <span class="meta">{totalToday} filings today · {hiScore} alerts</span>
+      </div>
+      <div class="wire-list">
+        {wire.map(f => (
+          <a href={f.canonical_url} class="wire-row">
+            <span class="wire-time">{timeOf(f.created_on)}</span>
+            <span class:list={['wire-tier', scoreBand(f.score)]}>{tierLabel(f.score)}</span>
+            <div class="wire-body">
+              <div class="kicker">
+                {f.canonical_category && f.canonical_category !== 'Other' ? <>{f.canonical_category} · {f.sector}</> : f.sector}
+              </div>
+              <h3>{f.headline}</h3>
+            </div>
+            <span class="wire-ticker">{f.symbol}</span>
+          </a>
+        ))}
+      </div>
+      <div class="wire-more"><a href="/filings/">See all filings →</a></div>
+    </section>
+  </main>
+
+  <SiteFooter />
+</Base>

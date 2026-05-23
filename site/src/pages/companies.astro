@@ -1,0 +1,65 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { listAllCompanies, sectorSlug } from '../lib/queries.mjs';
+
+const companies = listAllCompanies();
+const total = companies.length;
+
+// Group by first letter of company name
+const groups = new Map();
+for (const c of companies) {
+  const ch = String(c.company || c.symbol || '#').charAt(0).toUpperCase();
+  const key = /[A-Z]/.test(ch) ? ch : '#';
+  if (!groups.has(key)) groups.set(key, []);
+  groups.get(key).push(c);
+}
+const alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+const presentLetters = alphabet.filter(l => groups.has(l));
+if (groups.has('#')) presentLetters.push('#');
+
+const totalCompanies = total;
+const totalArticles = companies.reduce((sum, c) => sum + (c.article_count || 0), 0);
+---
+<Base
+  title={`Companies — every Indian-equity company we cover (${totalCompanies})`}
+  description={`Browse every Indian-listed company with published notes. ${totalCompanies} companies, ${totalArticles} articles. Editorial reads on exchange filings, with fundamentals snapshot from primary sources.`}
+>
+  <Masthead activeNav="companies" />
+  <main>
+    <article class="index-page">
+      <header class="index-header">
+        <div class="kicker"><span>Companies</span></div>
+        <h1 class="page-title">{totalCompanies} companies covered.</h1>
+        <p class="page-dek">{totalArticles} editorial reads across every Indian-listed company we've published on. Browse alphabetically, click through for the full timeline and fundamentals on each.</p>
+      </header>
+
+      <nav class="alpha-nav" aria-label="Jump to letter">
+        <span class="label">Jump to:</span>
+        {presentLetters.map(l => <a href={`#letter-${l === '#' ? 'other' : l}`}>{l}</a>)}
+      </nav>
+
+      <div class="index-list">
+        {presentLetters.map(l => (
+          <section class="index-section" id={`letter-${l === '#' ? 'other' : l}`}>
+            <h2 class="index-letter">{l}</h2>
+            <ul class="company-rows">
+              {groups.get(l).map(c => (
+                <li class="company-row">
+                  <a href={`/company/${String(c.symbol).toLowerCase()}/`}>
+                    <span class="cr-ticker mono">{c.symbol}</span>
+                    <span class="cr-name">{c.company || c.symbol}</span>
+                    {c.sector && <a href={`/sector/${sectorSlug(c.sector)}/`} class="cr-sector" onclick="event.stopPropagation()">{c.sector}</a>}
+                    <span class="cr-count mono">{c.article_count} {c.article_count === 1 ? 'note' : 'notes'}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

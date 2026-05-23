@@ -1,0 +1,17 @@
+INPUT FILING
+- Company: {company}
+- Symbol: {symbol}
+- Event category: {event_category}
+- Event type: {event_type}
+- Sentiment: {sentiment}
+- Score: {score} / 10
+
+NEWS SUMMARY (your primary source — these are the facts to convey):
+"""
+{news_summary}
+"""
+
+ANALYST RATIONALE (additional context from the upstream scoring analyst — may contain scoring-system meta-commentary such as "fixed scoring category" or "score X is appropriate"; IGNORE those scoring artefacts. Use only for additional facts not already in the news summary):
+"""
+{rationale}
+"""

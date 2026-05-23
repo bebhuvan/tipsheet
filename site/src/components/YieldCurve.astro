@@ -1,0 +1,92 @@
+---
+// Server-rendered SVG yield curve. Zero JS.
+// Plots tenor (x) vs yield % (y) with labeled points.
+interface Props {
+  points: Array<{ tenor_years: number, label: string, yield: number }>;
+  title?: string;
+  comparison?: Array<{ tenor_years: number, yield: number }>;  // optional: prior period for shading
+  width?: number;
+  height?: number;
+}
+const { points = [], title = 'Yield curve', comparison, width = 640, height = 280 } = Astro.props;
+
+const validPoints = (points || []).filter(p => p.yield != null && Number.isFinite(p.yield));
+const padL = 56, padR = 72, padT = 40, padB = 56;
+const plotW = width - padL - padR;
+const plotH = height - padT - padB;
+
+let svg = null;
+if (validPoints.length >= 2) {
+  // x: log-spaced for visual balance (3M and 30Y both legible)
+  const minTenor = Math.min(...validPoints.map(p => p.tenor_years));
+  const maxTenor = Math.max(...validPoints.map(p => p.tenor_years));
+  const xLog = (t) => {
+    const lmin = Math.log(minTenor);
+    const lmax = Math.log(maxTenor);
+    return padL + ((Math.log(t) - lmin) / (lmax - lmin)) * plotW;
+  };
+  // y: yield, padded by 0.3% above/below
+  const minY = Math.min(...validPoints.map(p => p.yield)) - 0.3;
+  const maxY = Math.max(...validPoints.map(p => p.yield)) + 0.3;
+  const yScale = (y) => padT + ((maxY - y) / (maxY - minY)) * plotH;
+
+  // y-axis ticks every 0.5%
+  const yTicks = [];
+  for (let v = Math.ceil(minY * 2) / 2; v <= maxY; v += 0.5) yTicks.push(+v.toFixed(2));
+
+  const sorted = [...validPoints].sort((a, b) => a.tenor_years - b.tenor_years);
+  const pathPts = sorted.map(p => [xLog(p.tenor_years), yScale(p.yield)]);
+  const pathD = 'M ' + pathPts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L ');
+  // shaded fill under curve
+  const fillD = `${pathD} L ${pathPts[pathPts.length-1][0].toFixed(1)} ${(padT + plotH).toFixed(1)} L ${pathPts[0][0].toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
+
+  svg = { pathD, fillD, sorted, xLog, yScale, yTicks, minY, maxY };
+}
+---
+<div class="yield-curve">
+  {svg ? (
+    <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={title}>
+      <title>{title}</title>
+      <!-- y-axis grid -->
+      {svg.yTicks.map(v => (
+        <g>
+          <line x1={padL} x2={width - padR} y1={svg.yScale(v)} y2={svg.yScale(v)}
+                stroke="var(--hairline)" stroke-width="1" />
+          <text x={padL - 10} y={svg.yScale(v) + 4} text-anchor="end"
+                font-family="JetBrains Mono, monospace" font-size="11" fill="var(--text-muted)">
+            {v.toFixed(2)}%
+          </text>
+        </g>
+      ))}
+      <!-- shaded area under the curve -->
+      <path d={svg.fillD} fill="var(--accent)" fill-opacity="0.08" />
+      <!-- the curve itself -->
+      <path d={svg.pathD} fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      <!-- points + labels -->
+      {svg.sorted.map(p => {
+        const x = svg.xLog(p.tenor_years);
+        const y = svg.yScale(p.yield);
+        return (
+          <g>
+            <circle cx={x} cy={y} r="4.5" fill="var(--bg)" stroke="var(--accent)" stroke-width="2" />
+            <text x={x} y={y - 14} text-anchor="middle"
+                  font-family="JetBrains Mono, monospace" font-size="12" font-weight="500" fill="var(--text)">
+              {p.yield.toFixed(2)}%
+            </text>
+            <text x={x} y={height - padB + 22} text-anchor="middle"
+                  font-family="JetBrains Mono, monospace" font-size="11" fill="var(--text-muted)" letter-spacing="0.1em">
+              {p.label}
+            </text>
+          </g>
+        );
+      })}
+      <!-- axis label -->
+      <text x={width / 2} y={height - 8} text-anchor="middle"
+            font-family="JetBrains Mono, monospace" font-size="10" fill="var(--text-faint)" letter-spacing="0.2em">
+        TENOR
+      </text>
+    </svg>
+  ) : (
+    <p style="font-style: italic; color: var(--text-muted);">Yield-curve data is incomplete.</p>
+  )}
+</div>

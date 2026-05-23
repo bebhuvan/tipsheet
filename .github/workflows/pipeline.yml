@@ -1,0 +1,213 @@
+name: Pipeline + Deploy
+
+on:
+  schedule:
+    # Market hours: every 30 min, 09:15–15:30 IST = UTC 03:45–10:00, weekdays
+    - cron: '15,45 3,4,5,6,7,8,9 * * 1-5'
+    - cron: '0 10 * * 1-5'
+    # Post-market: 15:30–17:00 IST = UTC 10:00–11:30
+    - cron: '0,30 10,11 * * 1-5'
+    # Morning open briefing — 08:45 IST weekdays
+    - cron: '15 3 * * 1-5'
+    # Evening close briefing — 17:00 IST weekdays
+    - cron: '30 11 * * 1-5'
+    # Late-night catch — 22:00 IST weekdays
+    - cron: '30 16 * * 1-5'
+    # Weekend full refresh — Sunday 11:30 IST
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+    inputs:
+      skip_deploy:
+        description: 'Skip Cloudflare Pages deploy'
+        type: boolean
+        default: false
+      skip_pipeline:
+        description: 'Skip pipeline (rebuild site only)'
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ !inputs.skip_pipeline }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Restore DB from cache (keyed by date so it rolls daily)
+      - name: Restore DB cache
+        uses: actions/cache/restore@v4
+        id: db-cache
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_number }}
+          restore-keys: |
+            filings-db-
+
+      - name: Ensure data directory
+        run: mkdir -p data
+
+      - name: Install pipeline deps
+        run: cd pipeline && npm ci
+
+      # ─── Core pipeline steps ───────────────────────────────────────
+      - name: Poll filings
+        run: cd pipeline && node --env-file=../.env.ci run.mjs poll
+        env:
+          TIJORI_FEED_URL: ${{ secrets.TIJORI_FEED_URL }}
+
+      - name: Enrich filings
+        run: cd pipeline && node --env-file=../.env.ci run.mjs enrich 50
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+
+      - name: Fetch fundamentals
+        run: cd pipeline && node --env-file=../.env.ci run.mjs fetch-fundamentals
+        env:
+          KITE_SCREENER_URL: ${{ secrets.KITE_SCREENER_URL }}
+
+      - name: Resolve Tijori slugs
+        run: cd pipeline && node --env-file=../.env.ci run.mjs resolve-tijori-slugs 50
+        continue-on-error: true
+
+      - name: Poll + enrich concalls
+        run: cd pipeline && node --env-file=../.env.ci run.mjs concalls 50
+        env:
+          TIJORI_CONCALLS_API_KEY: ${{ secrets.TIJORI_CONCALLS_API_KEY }}
+          TIJORI_CONCALLS_BASE_URL: ${{ secrets.TIJORI_CONCALLS_BASE_URL }}
+        continue-on-error: true
+
+      - name: Poll macro calendar
+        run: cd pipeline && node --env-file=../.env.ci run.mjs poll-macro-calendar
+        env:
+          INDIA_DATAHUB_API_KEY: ${{ secrets.INDIA_DATAHUB_API_KEY }}
+          INDIA_DATAHUB_BASE_URL: ${{ secrets.INDIA_DATAHUB_BASE_URL }}
+        continue-on-error: true
+
+      - name: Generate briefings
+        run: |
+          cd pipeline
+          node --env-file=../.env.ci run.mjs briefing-close || true
+          node --env-file=../.env.ci run.mjs briefing-open  || true
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+
+      - name: Generate radar
+        run: cd pipeline && node --env-file=../.env.ci run.mjs generate-radar
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        continue-on-error: true
+
+      - name: Show stats
+        run: cd pipeline && node --env-file=../.env.ci run.mjs stats
+
+      # ─── Persist DB ────────────────────────────────────────────────
+      - name: Save DB cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_number }}
+
+      - name: Upload DB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: filings-db
+          path: data/filings.db
+          retention-days: 7
+
+  build-deploy:
+    needs: pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Run even if pipeline was skipped (for rebuild-only runs)
+    if: ${{ always() && !inputs.skip_deploy && (needs.pipeline.result == 'success' || inputs.skip_pipeline) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Get DB — from artifact if pipeline ran, from cache if pipeline was skipped
+      - name: Download DB artifact
+        if: ${{ !inputs.skip_pipeline }}
+        uses: actions/download-artifact@v4
+        with:
+          name: filings-db
+          path: data/
+
+      - name: Restore DB from cache (rebuild-only)
+        if: ${{ inputs.skip_pipeline }}
+        uses: actions/cache/restore@v4
+        with:
+          path: data/filings.db
+          key: filings-db-
+          restore-keys: |
+            filings-db-
+
+      - name: Install site deps
+        run: cd site && npm ci
+
+      - name: Build site
+        run: cd site && npm run build
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: deploy
+
+      - name: Notify Telegram
+        if: success() && !inputs.skip_pipeline
+        continue-on-error: true
+        run: |
+          cd pipeline && node --env-file=../.env.ci -e "
+            import { openDb } from './db.mjs';
+            const db = openDb();
+            const cutoff = Math.floor(Date.now() / 1000) - 35 * 60;
+            const rows = db.prepare(\`
+              SELECT r.symbol, r.company, r.score,
+                     e.headline, e.dek, e.the_number_value, e.the_number_label,
+                     e.canonical_category, e.tone_score, r.record_id
+              FROM filings_enriched e
+              JOIN filings_raw r ON r.record_id = e.record_id
+              WHERE e.enriched_at > ? AND e.validation_ok = 1
+              ORDER BY r.score DESC LIMIT 10
+            \`).all(cutoff);
+            if (!rows.length) { console.log('No new articles to notify'); process.exit(0); }
+            const tierFor = (s) => s >= 9 ? 'Alert' : s >= 7 ? 'Lead' : 'Brief';
+            const articles = rows.map(r => ({
+              symbol: r.symbol, tier: tierFor(r.score),
+              headline: r.headline, dek: r.dek,
+              the_number_value: r.the_number_value, the_number_label: r.the_number_label,
+              canonical_url: '/filings/' + (r.symbol || '').toLowerCase() + '-' + r.record_id + '/',
+            }));
+            const resp = await fetch(process.env.TELEGRAM_NOTIFY_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + process.env.TELEGRAM_NOTIFY_SECRET,
+              },
+              body: JSON.stringify({ articles }),
+            });
+            console.log('Telegram notify:', resp.status, await resp.text());
+          "
+        env:
+          TELEGRAM_NOTIFY_URL: ${{ secrets.TELEGRAM_NOTIFY_URL }}
+          TELEGRAM_NOTIFY_SECRET: ${{ secrets.TELEGRAM_NOTIFY_SECRET }}

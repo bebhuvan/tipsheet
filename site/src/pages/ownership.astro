@@ -1,0 +1,48 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+<Base
+  title="Ownership and funding"
+  description="Who owns and funds Tipsheet. Founder-funded, no advertising, no external investor influence on editorial."
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Ownership</span></div>
+        <h1 class="page-title">Ownership and funding.</h1>
+      </header>
+
+      <hr class="rule" />
+
+      <h2>Who owns Tipsheet</h2>
+      <p>
+        Tipsheet is owned by its founder. The publication does not have outside investors. Editorial control rests entirely with the editorial team and is not subject to influence from any third party.
+      </p>
+
+      <h2>How Tipsheet is funded</h2>
+      <p>
+        Tipsheet is funded by the founder out of pocket. Operating costs are minimal — under fifty dollars a year for infrastructure, hosting, and the language-model APIs used in production. We do not accept advertising. We do not accept paid placements. We do not accept sponsored content. We do not run a paywall.
+      </p>
+      <p>
+        If Tipsheet becomes commercially viable in the future, the publication will explore funding models that do not compromise editorial independence — for example, paid subscriptions for institutional users.
+      </p>
+
+      <h2>Relationship with Tijori</h2>
+      <p>
+        Tipsheet uses data feeds from <a href="https://tijorifinance.com" target="_blank" rel="noopener">Tijori Finance</a> and the <a href="https://www.tijoristack.ai/concall-monitor" target="_blank" rel="noopener">Tijori Concall Monitor</a> API for primary-source filings and earnings-call summaries. The founder has a working relationship with Tijori. Tijori does not influence editorial decisions, does not see articles before publication, and is not paid for content placement.
+      </p>
+      <p>
+        Where we use Tijori data, we credit the source on every article and link readers back to Tijori's product. This is a credit and discoverability arrangement, not a commercial one.
+      </p>
+
+      <h2>No conflict of interest in coverage</h2>
+      <p>
+        We do not hold positions in the securities we cover. We do not accept gifts, hospitality, or payment from companies, investors, brokers, or any party with a financial interest in the coverage. If a coverage decision would create the appearance of a conflict, we disclose it on the article.
+      </p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

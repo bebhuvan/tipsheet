@@ -1,0 +1,50 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+<Base
+  title="Privacy"
+  description="What Tipsheet collects from visitors: nothing personally identifying, no third-party tracking, no advertising cookies."
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Privacy</span></div>
+        <h1 class="page-title">Privacy.</h1>
+      </header>
+
+      <hr class="rule" />
+
+      <h2>What we collect</h2>
+      <p>
+        Tipsheet does not require an account, does not run advertising, and does not embed third-party tracking pixels. The only data the site itself collects is anonymous request information that web servers conventionally log (timestamp, requested URL, user agent, IP address) for operational purposes such as troubleshooting and abuse mitigation.
+      </p>
+
+      <h2>What we do not do</h2>
+      <ul>
+        <li>We do not place advertising cookies.</li>
+        <li>We do not sell, share, or rent visitor data to any third party.</li>
+        <li>We do not profile readers across sessions.</li>
+        <li>We do not embed social-media widgets that load third-party trackers.</li>
+      </ul>
+
+      <h2>Third-party services</h2>
+      <p>
+        All fonts are self-hosted. The site may use a content delivery network for static assets. These services may log request information per their own privacy policies; refer to their published policies for details.
+      </p>
+
+      <h2>Cookies</h2>
+      <p>
+        We may use a single local-storage entry to remember the colour-theme preference (light or dark). No tracking cookies. No identifiers.
+      </p>
+
+      <h2>Changes</h2>
+      <p>
+        If this policy materially changes, the change will be documented on this page with a dated note.
+      </p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

@@ -1,0 +1,207 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { listConcalls } from '../lib/queries.mjs';
+
+const items = listConcalls({ limit: 200 });
+const withFlag = items.filter(c => c.inconsistency_flag);
+const withoutFlag = items.filter(c => !c.inconsistency_flag);
+
+function dateOf(iso) {
+  const d = new Date(String(iso).replace(' ', 'T'));
+  if (Number.isNaN(d.valueOf())) return iso;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+---
+<Base
+  title="Concalls — editorial coverage of Indian earnings calls"
+  description="Tipsheet Concall Notes — short editorial briefs on Indian earnings calls. Where management has flip-flopped versus prior calls, we lead with the contradiction. Powered by Tijori Concall Monitor."
+>
+  <Masthead activeNav="concalls" />
+  <main>
+    <article class="concalls-page">
+      <header class="page-head">
+        <div class="kicker"><span>Concalls</span></div>
+        <h1 class="page-title">Concall Notes.</h1>
+        <p class="page-dek">
+          Short editorial briefs on Indian earnings calls. When management's guidance contradicts what they said last quarter, we lead with the contradiction — that is the news.
+          Underlying transcripts and analysis are produced by <a href="https://www.tijoristack.ai/concall-monitor" class="inline" target="_blank" rel="noopener">Tijori Concall Monitor</a>; we summarise and add editorial framing.
+        </p>
+      </header>
+
+      {items.length === 0 && (
+        <p class="empty-note">No Concall Notes yet — they land here as the season picks up.</p>
+      )}
+
+      {withFlag.length > 0 && (
+        <section class="concall-section">
+          <h2 class="section-title">Where management changed its story</h2>
+          <p class="section-dek">Calls where this quarter's guidance contradicts a prior call. Source: Tijori Concall Monitor's consistency check, summarised editorially.</p>
+          <ol class="concall-list">
+            {withFlag.map(c => (
+              <li>
+                <a href={c.canonical_url} class="concall-row flag">
+                  <div class="concall-meta">
+                    <span class="concall-symbol">{c.symbol}</span>
+                    <span class="concall-dot">·</span>
+                    <span class="concall-sector">{c.sector}</span>
+                    <span class="concall-dot">·</span>
+                    <span class="concall-date">{dateOf(c.event_time)}</span>
+                  </div>
+                  <h3 class="concall-headline">{c.headline}</h3>
+                  {c.dek && <p class="concall-dek">{c.dek}</p>}
+                  <div class="concall-flag">
+                    <span class="flag-label">Inconsistency</span>
+                    <span class="flag-body">{c.inconsistency_flag}</span>
+                  </div>
+                  {c.the_take && <p class="concall-take">{c.the_take}</p>}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {withoutFlag.length > 0 && (
+        <section class="concall-section">
+          <h2 class="section-title">Recent Concall Notes</h2>
+          <ol class="concall-list">
+            {withoutFlag.map(c => (
+              <li>
+                <a href={c.canonical_url} class="concall-row">
+                  <div class="concall-meta">
+                    <span class="concall-symbol">{c.symbol}</span>
+                    <span class="concall-dot">·</span>
+                    <span class="concall-sector">{c.sector}</span>
+                    <span class="concall-dot">·</span>
+                    <span class="concall-date">{dateOf(c.event_time)}</span>
+                  </div>
+                  <h3 class="concall-headline">{c.headline}</h3>
+                  {c.dek && <p class="concall-dek">{c.dek}</p>}
+                  {c.the_take && <p class="concall-take">{c.the_take}</p>}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+    </article>
+  </main>
+  <SiteFooter />
+</Base>
+
+<style>
+  .concalls-page { max-width: 880px; margin: 0 auto; padding: 96px 0 96px; }
+  .page-head { margin-bottom: 80px; }
+  .page-head .kicker {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 28px;
+  }
+  .page-title {
+    font-family: var(--serif); font-weight: 400;
+    font-size: clamp(40px, 5vw, 64px);
+    line-height: 1.04; letter-spacing: -0.024em;
+    margin: 0 0 24px; max-width: 18ch;
+    font-variation-settings: "opsz" 56;
+    text-wrap: balance;
+  }
+  .page-dek {
+    font-family: var(--serif); font-style: italic; font-weight: 300;
+    font-size: clamp(18px, 1.55vw, 22px);
+    line-height: 1.42; color: var(--text-soft);
+    margin: 0; max-width: 56ch;
+    font-variation-settings: "opsz" 22;
+  }
+  .empty-note {
+    font-family: var(--serif); font-style: italic;
+    color: var(--text-muted); padding: 24px 0;
+  }
+  .concall-section { margin-top: 64px; }
+  .concall-section + .concall-section { margin-top: 96px; }
+  .section-title {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--text);
+    margin: 0 0 12px; font-weight: 500;
+    padding-bottom: 18px; border-bottom: 1px solid var(--text);
+  }
+  .section-dek {
+    font-family: var(--serif); font-style: italic; font-weight: 300;
+    font-size: 16px; line-height: 1.5; color: var(--text-muted);
+    margin: 0 0 32px; max-width: 56ch;
+    font-variation-settings: "opsz" 18;
+  }
+  .concall-list { list-style: none; margin: 0; padding: 0; }
+  .concall-list li { border-bottom: 1px solid var(--hairline); }
+  .concall-list li:last-child { border-bottom: 0; }
+  .concall-row {
+    display: block;
+    padding: 32px 0 36px;
+    border-left: 1px solid transparent;
+    padding-left: 24px;
+    margin-left: -24px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 180ms ease, border-left-color 180ms ease;
+  }
+  .concall-row:hover { background: var(--bg-soft); }
+  .concall-row.flag { border-left-color: var(--accent); }
+  .concall-meta {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.16em; margin-bottom: 14px;
+    font-feature-settings: "tnum" 1;
+  }
+  .concall-symbol { color: var(--text); font-weight: 500; letter-spacing: 0.2em; }
+  .concall-dot    { color: var(--text-faint); }
+  .concall-date   { color: var(--text-muted); }
+  .concall-headline {
+    font-family: var(--serif); font-weight: 400;
+    font-size: clamp(22px, 2.2vw, 28px);
+    line-height: 1.18; letter-spacing: -0.016em;
+    margin: 0 0 12px; max-width: 28ch;
+    font-variation-settings: "opsz" 28;
+    text-wrap: balance;
+  }
+  .concall-dek {
+    font-family: var(--serif); color: var(--text-soft);
+    margin: 0 0 16px; font-size: 17px; line-height: 1.5;
+    max-width: 52ch; font-variation-settings: "opsz" 18;
+  }
+  .concall-flag {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    align-items: baseline;
+    padding: 14px 0;
+    margin: 16px 0 0;
+    border-top: 1px solid var(--accent);
+    border-bottom: 1px solid var(--hairline);
+    max-width: 60ch;
+  }
+  .flag-label {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--accent); font-weight: 500;
+    white-space: nowrap;
+  }
+  .flag-body {
+    font-family: var(--serif); font-size: 16px;
+    line-height: 1.5; color: var(--text);
+    font-variation-settings: "opsz" 18;
+  }
+  .concall-take {
+    font-family: var(--serif); font-style: italic; font-weight: 300;
+    color: var(--text-muted); margin: 14px 0 0;
+    font-size: 15px; line-height: 1.5;
+    max-width: 56ch; font-variation-settings: "opsz" 18;
+  }
+  @media (max-width: 800px) {
+    .concalls-page { padding: 56px 0 72px; }
+    .page-head { margin-bottom: 48px; }
+    .concall-flag { grid-template-columns: 1fr; gap: 8px; }
+  }
+</style>
