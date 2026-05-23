@@ -31,24 +31,21 @@ export default {
 
     const headers = new Headers(response.headers);
 
-    if (!headers.has('Cache-Control')) {
-      let cc;
-
-      for (const rule of CACHE_RULES) {
-        if (rule.pattern.test(url.pathname)) {
-          const extra = rule.immutable ? ', immutable' : '';
-          cc = `public, max-age=${rule.maxAge}${extra}`;
-          break;
-        }
+    let cc;
+    for (const rule of CACHE_RULES) {
+      if (rule.pattern.test(url.pathname)) {
+        const extra = rule.immutable ? ', immutable' : '';
+        cc = `public, max-age=${rule.maxAge}${extra}`;
+        break;
       }
+    }
 
-      if (!cc && url.pathname.endsWith('.html')) {
-        cc = `public, max-age=${DEFAULT_PAGE_MAX_AGE}, stale-while-revalidate=3600`;
-      }
+    if (!cc && (url.pathname.endsWith('.html') || url.pathname === '/')) {
+      cc = `public, max-age=${DEFAULT_PAGE_MAX_AGE}, stale-while-revalidate=3600`;
+    }
 
-      if (cc) {
-        headers.set('Cache-Control', cc);
-      }
+    if (cc) {
+      headers.set('Cache-Control', cc);
     }
 
     return new Response(response.body, {
