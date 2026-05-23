@@ -11,7 +11,7 @@ export default defineConfig({
   site: 'https://tipsheet.markets',
   compressHTML: true,
   build: {
-    inlineStylesheets: 'auto',              // small CSS inlined for first-paint speed
+    inlineStylesheets: 'always',              // inline all CSS — no render-blocking external stylesheets
     assets: '_assets',
   },
   vite: {

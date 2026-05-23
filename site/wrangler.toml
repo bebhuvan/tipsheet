@@ -1,7 +1,12 @@
 name = "tipsheet"
 main = "worker-entry.js"
 compatibility_date = "2026-05-01"
+workers_dev = true
 assets = { directory = "./dist", binding = "ASSETS" }
 
 [vars]
 SITE_URL = "https://tipsheet.markets"
+
+[[routes]]
+pattern = "tipsheet.markets"
+custom_domain = true

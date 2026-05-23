@@ -2,7 +2,6 @@
 import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
 
 interface Props {
-  edition?: number;
   weekday?: string;
   stamp?: string;
   activeNav?: string;
@@ -12,9 +11,9 @@ const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','S
 const monthsLong = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const monthsShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const {
-  edition = 145,
   weekday = weekdays[today.getDay()],
   dateline = `${weekdays[today.getDay()]}, ${today.getDate()} ${monthsLong[today.getMonth()]} ${today.getFullYear()}`,
+  timeIst = `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')} IST`,
   stamp = `${today.getDate()} ${monthsShort[today.getMonth()]} · ${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')} IST`,
   activeNav = 'today',
 } = Astro.props;
@@ -34,7 +33,9 @@ const navItems = [
       <span class="dot"></span><span id="themeLabel">Light</span>
     </button>
   </div>
-  <div class="masthead-dateline">№&nbsp;{edition} · {dateline}</div>
+  <div class="masthead-dateline">
+    {dateline} · Last updated {timeIst}
+  </div>
   <div class="wordmark-block">
     <a href="/" class="word">{BRAND_NAME}</a>
     <div class="tagline">{BRAND_TAGLINE}</div>

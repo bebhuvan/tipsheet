@@ -43,7 +43,7 @@ async function getJson(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
     }
     return { ok: true, status: r.status, body: await r.json(), retryAfterMs };
   } catch (e) {
-    return { ok: false, status: 0, error: e.name === 'AbortError' ? 'timeout' : e.message };
+    return { ok: false, status: 0, error: e.name === 'AbortError' ? 'timeout' : 'network error' };
   } finally {
     clearTimeout(timer);
   }
