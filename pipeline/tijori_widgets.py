@@ -46,7 +46,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db", default=str(DEFAULT_DB), help="Path to Tipsheet SQLite DB.")
     parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="Tijori SDK cache directory.")
     parser.add_argument("--limit", type=int, default=5000, help="Candidate companies to EXPORT from cache (covers the whole archive).")
-    parser.add_argument("--max-fetch", type=int, default=200, help="Max companies to FETCH from Tijori per run (un-cached first, then refresh recent). Coverage accumulates daily.")
+    parser.add_argument("--max-fetch", type=int, default=200, help="Max companies to FETCH from Tijori per run (un-cached first, then stale). Coverage accumulates daily.")
+    parser.add_argument("--refresh-days", type=int, default=30, help="Re-fetch a cached company once its data is older than this (quarterly-results refresh).")
     parser.add_argument("--symbols", nargs="*", help="Optional explicit NSE symbols to process.")
     parser.add_argument("--cache-only", action="store_true", help="Do not refresh Tijori; only export existing cache.")
     parser.add_argument("--workers", type=int, default=8)
@@ -61,20 +62,34 @@ def connect(db_path: str) -> sqlite3.Connection:
     return db
 
 
-def cached_slugs(data_dir: str) -> set[str]:
-    """Slugs already present in the persisted SDK cache (so we don't re-fetch them)."""
+def cache_fetch_times(data_dir: str) -> dict[str, "datetime"]:
+    """{slug: last-fetched datetime} for slugs in the persisted SDK cache.
+    Used to skip fresh companies and re-fetch stale ones (quarterly refresh)."""
+    from datetime import datetime, timezone
+
     cat = Path(data_dir) / "catalog.duckdb"
     if not cat.exists():
-        return set()
+        return {}
     try:
         import duckdb
 
         con = duckdb.connect(str(cat), read_only=True)
-        rows = con.execute("SELECT DISTINCT slug FROM article_widgets WHERE slug IS NOT NULL").fetchall()
+        rows = con.execute(
+            "SELECT slug, MAX(fetched_at) FROM article_widgets WHERE slug IS NOT NULL GROUP BY slug"
+        ).fetchall()
         con.close()
-        return {r[0] for r in rows}
     except Exception:
-        return set()
+        return {}
+    out: dict[str, datetime] = {}
+    for slug, fa in rows:
+        try:
+            dt = datetime.fromisoformat(str(fa))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            out[slug] = dt
+        except Exception:
+            out[slug] = datetime.now(timezone.utc)  # present but unparseable → treat as fresh
+    return out
 
 
 def load_companies(db: sqlite3.Connection, limit: int, symbols: list[str] | None) -> list[sqlite3.Row]:
@@ -150,18 +165,28 @@ def main() -> int:
         print("[tijori-widgets] no companies to process")
         return 0
 
-    # Fetch budget per run: prioritise companies NOT yet in the cache (backfill
-    # coverage), then spend any leftover quota refreshing the most-recent ones
-    # (freshness). EXPORT every candidate from the cache. With the cache
-    # persisted across runs, coverage reaches the whole archive in a few days.
-    have = cached_slugs(args.data_dir)
-    uncached = [row["slug"] for row in rows if row["slug"] not in have]
-    to_fetch = uncached[: args.max_fetch]
-    if len(to_fetch) < args.max_fetch:
-        for row in rows[: args.max_fetch - len(to_fetch)]:
-            if row["slug"] not in to_fetch:
-                to_fetch.append(row["slug"])
-    print(f"[tijori-widgets] candidates={len(rows)} cached={len(have)} fetch={len(to_fetch)} data_dir={args.data_dir}")
+    # Fetch budget per run: first backfill companies NOT yet cached (coverage),
+    # then re-fetch cached companies whose data is older than --refresh-days
+    # (oldest first) so quarterly results get picked up ~monthly. EXPORT every
+    # candidate from the (persisted) cache regardless.
+    from datetime import datetime, timezone, timedelta
+
+    times = cache_fetch_times(args.data_dir)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=args.refresh_days)
+    uncached = [row["slug"] for row in rows if row["slug"] not in times]
+    stale = sorted(
+        (row["slug"] for row in rows if row["slug"] in times and times[row["slug"]] < cutoff),
+        key=lambda s: times[s],
+    )
+    seen: set[str] = set()
+    to_fetch = []
+    for slug in [*uncached, *stale]:
+        if slug not in seen:
+            seen.add(slug)
+            to_fetch.append(slug)
+        if len(to_fetch) >= args.max_fetch:
+            break
+    print(f"[tijori-widgets] candidates={len(rows)} cached={len(times)} uncached={len(uncached)} stale={len(stale)} fetch={len(to_fetch)} data_dir={args.data_dir}")
 
     if not args.cache_only and to_fetch:
         issues = download(
