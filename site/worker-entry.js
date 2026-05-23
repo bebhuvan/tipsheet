@@ -109,6 +109,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Retired sections → permanent redirects (the Worker handles routing, so
+    // a static _redirects file wouldn't apply here).
+    if (url.pathname === '/smart-money' || url.pathname === '/smart-money/') {
+      return Response.redirect(new URL('/alerts/', url).toString(), 301);
+    }
+
     const widget = await handleWidgetApi(url.pathname, env);
     if (widget) return widget;
 
