@@ -7,6 +7,11 @@ assets = { directory = "./dist", binding = "ASSETS" }
 [vars]
 SITE_URL = "https://tipsheet.markets"
 
+[[d1_databases]]
+binding = "tipsheet_db"
+database_name = "tipsheet-db"
+database_id = "4645967f-e1aa-4291-b023-5509fcddb758"
+
 [[routes]]
 pattern = "tipsheet.markets"
 custom_domain = true

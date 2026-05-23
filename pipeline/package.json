@@ -23,6 +23,7 @@
     "loop": "node --env-file=../.env loop.mjs"
   },
   "dependencies": {
+    "@google/genai": "^2.6.0",
     "better-sqlite3": "^12.10.0"
   }
 }

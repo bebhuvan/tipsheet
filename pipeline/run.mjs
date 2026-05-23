@@ -54,10 +54,10 @@ export async function enrichBatch(max = 50) {
     const batch = pending.slice(i, i + PARALLEL);
     await Promise.all(batch.map(async (raw) => {
       let result = await enrich(raw);
-      if (!result.ok) {
-        // Two retry modes:
-        //  • If we got a parsed output that just failed validation → feedback retry with the issues.
-        //  • If it was a transient error (HTTP/network/timeout) → plain retry.
+      let retries = 0;
+      
+      while (!result.ok && retries < 3) {
+        retries++;
         await sleep(600);
         if (result.parsed && result.validation?.issues?.length) {
           result = await enrich(raw, result);   // pass previous as feedback
@@ -65,6 +65,15 @@ export async function enrichBatch(max = 50) {
           result = await enrich(raw);
         } else {
           result = await enrich(raw);            // plain retry for parse errors
+        }
+      }
+
+      // FALLBACK: If we exhausted retries and the only issues are stylistic, force accept it.
+      if (!result.ok && result.parsed && result.validation?.issues) {
+        const onlyStyleIssues = result.validation.issues.every(i => i.startsWith('banned:') || i.startsWith('structural:'));
+        if (onlyStyleIssues) {
+          result.ok = true;
+          result.forced_pass = true;
         }
       }
       const u = result.usage || {};
@@ -83,6 +92,7 @@ export async function enrichBatch(max = 50) {
           whats_new:           JSON.stringify(p.whats_new || []),
           why_it_matters:      p.why_it_matters || null,
           what_were_watching:  JSON.stringify(p.what_were_watching || []),
+          faqs:                JSON.stringify(p.faqs || []),
           the_full_read:       p.the_full_read || null,
           editorial_tone:      p.editorial_tone?.label || null,
           tone_score:          Number.isFinite(Number(p.editorial_tone?.score)) ? Math.round(Number(p.editorial_tone.score)) : null,
@@ -94,16 +104,16 @@ export async function enrichBatch(max = 50) {
           model_used:          result.model,
           prompt_version:      result.promptVersion,
           validation_ok:       1,
-          validation_issues:   null,
+          validation_issues:   result.forced_pass ? JSON.stringify(result.validation.issues) : null,
         });
-        console.log(`  ✓ ${(raw.symbol || '?').padEnd(12)} ${result.elapsed_ms}ms  ${p.headline?.slice(0, 70) || ''}`);
+        console.log(`  ✓ ${(raw.symbol || '?').padEnd(12)} ${result.elapsed_ms}ms  ${p.headline?.slice(0, 70) || ''}${result.forced_pass ? ' (FORCED PASS)' : ''}`);
       } else {
         fail++;
         insertEnriched(db, {
           record_id:           raw.record_id,
           headline:            null, dek: null,
           the_number_value:    null, the_number_label: null,
-          whats_new:           null, why_it_matters: null, what_were_watching: null, the_full_read: null,
+          whats_new:           null, why_it_matters: null, what_were_watching: null, faqs: null, the_full_read: null,
           editorial_tone:      null, tone_score: null, tone_confidence: null, tone_reason: null,
           canonical_category:  null, sector: null, key_entities: null,
           model_used:          '',

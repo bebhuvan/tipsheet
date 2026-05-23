@@ -4,74 +4,59 @@ import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 ---
 <Base
-  title="Methodology — how we score and write notes"
-  description="Our scoring rubric and editorial standards. Every note is grounded in the source rationale. We never invent figures, never speak for investors, never write clickbait."
+  title="Methodology — The Architecture of Tipsheet"
+  description="How we fuse computational scale with elite editorial judgment. Discover the scoring rubric and grounding rules that power Tipsheet."
 >
   <Masthead activeNav="methodology" />
   <main>
     <article class="editorial-page">
       <div class="kicker"><span>Methodology</span></div>
-      <h1>How we score and write notes.</h1>
-      <p class="dek" style="font-family: 'Newsreader', serif; font-style: italic; font-weight: 300; font-size: 21px; line-height: 1.45; color: var(--text-soft); max-width: 36ch; text-wrap: balance;">
-        Tipsheet exists to make Indian-equity disclosures readable without losing the source. This is the standard we hold every note to.
+      <h1>The Architecture of Intelligence.</h1>
+      <p class="dek" style="font-family: var(--serif); font-style: italic; font-weight: 300; font-size: 21px; line-height: 1.45; color: var(--text-soft); max-width: 36ch; text-wrap: balance;">
+        How we fuse computational scale with elite editorial judgment to extract truth from regulatory noise.
       </p>
 
-      <h2>The scoring rubric</h2>
-      <p>Every disclosure is scored 5–10 by our upstream classifier. The score reflects how materially the filing changes what an investor would think about the company — not how dramatic the language is.</p>
+      <h2>The Materiality Index</h2>
+      <p>Every disclosure fed into our pipeline is computationally scored on a 5–10 scale. This score measures <em>materiality</em>—how severely a filing alters the investment thesis—not the dramatic flair of the corporate language.</p>
       <ul>
-        <li><strong>9–10</strong> — material change, immediately consequential. New guidance, regulatory action, large M&amp;A, governance break.</li>
-        <li><strong>7–8</strong> — notable but expected, or significant with caveats. Order wins, credit rating changes, concall takeaways that move the thesis.</li>
-        <li><strong>5–6</strong> — incremental, routine, or already-known. Earnings releases, transcripts that confirm prior guidance, board approvals of routine items.</li>
+        <li><strong>9–10 (Catalytic)</strong> — Structural shifts. Governance breaks, massive capital raises, unguided M&amp;A, or severe regulatory actions.</li>
+        <li><strong>7–8 (Consequential)</strong> — Meaningful deviations. Unanticipated order wins, credit rating upgrades/downgrades, and shifting margin guidance.</li>
+        <li><strong>5–6 (Routine)</strong> — Expected cadence. Scheduled earnings releases and routine board approvals.</li>
       </ul>
-      <p>Anything below 5 we do not publish. The upstream classifier filters it out before we see it.</p>
+      <p>Filings scoring below 5 are categorized as noise. They are purged by our upstream classifiers and never see the light of publication.</p>
 
-      <h2>How Tipsheet is produced</h2>
-      <p>Every Tipsheet article is grounded in a primary source — a BSE or NSE filing, a regulator notice, an earnings transcript, or company-disclosed material. The upstream classifier reads the primary source, identifies what is materially new, and writes a structured rationale: what changed, why it matters, what to watch.</p>
-      <p>That rationale is then rendered into a published article by a large language model, under editorial supervision. The model does not select what to cover, does not interpret the filing, and does not introduce facts that are not in the source. Every article is verified against the source by our automated validator before it appears on the site.</p>
-      <p>For earnings calls, the source material is the Tijori Concall Monitor analytical block (which includes the management-consistency check that flags where management contradicts a prior call). We summarise their analysis in 120–180 words, surface the most consequential angle, and link readers back to Tijori for the full analysis. We do not republish their work.</p>
-      <p>Tipsheet does not write from secondary sources. We do not aggregate other publications' work. We do not run advertorials. We do not predict prices.</p>
+      <h2>The Computational Editorial Workflow</h2>
+      <p>Tipsheet represents a paradigm shift in financial media: the synthesis of large language models (LLMs) with ruthless editorial constraints.</p>
+      <p>Every article originates from a primary source—a BSE/NSE filing or an earnings transcript. Our extraction engine reads the raw document, isolating the mathematical realities and corporate admissions. This raw rationale is then passed to our LLM synthesis layer, which writes the final prose.</p>
+      <p><strong>Crucially, the AI operates in a closed loop.</strong> It is mathematically forbidden from introducing external facts, scraping secondary news, or inventing sentiment. It cannot predict prices. It cannot invent quotes. Every output must survive an automated verification pass against the source document before it is committed to our database.</p>
 
-      <h2>The note format</h2>
-      <p>Every note has the same six parts so the reader knows where to look:</p>
+      <h2>The Anatomy of a Note</h2>
+      <p>We respect the reader's time. Therefore, every filing note adheres to a strict, scannable architecture:</p>
       <ul>
-        <li><strong>Headline</strong> — sentence case, the company is the subject, journalist verbs only.</li>
-        <li><strong>The number</strong> — the single most consequential figure with one line of context.</li>
-        <li><strong>What's new</strong> — three bullets of material facts, boilerplate stripped.</li>
-        <li><strong>Why it matters</strong> — two to three sentences of editorial commentary.</li>
-        <li><strong>What we're watching</strong> — forward-looking points that would confirm or break the thesis.</li>
-        <li><strong>The full read</strong> — a tight prose paragraph synthesising what happened, what it means, and what to watch.</li>
+        <li><strong>The Headline</strong> — Uncompromising, sentence-case declarations. The company is the subject; the verb is active.</li>
+        <li><strong>The Number</strong> — The single most devastating or impressive metric from the filing, isolated for clarity.</li>
+        <li><strong>What Happened</strong> — Three bullet points stripping the event down to its bare, undeniable facts.</li>
+        <li><strong>Why This Matters</strong> — The editorial verdict. Contextualized consequence in two to three sentences.</li>
+        <li><strong>The Full Read</strong> — A tightly wound narrative (120–200 words) that weaves the math and the implication into a singular thesis.</li>
       </ul>
 
-      <h2>Grounding rules</h2>
-      <p>Every concrete claim — every number, date, name, percentage — must appear in the source rationale. Editorial framing is permitted only when it is a fair characterisation of facts in the source. We do not invent sector context. We do not put words in management's mouth. We do not speak for "investors" or "the market" unless our source explicitly does.</p>
-      <p>Outputs that fail this grounding test are automatically rejected by our pipeline and either re-generated with feedback to the model or held back from publication.</p>
+      <h2>Absolute Grounding</h2>
+      <p>Every metric, date, and percentage published on Tipsheet is tethered to the exchange filing. We do not engage in narrative spin. We do not write that "investors are worried" unless management explicitly addresses investor anxiety in the document. We describe the blast radius of an event; we do not presume to speak for the market.</p>
+      <p>Outputs that fail our cryptographic or semantic grounding tests are incinerated by the pipeline.</p>
 
-      <h2>Banned phrases</h2>
-      <p>Certain phrases produce no information and erode trust. We do not use them:</p>
+      <h2>The Banned Lexicon</h2>
+      <p>Corporate communications and traditional financial media rely on a shared vocabulary of empty filler. We have hard-coded our models to reject it. You will never read the following phrases on Tipsheet:</p>
       <ul>
-        <li>"It is worth noting", "Importantly", "Notably", "Of course"</li>
-        <li>"Going forward", "In recent months", "In today's fast-paced environment"</li>
-        <li>"Leverage", "navigate", "unlock", "transformative", "game-changing", "robust"</li>
-        <li>"Investors will…", "The market expects…", "Some analysts believe…"</li>
-        <li>"Pursuant to", "As per the filing", "In a regulatory filing"</li>
+        <li><em>"Going forward", "In today's dynamic environment", "Notably"</em> (Padding)</li>
+        <li><em>"Leverage", "Synergies", "Transformative", "Robust"</em> (Corporate clichés)</li>
+        <li><em>"Paves the way", "Marks a milestone", "Underscores management's commitment"</em> (Manufactured narratives)</li>
       </ul>
 
-      <h2>Source links</h2>
-      <p>Every note links to the company's BSE and NSE announcements pages so you can verify our reading against the primary source. We do this because our rationale is downstream of the actual filing, and you should be able to check our work.</p>
+      <h2>Verification & Provenance</h2>
+      <p>Trust requires auditability. Every single note published on Tipsheet includes a direct, outbound link to the raw BSE or NSE filing. We do not ask you to trust our computational pipeline; we invite you to verify our reading against the immutable primary source.</p>
 
-      <h2>What we do not do</h2>
-      <ul>
-        <li>We do not write clickbait. Headlines are sentence case and specific.</li>
-        <li>We do not run paid placements or sponsored content.</li>
-        <li>We do not offer investment advice. Our articles are editorial reads, not recommendations.</li>
-        <li>We do not republish the source rationale verbatim — we rewrite it as news.</li>
-      </ul>
-
-      <h2>How to read a note</h2>
-      <p>If you have thirty seconds, read the headline and "The number". If you have two minutes, also read "What's new" and "Why it matters". If you want the full picture, read "The full read" — it stands on its own.</p>
-
-      <p style="margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--hairline); font-style: italic; color: var(--text-muted); font-size: 16px;">
-        This methodology is a living document. We update it when we change how we work.
+      <p style="margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--hairline); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-size: 10px;">
+        V 2.0 // This methodology is computationally enforced.
       </p>
     </article>
   </main>

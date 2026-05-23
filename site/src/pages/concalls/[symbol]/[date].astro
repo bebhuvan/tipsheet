@@ -52,15 +52,13 @@ const schema = {
     tickerSymbol: concall.symbol,
     identifier: concall.isin ? `ISIN:${concall.isin}` : undefined,
   } : undefined,
+  // Private files.tijoristack.ai audio/transcript URLs deliberately excluded —
+  // they are unsigned source media and must not be exposed (incl. in JSON-LD).
   isBasedOn: [
-    concall.transcript_url,
-    concall.recording_url,
     concall.tijori_concall_monitor_url,
   ].filter(Boolean),
   citation: [
-    concall.transcript_url && { '@type': 'CreativeWork', name: 'Original transcript', url: concall.transcript_url },
-    concall.recording_url  && { '@type': 'CreativeWork', name: 'Original recording',  url: concall.recording_url  },
-    { '@type': 'CreativeWork', name: 'Tijori Concall Monitor', url: concall.tijori_concall_monitor_url },
+    concall.tijori_concall_monitor_url && { '@type': 'CreativeWork', name: 'Tijori Concall Monitor', url: concall.tijori_concall_monitor_url },
   ].filter(Boolean),
   isAccessibleForFree: true,
 };
@@ -76,7 +74,7 @@ const schema = {
 
   <main>
     <article class="concall">
-      <div class="kicker reveal">
+      <div class="kicker">
         <span style="color: var(--accent); font-weight: 500;">Concall Note</span>
         <span class="sep">/</span>
         <span>{concall.sector}</span>
@@ -88,12 +86,12 @@ const schema = {
         )}
       </div>
 
-      <h1 class="headline reveal d1">{concall.headline}</h1>
-      <p class="dek reveal d2">{concall.dek}</p>
+      <h1 class="headline">{concall.headline}</h1>
+      <p class="dek">{concall.dek}</p>
 
       <hr class="rule" />
 
-      <div class="dateline reveal d3">
+      <div class="dateline">
         {concall.symbol && <span><strong>{concall.symbol}</strong></span>}
         {concall.isin && <span class="mono">ISIN {concall.isin}</span>}
         <span>{dateOf(concall.event_time)}</span>
@@ -131,12 +129,6 @@ const schema = {
           <div class="primary-block">
             <h3>Primary source</h3>
             <ul class="primary-list">
-              {concall.transcript_url && (
-                <li><a href={concall.transcript_url} target="_blank" rel="noopener">Full transcript (PDF)</a></li>
-              )}
-              {concall.recording_url && (
-                <li><a href={concall.recording_url} target="_blank" rel="noopener">Listen to the recording</a></li>
-              )}
               <li><a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener">Full analysis on Tijori Concall Monitor</a></li>
             </ul>
           </div>
@@ -191,9 +183,7 @@ const schema = {
           )}
 
           <div class="primary-source">
-            <span class="label">Sources</span>
-            {concall.transcript_url && <a href={concall.transcript_url} target="_blank" rel="noopener">Transcript</a>}
-            {concall.recording_url  && <a href={concall.recording_url}  target="_blank" rel="noopener">Recording</a>}
+            <span class="label">Source</span>
             <a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener">Tijori Concall Monitor (full analysis)</a>
             <span class="note">Our brief is derived from the Tijori Concall Monitor analysis. Read the full analysis on Tijori for the complete picture.</span>
           </div>

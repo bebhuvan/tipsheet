@@ -20,6 +20,8 @@
   --mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --data:  'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   --gutter: 56px;
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(0, 0, 0, 0.08);
 }
 [data-theme="dark"] {
   --bg: #0c0c0c;
@@ -38,12 +40,84 @@
   --brief-close: #6f86c8;
   --selection: #ece8e0;
   --selection-text: #0c0c0c;
+  --glass-bg: rgba(28, 25, 22, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 ::selection { background: var(--selection); color: var(--selection-text); }
 
 html { -webkit-text-size-adjust: 100%; }
+
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.organic-divider {
+  display: block;
+  width: 100%;
+  height: 24px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 24' preserveAspectRatio='none'%3E%3Cpath d='M0,12 C250,24 750,0 1000,12' stroke='currentColor' stroke-width='1' fill='none' stroke-opacity='0.15'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  margin: 32px 0;
+  border: none;
+}
+
+.tijori-sidebar-btn {
+  display: block;
+  margin-top: 40px;
+  padding: 16px 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  text-decoration: none;
+  transition: all 300ms ease;
+}
+.tijori-sidebar-btn:hover {
+  border-top-color: var(--text);
+  border-bottom-color: var(--text);
+}
+.tijori-sidebar-btn .tijori-title {
+  display: block;
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.3;
+  font-style: italic;
+  font-weight: 300;
+  color: var(--text);
+  margin-bottom: 8px;
+  transition: color 300ms ease;
+}
+.tijori-sidebar-btn:hover .tijori-title {
+  color: var(--accent);
+}
+.tijori-sidebar-btn .tijori-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.tijori-sidebar-btn .tijori-arrow {
+  font-family: var(--data);
+  font-size: 14px;
+  font-style: normal;
+  transition: transform 300ms ease;
+}
+.tijori-sidebar-btn:hover .tijori-arrow {
+  color: var(--text);
+  transform: translate(2px, -2px);
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -178,6 +252,16 @@ a.inline:hover { background-size: 100% 2px; }
   font-variation-settings: "opsz" 72;
   display: inline-block;
   color: var(--text);
+}
+/* The "tip" — a small crimson triangle after the wordmark, echoing the OG cards. */
+.masthead .word::after {
+  content: '';
+  display: inline-block;
+  margin-left: 0.14em;
+  border-left: 0.11em solid transparent;
+  border-right: 0.11em solid transparent;
+  border-bottom: 0.19em solid var(--accent);
+  transform: translateY(-0.16em);
 }
 .masthead .tagline {
   font-family: 'Newsreader', serif;
@@ -1127,28 +1211,64 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .dateline .source-links .src-sep { color: var(--text-faint); }
 
 .primary-source {
-  margin: 48px 0 0;
-  padding: 24px 0;
+  margin: 44px 0 0;
+  padding: 20px 0 0;
   border-top: 1px solid var(--hairline-strong);
-  border-bottom: 1px solid var(--hairline);
+}
+.ps-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+}
+.ps-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.ps-links {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 11px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px 32px;
-  align-items: baseline;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
-.primary-source .label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text); font-weight: 500; }
-.primary-source a { color: var(--text); font-weight: 500; }
-.primary-source a::after { content: ' ↗'; color: var(--text-muted); }
-.primary-source .note { font-family: 'Newsreader', serif; font-style: italic; font-size: 13px; color: var(--text-muted); letter-spacing: 0; margin-left: auto; max-width: 38ch; line-height: 1.4; text-align: right; }
+.ps-links a { color: var(--text); font-weight: 500; text-decoration: none; }
+.ps-links a::after { content: ' ↗'; color: var(--text-faint); font-weight: 400; }
+.ps-links a:hover { color: var(--accent); }
+.ps-dot { color: var(--text-faint); }
+.ps-note {
+  margin: 18px 0 0;
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+  letter-spacing: 0;
+  max-width: 60ch;
+}
+@media (max-width: 520px) {
+  .ps-head { flex-direction: column; gap: 8px; }
+}
 
 /* ─── responsive ────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .briefs-grid { grid-template-columns: repeat(2, 1fr); row-gap: 64px; column-gap: 48px; }
-  .content { grid-template-columns: 1fr; gap: 48px; padding-top: 40px; }
+  .content { grid-template-columns: 1fr; gap: 40px; padding-top: 40px; }
+  /* Reset the desktop column placement and order the article first — the
+     sidebar (now just "Story so far") follows. The verbose "At a glance" and
+     redundant tier block are hidden; their data lives in the .stat-strip up
+     top and the bottom company-snapshot. This keeps the read article-first. */
+  .content > aside.gutter, .content > .body { grid-column: auto; }
+  .content > .body { order: 1; }
+  .content > aside.gutter { order: 2; }
+  aside.gutter .tier-block, aside.gutter .fund-block { display: none; }
+  aside.gutter.glass-panel { background: none; border: 0; padding: 0; backdrop-filter: none; }
   .content::before { display: none; }
   aside.gutter { position: static; }
 }

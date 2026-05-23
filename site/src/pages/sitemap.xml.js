@@ -4,7 +4,7 @@
 import { listFilings, distinctSymbolsWithFilings, distinctSectorsWithFilings, sectorSlug } from '../lib/queries.mjs';
 
 export async function GET({ site }) {
-  const siteUrl = site?.toString().replace(/\/$/, '') || 'https://filings.example';
+  const siteUrl = site?.toString().replace(/\/$/, '') || 'https://tipsheet.markets';
   const filings = listFilings({ limit: 50000 });
   const symbols = distinctSymbolsWithFilings();
   const sectors = distinctSectorsWithFilings();

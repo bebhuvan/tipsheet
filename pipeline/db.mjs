@@ -63,13 +63,13 @@ export function insertRaw(db, row) {
 const _insertEnriched = (db) => db.prepare(`
   INSERT OR REPLACE INTO filings_enriched
     (record_id, headline, dek, the_number_value, the_number_label,
-     whats_new, why_it_matters, what_were_watching, the_full_read,
+     whats_new, why_it_matters, what_were_watching, faqs, the_full_read,
      editorial_tone, tone_score, tone_confidence, tone_reason,
      canonical_category, sector, key_entities, model_used, prompt_version,
      enriched_at, validation_ok, validation_issues)
   VALUES
     (@record_id, @headline, @dek, @the_number_value, @the_number_label,
-     @whats_new, @why_it_matters, @what_were_watching, @the_full_read,
+     @whats_new, @why_it_matters, @what_were_watching, @faqs, @the_full_read,
      @editorial_tone, @tone_score, @tone_confidence, @tone_reason,
      @canonical_category, @sector, @key_entities, @model_used, @prompt_version,
      @enriched_at, @validation_ok, @validation_issues)
