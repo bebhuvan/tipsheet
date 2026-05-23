@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS filings_enriched (
   tone_reason            TEXT,
   canonical_category     TEXT,
   sector                 TEXT,
+  faqs                   TEXT,
   key_entities           TEXT,
   model_used             TEXT,
   prompt_version         TEXT,

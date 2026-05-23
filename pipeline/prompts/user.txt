@@ -5,7 +5,7 @@ INPUT FILING
 - Event type: {event_type}
 - Sentiment: {sentiment}
 - Score: {score} / 10
-
+{metadata}
 NEWS SUMMARY (your primary source — these are the facts to convey):
 """
 {news_summary}

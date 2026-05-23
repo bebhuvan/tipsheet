@@ -6,6 +6,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GoogleGenAI } from '@google/genai';
 import { PHRASE_PATTERNS, STRUCTURAL_RULES, FEEDBACK_SUBSTITUTIONS } from './banned-patterns.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -77,7 +78,7 @@ function buildFeedbackMessage(validation) {
   if (fab.length) {
     lines.push('');
     lines.push(`Numbers in your output that do not appear in the source: ${fab.join(', ')}`);
-    lines.push('Use only numbers verbatim from the news_summary or rationale. If a number you cited is wrong, remove it or replace with the correct one from the source.');
+    lines.push('Use only numbers verbatim from the news_summary or rationale. DO NOT perform arithmetic (e.g. adding two numbers together). If a number you cited is wrong, remove it or replace with the correct one from the source.');
   }
   const issues = (validation.issues || []).filter(i => !i.startsWith('banned') && !i.startsWith('fabricated') && !i.startsWith('structural'));
   if (issues.length) {
@@ -95,6 +96,13 @@ function buildUserMessage(template, raw) {
   // scoring-system meta-commentary the model should ignore.
   const newsSummary = (raw.news_summary || '').slice(0, 4000);
   const rationale = (raw.rationale || '').slice(0, 4000);
+
+  let metadata = [];
+  if (raw.major_order) metadata.push(`- Major Order Size: ${raw.major_order_size || 'Not specified'}`);
+  if (raw.famous_investor_meeting) metadata.push(`- Famous Investor Meeting: ${raw.investor_name || 'Not specified'}`);
+  if (raw.concall_to_join) metadata.push(`- Concall: Marked as important to join`);
+  const metaString = metadata.length ? metadata.join('\n') : '';
+
   return template
     .replace('{company}',        raw.company || '?')
     .replace('{symbol}',         raw.symbol || '?')
@@ -102,63 +110,95 @@ function buildUserMessage(template, raw) {
     .replace('{event_type}',     raw.event_type || '?')
     .replace('{sentiment}',      raw.sentiment || '(blank)')
     .replace('{score}',          String(raw.score ?? '?'))
+    .replace('{metadata}',       metaString)
     .replace('{news_summary}',   newsSummary || '(no news summary provided — use rationale only)')
     .replace('{rationale}',      rationale || '(no rationale)');
 }
 
+const responseSchema = {
+  type: "OBJECT",
+  properties: {
+    headline: { type: "STRING" },
+    dek: { type: "STRING" },
+    the_number: {
+      type: "OBJECT",
+      properties: {
+        value: { type: "STRING" },
+        label: { type: "STRING" }
+      },
+      required: ["value", "label"]
+    },
+    whats_new: { type: "ARRAY", items: { type: "STRING" } },
+    why_it_matters: { type: "STRING" },
+    what_were_watching: { type: "ARRAY", items: { type: "STRING" } },
+    faqs: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          question: { type: "STRING" },
+          answer: { type: "STRING" }
+        },
+        required: ["question", "answer"]
+      }
+    },
+    the_full_read: { type: "STRING" },
+    editorial_tone: {
+      type: "OBJECT",
+      properties: {
+        label: { type: "STRING" },
+        score: { type: "INTEGER" },
+        confidence: { type: "STRING" },
+        reason: { type: "STRING" }
+      },
+      required: ["label", "score", "confidence", "reason"]
+    },
+    canonical_category: { type: "STRING" },
+    sector: { type: "STRING" },
+    key_entities: { type: "ARRAY", items: { type: "STRING" } }
+  },
+  required: [
+    "headline", "dek", "the_number", "whats_new", "why_it_matters", 
+    "what_were_watching", "faqs", "the_full_read", "editorial_tone", 
+    "canonical_category", "sector", "key_entities"
+  ]
+};
+
 export async function enrich(raw, previousAttempt = null) {
-  if (!CFG.apiKey) return { ok: false, error: 'missing API key (set LLM_API_KEY or OPENROUTER_API_KEY)' };
+  if (!CFG.apiKey) return { ok: false, error: 'missing API key (set LLM_API_KEY or GOOGLE_API_KEY)' };
   const { system, userTemplate } = await loadPrompts();
   const userMsg = buildUserMessage(userTemplate, raw);
 
-  // Compose messages. If we have a previous attempt with issues, append it as a feedback turn.
-  const messages = [
-    { role: 'system', content: system },
-    { role: 'user',   content: userMsg },
-  ];
+  const contents = [];
   if (previousAttempt?.parsed && previousAttempt?.validation?.issues?.length) {
-    messages.push(
-      { role: 'assistant', content: JSON.stringify(previousAttempt.parsed) },
-      { role: 'user', content: buildFeedbackMessage(previousAttempt.validation) },
-    );
+    contents.push({ role: 'user', parts: [{ text: userMsg }] });
+    contents.push({ role: 'model', parts: [{ text: JSON.stringify(previousAttempt.parsed) }] });
+    contents.push({ role: 'user', parts: [{ text: buildFeedbackMessage(previousAttempt.validation) }] });
+  } else {
+    contents.push({ role: 'user', parts: [{ text: userMsg }] });
   }
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), CFG.timeoutMs);
   const t0 = Date.now();
   try {
-    const r = await fetch(`${CFG.baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: {
-        'Authorization': `Bearer ${CFG.apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://filings.local',
-        'X-Title': 'Tipsheet pipeline',
-      },
-      body: JSON.stringify({
-        model: CFG.model,
-        messages,
-        response_format: { type: 'json_object' },
+    const ai = new GoogleGenAI({ apiKey: CFG.apiKey });
+    const response = await ai.models.generateContent({
+      model: CFG.model,
+      contents,
+      config: {
+        systemInstruction: system,
         temperature: CFG.temperature,
-        max_tokens: CFG.maxTokens,
-      }),
+        maxOutputTokens: CFG.maxTokens,
+        responseMimeType: 'application/json',
+        responseSchema,
+      }
     });
+
     const elapsed_ms = Date.now() - t0;
-    if (!r.ok) {
-      const body = await r.text();
-      return { ok: false, error: `HTTP ${r.status}`, raw_error: body.slice(0, 300), elapsed_ms };
-    }
-    const body = await r.json();
-    const content = body.choices?.[0]?.message?.content ?? '';
-    // Robust JSON extraction
-    const start = content.indexOf('{');
-    const end   = content.lastIndexOf('}');
-    if (start === -1 || end <= start) return { ok: false, error: 'no_json', raw_text: content.slice(0, 300), elapsed_ms };
-    const stripped = content.slice(start, end + 1);
+    const content = response.text || '';
+
     let parsed;
-    try { parsed = JSON.parse(stripped); }
-    catch (e) { return { ok: false, error: 'json_parse', raw_error: e.message, raw_text: stripped.slice(0, 300), elapsed_ms }; }
+    try { parsed = JSON.parse(content); }
+    catch (e) { return { ok: false, error: 'json_parse', raw_error: e.message, raw_text: content.slice(0, 300), elapsed_ms }; }
 
     const v = validate(parsed, raw);
     return {
@@ -167,13 +207,11 @@ export async function enrich(raw, previousAttempt = null) {
       validation: v,
       model: CFG.model,
       promptVersion: PROMPT_VERSION,
-      usage: body.usage || null,
+      usage: response.usageMetadata || null,
       elapsed_ms,
     };
   } catch (e) {
-    return { ok: false, error: e.name === 'AbortError' ? 'timeout' : e.message, elapsed_ms: Date.now() - t0 };
-  } finally {
-    clearTimeout(timer);
+    return { ok: false, error: e.message, elapsed_ms: Date.now() - t0 };
   }
 }
 
@@ -189,6 +227,7 @@ function validate(parsed, raw) {
   if (!Array.isArray(parsed.whats_new) || parsed.whats_new.length === 0) issues.push('whats_new_empty');
   if (typeof parsed.why_it_matters !== 'string' || parsed.why_it_matters.length < 30) issues.push('why_it_matters_thin');
   if (!Array.isArray(parsed.what_were_watching) || parsed.what_were_watching.length === 0) issues.push('what_were_watching_empty');
+  if (!Array.isArray(parsed.faqs) || parsed.faqs.length === 0) issues.push('faqs_empty');
   if (typeof parsed.the_full_read !== 'string') issues.push('the_full_read_missing');
   else if (parsed.the_full_read.length < 200) issues.push(`the_full_read_thin:${parsed.the_full_read.length}`);
   else if (parsed.the_full_read.length > 1500) issues.push(`the_full_read_too_long:${parsed.the_full_read.length}`);

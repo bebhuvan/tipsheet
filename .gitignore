@@ -6,6 +6,15 @@ node_modules/
 .DS_Store
 dist/
 .astro/
+.wrangler/
+site/.wrangler/
+.og-cache/
+site/.og-cache/
+site/_og_proto/
+site/_snapshot_preview/
+site/_mark_proto/
+site/_*.mjs
+site/_local_d1_seed.sql
 data/
 __pycache__/
 *.pyc

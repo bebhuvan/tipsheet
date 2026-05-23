@@ -41,7 +41,7 @@ const schema = {
   '@type': 'WebSite',
   name: BRAND_NAME,
   url: Astro.site?.toString(),
-  description: 'An editorial reading of Indian exchange filings.',
+  description: 'What matters at India’s listed companies.',
 };
 ---
 <Base
@@ -67,7 +67,7 @@ const schema = {
     )}
 
     {lead && (
-      <section class="hero reveal d1">
+      <section class="hero">
         <article class="hero-lead">
           <div class:list={['lead-tier', scoreBand(lead.score)]}>
             <span class="tier">{tierLabel(lead.score)}</span>

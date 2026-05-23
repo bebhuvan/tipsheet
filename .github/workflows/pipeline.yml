@@ -177,6 +177,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      # Persisted OG image cache — render only NEW cards each build (O(new),
+      # not O(all)). Restores the most recent cache and saves an updated one.
+      - name: Restore + persist OG image cache
+        uses: actions/cache@v4
+        with:
+          path: site/.og-cache
+          key: og-cache-${{ github.run_id }}
+          restore-keys: |
+            og-cache-
+
       - name: Install site deps
         run: cd site && npm ci
 
@@ -194,38 +204,8 @@ jobs:
       - name: Notify Telegram
         if: success() && !inputs.skip_pipeline
         continue-on-error: true
-        run: |
-          cd pipeline && node --env-file=../.env.ci -e "
-            import { openDb } from './db.mjs';
-            const db = openDb();
-            const cutoff = Math.floor(Date.now() / 1000) - 35 * 60;
-            const rows = db.prepare(\`
-              SELECT r.symbol, r.company, r.score,
-                     e.headline, e.dek, e.the_number_value, e.the_number_label,
-                     e.canonical_category, e.tone_score, r.record_id
-              FROM filings_enriched e
-              JOIN filings_raw r ON r.record_id = e.record_id
-              WHERE e.enriched_at > ? AND e.validation_ok = 1
-              ORDER BY r.score DESC LIMIT 10
-            \`).all(cutoff);
-            if (!rows.length) { console.log('No new articles to notify'); process.exit(0); }
-            const tierFor = (s) => s >= 9 ? 'Alert' : s >= 7 ? 'Lead' : 'Brief';
-            const articles = rows.map(r => ({
-              symbol: r.symbol, tier: tierFor(r.score),
-              headline: r.headline, dek: r.dek,
-              the_number_value: r.the_number_value, the_number_label: r.the_number_label,
-              canonical_url: '/filings/' + (r.symbol || '').toLowerCase() + '-' + r.record_id + '/',
-            }));
-            const resp = await fetch(process.env.TELEGRAM_NOTIFY_URL, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + process.env.TELEGRAM_NOTIFY_SECRET,
-              },
-              body: JSON.stringify({ articles }),
-            });
-            console.log('Telegram notify:', resp.status, await resp.text());
-          "
+        run: cd pipeline && node --env-file=../.env.ci notify_telegram.mjs
         env:
-          TELEGRAM_NOTIFY_URL: ${{ secrets.TELEGRAM_NOTIFY_URL }}
-          TELEGRAM_NOTIFY_SECRET: ${{ secrets.TELEGRAM_NOTIFY_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SITE_URL: https://tipsheet.markets

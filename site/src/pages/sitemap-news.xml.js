@@ -4,7 +4,7 @@
 import { listFilings } from '../lib/queries.mjs';
 
 export async function GET({ site }) {
-  const siteUrl = site?.toString().replace(/\/$/, '') || 'https://filings.example';
+  const siteUrl = site?.toString().replace(/\/$/, '') || 'https://tipsheet.markets';
   const all = listFilings({ limit: 1000 });
   const cutoff = Date.now() - 48 * 60 * 60 * 1000;
   const recent = all.filter(f => {

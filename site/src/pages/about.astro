@@ -4,60 +4,65 @@ import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 ---
 <Base
-  title="About"
-  description="Tipsheet is an editorial publication covering Indian-equity disclosures. We turn every consequential exchange filing into a short, source-grounded read. No clickbait, no ads, no paywall."
+  title="About Tipsheet"
+  description="Tipsheet extracts the signal from the noise of Indian equities. We turn dense, consequential exchange filings into sharp, uncompromising editorial intelligence."
 >
   <Masthead />
   <main>
     <article class="prose-page">
       <header>
         <div class="kicker"><span>About</span></div>
-        <h1 class="page-title">About Tipsheet.</h1>
+        <h1 class="page-title">The signal in the noise of Indian equities.</h1>
       </header>
 
       <hr class="rule" />
 
-      <h2>What Tipsheet is</h2>
+      <h2>The Information Deficit</h2>
       <p>
-        Tipsheet is an editorial publication covering Indian-equity disclosures. Every note is a short editorial read — anchored to a primary source (an exchange filing, regulator notice, or earnings transcript) and written in the spirit of the FT Lex column, the Economist's Buttonwood, and the Wall Street Journal's Heard on the Street.
+        The Indian equity market generates thousands of regulatory disclosures a week. Most of it is noise. But buried in that noise are the structural shifts, the governance breaks, and the capital moves that dictate market reality.
       </p>
       <p>
-        We started because most Indian-equity reporting we read was either dry newswire, hype-padded clickbait, or both. There was no publication that covered every consequential exchange disclosure with brevity, judgment, and respect for the reader's time. We are trying to build that publication.
+        Historically, investors had two choices: wade through raw, unformatted PDF filings, or rely on financial media that pads routine updates with manufactured drama and syndicated wire copy. Neither respects the reader’s time. We built Tipsheet to offer a third way.
       </p>
 
-      <h2>What Tipsheet is not</h2>
+      <h2>Our Standard</h2>
+      <p>
+        Tipsheet is an unapologetic, high-fidelity editorial filter. We read every material disclosure filed with the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE). We strip away the corporate boilerplate, extract the consequential math, and publish a razor-sharp editorial note. 
+      </p>
+      <p>
+        Our tone is anchored in the tradition of the FT’s <em>Lex</em> column and the WSJ’s <em>Heard on the Street</em>: brief, analytical, and entirely grounded in primary evidence. If we cannot verify a claim directly from an exchange filing, we delete it.
+      </p>
+
+      <h2>The Architecture</h2>
+      <p>
+        We operate at the bleeding edge of editorial technology. Tipsheet is powered by a proprietary computational pipeline that ingests raw exchange data, scores it for materiality, and synthesizes the core facts using large language models. 
+      </p>
+      <p>
+        However, technology is merely our engine; editorial judgment is our steering wheel. Every output is governed by an unyielding set of journalistic constraints. The AI does not predict prices, it does not invent context, and it does not write clickbait. To understand the exact mechanics of this hybrid intelligence model, review our <a href="/methodology/">Methodology</a>.
+      </p>
+
+      <h2>What We Do Not Do</h2>
       <ul>
-        <li>We do not aggregate other publications' content. We do not republish Reuters or PTI wire. We do not summarise other journalists' takes.</li>
-        <li>We do not predict prices. We do not issue recommendations. We do not write "buy / sell / hold" verdicts.</li>
-        <li>We do not write what is not in the source. If we cannot evidence a claim, we delete it.</li>
-        <li>We do not run advertising. We do not run paid placements. We do not run a paywall.</li>
+        <li><strong>No noise:</strong> We do not aggregate other journalists' work or republish wire copy.</li>
+        <li><strong>No advice:</strong> We do not issue "buy, sell, or hold" recommendations.</li>
+        <li><strong>No compromise:</strong> We do not run advertising, sponsored placements, or advertorials.</li>
       </ul>
 
-      <h2 id="team">Team and mission</h2>
+      <h2 id="team">Independence & Ownership</h2>
       <p>
-        Tipsheet is published by a small editorial team. We are funded by the founder and operate without external pressure on editorial decisions. The team is listed in <a href="/authors/">the authors directory</a>.
-      </p>
-      <p>
-        Our mission is to be the place a reader goes when they need to understand what a single disclosure means — without filler, without manufactured drama, and without the procedural noise that bog down most coverage.
+        Tipsheet is funded independently and operates entirely free of external editorial pressure. Our mandate is singular: to serve the reader with clarity and precision. 
       </p>
 
-      <h2>How we are made</h2>
-      <p>
-        Tipsheet articles are produced under editorial supervision with the assistance of large language models. The editorial workflow, including what role AI plays and what role human editors play, is documented in detail at <a href="/methodology/">our methodology page</a>. We disclose this prominently because the reader deserves to know how the work was made.
-      </p>
-
-      <h2>What we have built</h2>
+      <h2>The Archive</h2>
       <ul>
-        <li><a href="/filings/">Every note</a> we have published, with primary-source links to BSE and NSE.</li>
-        <li><a href="/companies/">A per-company page</a> for every listed company we have covered.</li>
-        <li><a href="/sectors/">A per-sector page</a> aggregating activity by sector.</li>
-        <li><a href="/markets/">A markets snapshot</a> covering Indian indices, international indices, FX, commodities, and the US Treasury yield curve.</li>
-        <li><a href="/concalls/">Concall Notes</a> covering earnings calls, with management-consistency flags when the call contradicts a prior one.</li>
+        <li><a href="/filings/">The Wire</a> — The complete chronological record of our filings coverage.</li>
+        <li><a href="/companies/">Company Intelligence</a> — The editorial ledger for every listed entity we track.</li>
+        <li><a href="/markets/">Market Telemetry</a> — A live pulse of Indian indices, FX, and macro conditions.</li>
       </ul>
 
-      <h2>Get in touch</h2>
+      <h2>Contact</h2>
       <p>
-        Tips, corrections, or feedback: see <a href="/contact/">our contact page</a>. Corrections policy at <a href="/corrections/">/corrections</a>; editorial standards at <a href="/editorial-standards/">/editorial-standards</a>; methodology at <a href="/methodology/">/methodology</a>.
+        For inquiries, corrections, or cryptographic keys, see our <a href="/contact/">Contact</a> page. We hold ourselves accountable to strict <a href="/editorial-standards/">Editorial Standards</a> and a transparent <a href="/corrections/">Corrections Policy</a>.
       </p>
     </article>
   </main>

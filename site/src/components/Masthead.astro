@@ -10,11 +10,16 @@ const today = new Date();
 const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const monthsLong = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const monthsShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// 12-hour clock, e.g. "4:26 PM".
+const time12 = (() => {
+  const h = today.getHours();
+  return `${h % 12 || 12}:${String(today.getMinutes()).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+})();
 const {
   weekday = weekdays[today.getDay()],
   dateline = `${weekdays[today.getDay()]}, ${today.getDate()} ${monthsLong[today.getMonth()]} ${today.getFullYear()}`,
-  timeIst = `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')} IST`,
-  stamp = `${today.getDate()} ${monthsShort[today.getMonth()]} · ${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')} IST`,
+  timeIst = `${time12} IST`,
+  stamp = `${today.getDate()} ${monthsShort[today.getMonth()]} · ${time12} IST`,
   activeNav = 'today',
 } = Astro.props;
 

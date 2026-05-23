@@ -54,20 +54,22 @@ function shapeFiling(row) {
     whats_new:          parseJsonArray(row.whats_new),
     why_it_matters:     row.why_it_matters,
     what_were_watching: parseJsonArray(row.what_were_watching),
+    faqs:               parseJsonArray(row.faqs),
     the_full_read:      row.the_full_read,
     editorial_tone:     row.editorial_tone,
     tone_score:         row.tone_score,
     tone_confidence:    row.tone_confidence,
     tone_reason:        row.tone_reason,
     key_entities:       parseJsonArray(row.key_entities),
-    slug:               buildSlug(row.symbol, row.record_id),
-    canonical_url:      `/${buildSlug(row.symbol, row.record_id)}/`,
+    slug:               buildSlug(row.symbol, row.headline, row.record_id),
+    canonical_url:      `/${buildSlug(row.symbol, row.headline, row.record_id)}/`,
   };
 }
 
-export function buildSlug(symbol, recordId) {
+export function buildSlug(symbol, headline, recordId) {
   const sym = String(symbol || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `${sym}-${recordId}`;
+  const hd = String(headline || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return hd ? `${sym}-${hd}-${recordId}` : `${sym}-${recordId}`;
 }
 
 /**
@@ -116,7 +118,7 @@ const ALL_COLS = `
   r.event_type, r.event_category_raw, r.event_category_canonical AS canonical_category,
   e.sector, r.created_on,
   e.headline, e.dek, e.the_number_value, e.the_number_label,
-  e.whats_new, e.why_it_matters, e.what_were_watching, e.the_full_read,
+  e.whats_new, e.why_it_matters, e.what_were_watching, e.faqs, e.the_full_read,
   e.editorial_tone, e.tone_score, e.tone_confidence, e.tone_reason,
   e.key_entities
 `;
@@ -595,7 +597,7 @@ export function getBriefingVisuals(type, dateYmd, focusRecordIds = []) {
   `;
   const shapeBriefingVisualFiling = row => ({
     ...row,
-    canonical_url: `/${buildSlug(row.symbol, row.record_id)}/`,
+    canonical_url: `/${buildSlug(row.symbol, row.headline, row.record_id)}/`,
   });
 
   const filings = db().prepare(`
@@ -837,13 +839,13 @@ export function priorConcallsForIsin(isin, excludeEventTime, limit = 4) {
 }
 
 /** All filings for static-path generation. */
-export function listAllForStaticPaths(limit = 5000) {
+export function listAllForStaticPaths(limit = 20000) {
   return db().prepare(`
-    SELECT r.record_id, r.symbol
+    SELECT r.record_id, r.symbol, e.headline
     FROM filings_raw r
     JOIN filings_enriched e ON e.record_id = r.record_id
     WHERE e.validation_ok = 1
     ORDER BY r.created_on DESC
     LIMIT ?
-  `).all(limit).map(row => ({ id: buildSlug(row.symbol, row.record_id), record_id: row.record_id }));
+  `).all(limit).map(row => ({ id: buildSlug(row.symbol, row.headline, row.record_id), record_id: row.record_id }));
 }

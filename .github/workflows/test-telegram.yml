@@ -1,0 +1,32 @@
+name: Test Telegram
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Restore DB from cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/filings.db
+          key: filings-db-
+          restore-keys: |
+            filings-db-
+      - name: Download seed DB from release (fallback)
+        run: |
+          gh release download --pattern 'filings.db.gz' -R ${{ github.repository }} || true
+          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv filings.db data/; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Install pipeline deps
+        run: cd pipeline && npm ci
+      - name: Send one test message
+        run: cd pipeline && node notify_telegram.mjs --test
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SITE_URL: https://tipsheet.markets

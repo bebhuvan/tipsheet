@@ -55,9 +55,57 @@ function cacheControlFor(pathname) {
   return null;
 }
 
+function json(data, status = 200, maxAge = 300) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      // Found data is cached long (financials change slowly); a "not yet
+      // available" answer is cached briefly so the box appears soon after a
+      // scrape populates D1, without rebuilding or republishing the article.
+      'Cache-Control': `public, max-age=${maxAge}`,
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+}
+
+async function handleWidgetApi(pathname, env) {
+  const match = pathname.match(/^\/api\/widget\/([a-zA-Z0-9_-]+)$/);
+  if (!match) return null;
+  const symbol = match[1].toUpperCase();
+
+  if (!env.tipsheet_db) return json({ symbol, available: false }, 200, 60);
+
+  try {
+    const row = await env.tipsheet_db
+      .prepare('SELECT * FROM tijori_widgets WHERE symbol = ?')
+      .bind(symbol)
+      .first();
+
+    if (!row) {
+      return json({ symbol, available: false }, 200, 120);
+    }
+
+    return json({
+      symbol: row.symbol,
+      slug: row.slug,
+      company_name: row.company_name,
+      available: true,
+      widget: JSON.parse(row.payload_json),
+      fetched_at: row.fetched_at,
+    }, 200, 3600);
+  } catch (err) {
+    return json({ symbol, error: 'unavailable' }, 500, 30);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    const widget = await handleWidgetApi(url.pathname, env);
+    if (widget) return widget;
+
     const response = await env.ASSETS.fetch(request);
 
     if (response.status === 404 && url.pathname !== '/') {
@@ -71,7 +119,6 @@ export default {
 
     const headers = new Headers(response.headers);
     applySecurityHeaders(headers);
-    headers.set('X-Worker-Version', 'v3-security');
 
     const cc = cacheControlFor(url.pathname);
     if (cc) {
