@@ -54,7 +54,8 @@ async function main() {
   `);
 
   // Batch upsert in groups of 25 (D1 API limits)
-  const BATCH = 25;
+  // D1 caps bound parameters at ~100/query; 7 cols → keep rows*7 under that.
+  const BATCH = 12;
   let synced = 0;
 
   for (let i = 0; i < rows.length; i += BATCH) {
