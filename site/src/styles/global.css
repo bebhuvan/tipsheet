@@ -102,14 +102,14 @@ html { -webkit-text-size-adjust: 100%; }
   align-items: center;
   justify-content: space-between;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 .tijori-sidebar-btn .tijori-arrow {
   font-family: var(--data);
-  font-size: 14px;
+  font-size: 15px;
   font-style: normal;
   transition: transform 300ms ease;
 }
@@ -178,7 +178,7 @@ a.inline:hover { background-size: 100% 2px; }
 }
 .smcap {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -213,7 +213,7 @@ a.inline:hover { background-size: 100% 2px; }
 }
 .masthead-search {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -224,7 +224,7 @@ a.inline:hover { background-size: 100% 2px; }
 }
 .masthead-search:hover { color: var(--accent); }
 .masthead-search .kbd-hint {
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.05em;
   padding: 1px 5px;
   border: 1px solid var(--hairline-strong);
@@ -234,7 +234,7 @@ a.inline:hover { background-size: 100% 2px; }
 .masthead-search:hover .kbd-hint { color: var(--accent); border-color: var(--accent); }
 .masthead-tg {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -297,7 +297,7 @@ a.inline:hover { background-size: 100% 2px; }
   border: 0;
   color: var(--text-muted);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.11em;
   text-transform: uppercase;
   padding: 4px 0;
@@ -382,7 +382,7 @@ a.inline:hover { background-size: 100% 2px; }
   flex-direction: column;
   gap: 4px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.13em;
   color: var(--text-muted);
@@ -391,7 +391,7 @@ a.inline:hover { background-size: 100% 2px; }
 .ribbon-label { color: var(--text); font-weight: 500; }
 .ribbon-card.open  .ribbon-label { color: var(--brief-open); }
 .ribbon-card.close .ribbon-label { color: var(--brief-close); }
-.ribbon-date { font-size: 9px; letter-spacing: 0.11em; color: var(--text-faint); }
+.ribbon-date { font-size: 12px; letter-spacing: 0.11em; color: var(--text-faint); }
 .ribbon-headline {
   font-family: var(--serif);
   font-size: 16px;
@@ -440,7 +440,7 @@ section.hero {
 /* legacy lead section retained for any other page that may use it */
 .lead-tier {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -483,7 +483,7 @@ section.hero {
   gap: 22px;
   align-items: center;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   color: var(--text-muted);
   flex-wrap: wrap;
@@ -530,7 +530,7 @@ section.hero {
 .lc-item:hover { opacity: 0.7; }
 .lc-kicker {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -560,7 +560,7 @@ section.hero {
   font-family: 'Newsreader', serif;
   font-style: italic;
   font-weight: 300;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.45;
   color: var(--text-muted);
   margin: 0 0 14px;
@@ -575,7 +575,7 @@ section.hero {
   display: flex; gap: 14px;
   margin-top: auto;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   color: var(--text-muted);
 }
@@ -596,7 +596,7 @@ section.hero {
   letter-spacing: -0.014em;
 }
 .hero-sec .sec-dek {
-  font-size: 14px;
+  font-size: 15px;
   margin: 0 0 14px;
   max-width: 38ch;
   font-variation-settings: "opsz" 16;
@@ -610,7 +610,7 @@ section.hero {
 
 .sec-kicker {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -647,7 +647,7 @@ section.hero {
   max-width: 38ch;
   font-variation-settings: "opsz" 20;
 }
-.sec-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--text-muted); display: flex; gap: 18px; margin-top: auto; padding-top: 8px; }
+.sec-meta { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--text-muted); display: flex; gap: 18px; margin-top: auto; padding-top: 8px; }
 .sec-meta .ticker { color: var(--text); font-weight: 500; letter-spacing: 0.14em; }
 
 /* ─── mid-tier strip (between hero and briefs) ──────────────────── */
@@ -680,7 +680,7 @@ section.midtier {
 }
 .midtier-head .meta {
   font-family: 'Newsreader', serif; font-style: italic; font-weight: 300;
-  font-size: 14px; color: var(--text-muted);
+  font-size: 15px; color: var(--text-muted);
   font-variation-settings: "opsz" 16;
 }
 .midtier-grid {
@@ -716,7 +716,7 @@ section.midtier {
 }
 .mt-kicker {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -758,7 +758,7 @@ section.midtier {
   font-family: 'JetBrains Mono', monospace;
   font-style: normal;
   font-weight: 500;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text);
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -824,7 +824,7 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
 }
 .brief-head .ct {
   font-family: 'Newsreader', serif; font-style: italic; font-weight: 300;
-  font-size: 14px; color: var(--text-muted);
+  font-size: 15px; color: var(--text-muted);
   letter-spacing: 0;
   font-variation-settings: "opsz" 16;
 }
@@ -855,7 +855,7 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
 .bi-ticker {
   display: inline-block;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 500;
@@ -882,7 +882,7 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
   font-family: 'Newsreader', serif;
   font-style: italic;
   font-weight: 400;
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: 0;
   color: var(--text-muted);
   transition: color 160ms ease;
@@ -940,13 +940,13 @@ section.wire-section { padding: 104px 0 128px; }
 }
 .wire-row:hover { background: var(--bg-soft); padding-left: 20px; padding-right: 4px; }
 .wire-time {
-  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
   letter-spacing: 0.12em; color: var(--text-muted);
   font-feature-settings: "tnum" 1;
 }
 .wire-tier {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   font-weight: 500;
@@ -976,7 +976,7 @@ section.wire-section { padding: 104px 0 128px; }
 .wire-ticker { transition: color 180ms ease; }
 .wire-row:hover .wire-ticker { color: var(--accent); }
 .wire-ticker {
-  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
   letter-spacing: 0.11em; color: var(--text); font-weight: 500;
   text-align: right;
 }
@@ -1000,12 +1000,12 @@ section.wire-section { padding: 104px 0 128px; }
   font-feature-settings: "tnum" 1;
   font-size: 12px;
 }
-.market-row .name { font-size: 11px; letter-spacing: 0.04em; color: var(--text); font-weight: 500; }
+.market-row .name { font-size: 12px; letter-spacing: 0.04em; color: var(--text); font-weight: 500; }
 .market-row .val  { color: var(--text); text-align: right; }
-.market-row .chg  { font-size: 11px; letter-spacing: 0.04em; text-align: right; }
+.market-row .chg  { font-size: 12px; letter-spacing: 0.04em; text-align: right; }
 .market-section-title {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--text-faint);
@@ -1016,7 +1016,7 @@ section.wire-section { padding: 104px 0 128px; }
 .market-section-title:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
 
 /* ─── footer ────────────────────────────────────────────────────── */
-footer.site-footer { max-width: 1240px; margin: 96px auto 56px; padding: 48px 56px 0; border-top: 1px solid var(--hairline); display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 56px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.14em; color: var(--text-muted); }
+footer.site-footer { max-width: 1240px; margin: 96px auto 56px; padding: 48px 56px 0; border-top: 1px solid var(--hairline); display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 56px; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.14em; color: var(--text-muted); }
 footer.site-footer h5 {
   font-family: 'Newsreader', serif;
   font-style: italic;
@@ -1032,17 +1032,17 @@ footer.site-footer ul { list-style: none; margin: 0; padding: 0; display: flex; 
 footer.site-footer a { color: var(--text-muted); transition: color 160ms ease; }
 footer.site-footer a:hover { color: var(--text); }
 footer.site-footer .col-about { font-family: 'Newsreader', serif; font-style: italic; font-weight: 300; font-size: 16px; letter-spacing: 0; text-transform: none; line-height: 1.55; color: var(--text-soft); max-width: 36ch; font-variation-settings: "opsz" 18; }
-.site-footer-bottom { max-width: 1240px; margin: 32px auto 40px; padding: 0 56px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-faint); }
+.site-footer-bottom { max-width: 1240px; margin: 32px auto 40px; padding: 0 56px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-faint); }
 
 /* ─── filing-page specific ──────────────────────────────────────── */
 article.filing { padding: 112px 0 80px; max-width: 1080px; margin: 0 auto; }
-.kicker { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 40px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.kicker { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 40px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .kicker .sep { color: var(--text-faint); }
 .kicker .tier-alert { color: var(--accent); font-weight: 500; }
 .kicker .brief-tag-open  { color: var(--brief-open);  font-weight: 500; }
 .kicker .brief-tag-close { color: var(--brief-close); font-weight: 500; }
 .gutter-link { color: var(--accent); }
-.timeline-headline { font-size: 14px; }
+.timeline-headline { font-size: 15px; }
 h1.headline { font-family: 'Newsreader', serif; font-weight: 400; font-size: clamp(40px, 5.4vw, 72px); line-height: 1.04; letter-spacing: -0.024em; margin: 0 0 28px; max-width: 18ch; font-variation-settings: "opsz" 60; text-wrap: balance; }
 .dek { font-family: 'Newsreader', serif; font-style: italic; font-weight: 300; font-size: clamp(20px, 1.8vw, 25px); line-height: 1.42; color: var(--text-soft); margin: 0 0 40px; max-width: 38ch; font-variation-settings: "opsz" 24; text-wrap: balance; }
 
@@ -1088,7 +1088,7 @@ h1.headline { font-family: 'Newsreader', serif; font-weight: 400; font-size: cla
 .timeline-cta:hover .cta-arrow { transform: translateX(4px); }
 .timeline-cta:hover .cta-count { color: var(--accent); }
 hr.rule { border: 0; border-top: 1px solid var(--hairline-strong); margin: 0; }
-.dateline { padding: 20px 0; display: flex; flex-wrap: wrap; gap: 28px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: var(--text-muted); border-bottom: 1px solid var(--hairline); font-feature-settings: "tnum" 1; }
+.dateline { padding: 20px 0; display: flex; flex-wrap: wrap; gap: 28px; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--text-muted); border-bottom: 1px solid var(--hairline); font-feature-settings: "tnum" 1; }
 .dateline strong { color: var(--text); font-weight: 500; letter-spacing: 0.16em; }
 .dateline .source-link { margin-left: auto; color: var(--text); }
 
@@ -1102,7 +1102,7 @@ hr.rule { border: 0; border-top: 1px solid var(--hairline-strong); margin: 0; }
   background: var(--hairline);
   align-self: stretch;
 }
-aside.gutter { position: sticky; top: 40px; align-self: start; font-size: 14px; }
+aside.gutter { position: sticky; top: 40px; align-self: start; font-size: 15px; }
 /* tier-block (filing page gutter): big serif italic tier word */
 .tier-block { margin-bottom: 48px; padding-bottom: 24px; border-bottom: 1px solid var(--hairline); }
 .tier-mark {
@@ -1122,7 +1122,7 @@ aside.gutter { position: sticky; top: 40px; align-self: start; font-size: 14px; 
 .tier-meta {
   margin-top: 14px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1144,7 +1144,7 @@ aside.gutter { position: sticky; top: 40px; align-self: start; font-size: 14px; 
 .fund-block dl.facts { margin: 0; display: grid; grid-template-columns: 1fr; gap: 16px 0; }
 .fund-block dl.facts dt {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--text-muted); font-weight: 500;
   margin: 0;
 }
@@ -1158,14 +1158,14 @@ aside.gutter { position: sticky; top: 40px; align-self: start; font-size: 14px; 
   line-height: 1.2;
   letter-spacing: -0.01em;
 }
-.gutter h3 { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-muted); font-weight: 500; margin: 0 0 22px; }
+.gutter h3 { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-muted); font-weight: 500; margin: 0 0 22px; }
 ol.timeline { list-style: none; margin: 0; padding: 0; }
-ol.timeline li { position: relative; padding-left: 22px; padding-bottom: 22px; font-size: 14px; color: var(--text); line-height: 1.4; }
+ol.timeline li { position: relative; padding-left: 22px; padding-bottom: 22px; font-size: 15px; color: var(--text); line-height: 1.4; }
 ol.timeline li::before { content: ''; position: absolute; left: 3px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--text); }
 ol.timeline li::after { content: ''; position: absolute; left: 6px; top: 16px; bottom: 4px; width: 1px; background: var(--hairline-strong); }
 ol.timeline li.current::before { background: var(--bg); border: 1.5px solid var(--accent); }
 ol.timeline li:last-child::after { display: none; }
-ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); letter-spacing: 0.04em; margin-top: 3px; }
+ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); letter-spacing: 0.04em; margin-top: 3px; }
 
 .body { max-width: 640px; }
 .body p { margin: 0 0 1.45em; font-size: 20px; line-height: 1.65; color: var(--text); font-variation-settings: "opsz" 18; }
@@ -1199,13 +1199,13 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   margin: 0 0 56px;
 }
 .the-number .v { font-family: 'Newsreader', serif; font-weight: 300; font-size: clamp(48px, 6.4vw, 80px); line-height: 1; letter-spacing: -0.03em; color: var(--text); font-variation-settings: "opsz" 60; font-feature-settings: "tnum" 1; }
-.the-number .l { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-muted); }
+.the-number .l { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-muted); }
 
 .bullets { list-style: none; padding: 0; margin: 0 0 48px; }
 .bullets li { font-family: 'Newsreader', serif; font-size: 19px; line-height: 1.55; padding: 10px 0 10px 28px; position: relative; color: var(--text); font-variation-settings: "opsz" 18; }
 .bullets li::before { content: ''; position: absolute; left: 0; top: 22px; width: 14px; height: 1px; background: var(--text); }
 
-.entities { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--text-muted); margin: 32px 0 0; padding-top: 18px; border-top: 1px solid var(--hairline); }
+.entities { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.06em; color: var(--text-muted); margin: 32px 0 0; padding-top: 18px; border-top: 1px solid var(--hairline); }
 .entities span { color: var(--text); }
 
 .end-mark {
@@ -1238,7 +1238,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 }
 .ps-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1249,7 +1249,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   align-items: baseline;
   gap: 11px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1329,11 +1329,11 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .markets-update {
   text-align: right;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   color: var(--text-muted);
 }
-.markets-update .lbl { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-faint); display: block; }
+.markets-update .lbl { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-faint); display: block; }
 .markets-update .val { color: var(--text); font-size: 13px; margin-top: 4px; display: block; }
 
 .hero-indices {
@@ -1355,7 +1355,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .hero-card.down { border-top-color: var(--down); }
 .hero-name {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1378,7 +1378,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   flex-direction: column;
   gap: 4px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   color: var(--text-muted);
   font-feature-settings: "tnum" 1;
@@ -1388,7 +1388,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .block { margin: 80px 0; }
 .block-title {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text);
@@ -1412,11 +1412,11 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   padding: 12px 16px 12px 0;
   border-bottom: 1px solid var(--hairline);
   vertical-align: baseline;
-  font-size: 14px;
+  font-size: 15px;
 }
 .market-table th {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1436,7 +1436,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 
 .market-table .spark-col { width: 150px; padding-right: 0; padding-left: 16px; }
 .spark { display: block; }
-.spark-empty { color: var(--text-faint); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.spark-empty { color: var(--text-faint); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
 
 .hero-spark { margin-top: 10px; }
 .hero-spark svg { display: block; width: 100%; }
@@ -1495,7 +1495,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 [data-theme="dark"] .archive-row:hover { background: rgba(255,255,255,0.02); }
 .archive-date {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.06em;
   color: var(--text-muted);
 }
@@ -1511,7 +1511,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .archive-score.accent { color: var(--accent); }
 .archive-tier {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 500;
@@ -1521,9 +1521,9 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .archive-tier.score-hi  { color: var(--accent); }
 .archive-tier.score-mid { color: var(--text); }
 .archive-tier.score-low { color: var(--text-muted); }
-.archive-body .kicker { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+.archive-body .kicker { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
 .archive-body h3 { font-family: 'Newsreader', serif; font-weight: 400; font-size: 20px; line-height: 1.3; letter-spacing: -0.012em; margin: 0; max-width: 70ch; }
-.archive-ticker { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: var(--text); font-weight: 500; text-align: right; }
+.archive-ticker { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.1em; color: var(--text); font-weight: 500; text-align: right; }
 
 .pagination {
   display: flex;
@@ -1532,7 +1532,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   gap: 24px;
   margin-top: 48px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1541,23 +1541,31 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .pagination .current { color: var(--text); }
 
 .archive-filters {
-  margin-bottom: 24px;
+  margin-bottom: 36px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--hairline);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   display: flex;
-  gap: 8px 14px;
+  gap: 10px;
   flex-wrap: wrap;
-  color: var(--text-muted);
+  align-items: center;
 }
-.archive-filters .label { letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-faint); margin-right: 4px; }
+.archive-filters .label {
+  letter-spacing: 0.13em;
+  color: var(--text-faint);
+  margin-right: 6px;
+}
 .archive-filters a {
-  color: var(--text);
-  border-bottom: 1px solid transparent;
-  padding-bottom: 2px;
+  color: var(--text-muted);
+  border: 1px solid var(--hairline-strong);
+  padding: 7px 14px;
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
 }
-.archive-filters a:hover { border-bottom-color: var(--text-muted); }
-.archive-filters a.active { border-bottom-color: var(--accent); color: var(--accent); }
+.archive-filters a:hover { border-color: var(--text); color: var(--text); background: var(--bg-soft); }
+.archive-filters a.active { border-color: var(--accent); color: var(--accent); font-weight: 500; }
 
 /* ─── company page ──────────────────────────────────────────────── */
 .company-page { padding: 96px 0 96px; max-width: 1080px; margin: 0 auto; }
@@ -1570,7 +1578,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 }
 .company-header .kicker {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--text-muted); margin-bottom: 28px;
 }
 .company-header .kicker a { color: var(--text-muted); }
@@ -1588,7 +1596,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 }
 .company-meta {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1603,28 +1611,28 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .company-fund {
   border-left: 1px solid var(--hairline);
   padding-left: 40px;
-  font-size: 14px;
+  font-size: 15px;
 }
 .company-fund h4 {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--text-muted); margin: 0 0 22px; font-weight: 500;
 }
 .company-fund dl.facts dt {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
   color: var(--text-muted); font-weight: 500; margin-top: 20px;
 }
 .company-fund dl.facts dt:first-of-type { margin-top: 0; }
 .company-fund dl.facts dd {
   font-family: 'JetBrains Mono', monospace;
   font-feature-settings: "tnum" 1;
-  font-size: 14px; margin: 4px 0 0; color: var(--text);
+  font-size: 15px; margin: 4px 0 0; color: var(--text);
 }
 .company-timeline { margin-top: 72px; }
 .timeline-title {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--text); margin: 0 0 32px; font-weight: 500;
   padding-bottom: 18px; border-bottom: 1px solid var(--text);
 }
@@ -1658,9 +1666,9 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   border-top: 1px solid var(--hairline-strong);
   border-bottom: 1px solid var(--hairline);
   display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: baseline;
-  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.06em; color: var(--text-muted);
 }
-.company-sources .label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text); font-weight: 500; }
+.company-sources .label { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text); font-weight: 500; }
 .company-sources a { color: var(--text); }
 .company-sources a::after { content: ' ↗'; color: var(--text-muted); }
 
@@ -1689,7 +1697,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 }
 .chip:hover { border-color: var(--text); }
 .chip-sym { font-size: 12px; letter-spacing: 0.12em; font-weight: 500; }
-.chip-mcap { font-size: 11px; color: var(--text-muted); font-feature-settings: "tnum" 1; }
+.chip-mcap { font-size: 12px; color: var(--text-muted); font-feature-settings: "tnum" 1; }
 
 .sector-activity { margin-top: 48px; }
 
@@ -1709,7 +1717,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   letter-spacing: 0.08em;
   align-items: baseline;
 }
-.alpha-nav .label { font-size: 10px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-muted); margin-right: 8px; }
+.alpha-nav .label { font-size: 12px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-muted); margin-right: 8px; }
 .alpha-nav a {
   color: var(--text);
   padding: 4px 8px;
@@ -1746,9 +1754,9 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 [data-theme="dark"] .company-row a:hover { background: rgba(255,255,255,0.02); }
 .cr-ticker { font-size: 12px; letter-spacing: 0.1em; color: var(--text); font-weight: 500; }
 .cr-name { font-family: 'Newsreader', serif; font-size: 17px; color: var(--text); }
-.cr-sector { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); text-decoration: none; }
+.cr-sector { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); text-decoration: none; }
 .cr-sector:hover { color: var(--accent); border-bottom: 1px solid var(--accent); }
-.cr-count { font-size: 11px; color: var(--text-muted); text-align: right; letter-spacing: 0.06em; }
+.cr-count { font-size: 12px; color: var(--text-muted); text-align: right; letter-spacing: 0.06em; }
 
 .sector-families { display: grid; gap: 48px; }
 .sector-family { }
@@ -1775,7 +1783,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .sector-row a:hover { background: rgba(0,0,0,0.012); }
 [data-theme="dark"] .sector-row a:hover { background: rgba(255,255,255,0.02); }
 .sr-name { font-family: 'Newsreader', serif; font-size: 17px; color: var(--text); }
-.sr-meta { font-size: 11px; color: var(--text-muted); letter-spacing: 0.04em; display: flex; gap: 10px; align-items: baseline; }
+.sr-meta { font-size: 12px; color: var(--text-muted); letter-spacing: 0.04em; display: flex; gap: 10px; align-items: baseline; }
 .sr-meta .sep { color: var(--text-faint); }
 .sr-meta .sr-count { color: var(--text); font-weight: 500; }
 
@@ -1783,7 +1791,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .editorial-page { padding: 64px 0 96px; max-width: 720px; margin: 0 auto; }
 .editorial-page h1 { font-family: 'Newsreader', serif; font-weight: 400; font-size: clamp(36px, 5vw, 56px); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 24px; max-width: 18ch; text-wrap: balance; }
 .editorial-page .dek { margin-bottom: 56px; }
-.editorial-page h2 { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-muted); font-weight: 500; margin: 56px 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--text); }
+.editorial-page h2 { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-muted); font-weight: 500; margin: 56px 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--text); }
 .editorial-page p { font-family: 'Newsreader', serif; font-size: 19px; line-height: 1.7; color: var(--text); margin: 0 0 1.4em; }
 .editorial-page ul { font-family: 'Newsreader', serif; font-size: 18px; line-height: 1.55; padding-left: 0; list-style: none; }
 .editorial-page ul li { padding: 8px 0 8px 22px; position: relative; }
