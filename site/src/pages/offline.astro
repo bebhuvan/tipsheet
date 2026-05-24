@@ -1,0 +1,25 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+<Base
+  title="Offline"
+  description="You appear to be offline. Reconnect to read the latest filings."
+>
+  <Masthead />
+  <main>
+    <article class="editorial-page" style="text-align: center;">
+      <header class="archive-header">
+        <div class="kicker" style="justify-content: center;"><span>No connection</span></div>
+        <h1 class="page-title" style="max-width: none;">You're offline.</h1>
+        <p class="page-dek" style="margin-left: auto; margin-right: auto;">
+          Tipsheet can't reach the network right now. Pages you've already opened
+          are available offline — anything new will load the moment you reconnect.
+        </p>
+      </header>
+      <p style="margin-top: 40px;"><a class="inline" href="/">Try the homepage &rarr;</a></p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

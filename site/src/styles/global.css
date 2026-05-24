@@ -232,7 +232,7 @@ a.inline:hover { background-size: 100% 2px; }
   line-height: 1;
 }
 .masthead-search:hover .kbd-hint { color: var(--accent); border-color: var(--accent); }
-.masthead-tg {
+.masthead-tg, .masthead-rss {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   letter-spacing: 0.13em;
@@ -245,8 +245,8 @@ a.inline:hover { background-size: 100% 2px; }
   text-decoration: none;
   transition: color 160ms ease;
 }
-.masthead-tg svg { display: block; }
-.masthead-tg:hover { color: var(--accent); }
+.masthead-tg svg, .masthead-rss svg { display: block; }
+.masthead-tg:hover, .masthead-rss:hover { color: var(--accent); }
 .masthead-dateline {
   font-family: 'Newsreader', serif;
   font-style: italic;

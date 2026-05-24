@@ -197,6 +197,15 @@ const orgSchema = {
       } catch (_) {}
     })();
   </script>
+
+  <!-- PWA: register the service worker (installable app + offline fallback). -->
+  <script is:inline>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to content</a>
