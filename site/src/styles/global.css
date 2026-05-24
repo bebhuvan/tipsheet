@@ -887,12 +887,12 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 500;
-  color: var(--text);
+  color: var(--text-muted);
   margin-bottom: 10px;
 }
-.bi-ticker.score-hi  { color: var(--accent); }
-.bi-ticker.score-mid { color: var(--text); }
-.bi-ticker.score-low { color: var(--text-muted); }
+/* Binary signal: only top-conviction filings (score >= 9) carry the accent;
+   everything else is one quiet, uniform muted tone — no ambiguous third shade. */
+.bi-ticker.score-hi { color: var(--accent); }
 .bi-headline {
   font-family: 'Newsreader', serif;
   font-weight: 400;

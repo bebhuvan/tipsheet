@@ -1,0 +1,86 @@
+---
+// Renders one Regulation/Economy note (handles both circular + RBI shapes).
+const { note } = Astro.props;
+function mdBold(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+const paras = (s) => String(s || '').split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+const isCircular = note.kind === 'circular';
+---
+<article class="reg-note">
+  <header class="reg-head">
+    <div class="kicker"><span>{note.source}</span> · {note.category_label}{note.severity ? ` · ${note.severity}` : ''}</div>
+    <h1 class="reg-headline">{note.headline}</h1>
+    {note.dek && <p class="reg-dek">{note.dek}</p>}
+    <div class="reg-meta">
+      {note.date_label && <span>{note.date_label}</span>}
+      {isCircular && note.effective_date && <span>Effective {note.effective_date}</span>}
+      {isCircular && note.who_is_affected && <span>Affects: {note.who_is_affected}</span>}
+    </div>
+  </header>
+
+  {note.what_changed?.length > 0 && (
+    <section class="reg-block">
+      <h2>What changed</h2>
+      <ul>{note.what_changed.map(x => <li>{x}</li>)}</ul>
+    </section>
+  )}
+
+  {note.the_read && (
+    <section class="reg-block reg-read">
+      <h2>The read</h2>
+      {paras(note.the_read).map(p => <p set:html={mdBold(p)} />)}
+    </section>
+  )}
+
+  {note.key_numbers?.length > 0 && (
+    <section class="reg-block">
+      <h2>Key numbers</h2>
+      <ul class="reg-nums">{note.key_numbers.map(x => <li>{x}</li>)}</ul>
+    </section>
+  )}
+
+  {isCircular && note.tables?.length > 0 && (
+    <section class="reg-block">
+      <h2>Affected securities</h2>
+      {note.tables.map(t => (
+        <div class="reg-table-wrap"><table class="reg-table">
+          {t.map((row, i) => (
+            <tr>{row.map(cell => (i === 0 ? <th>{cell}</th> : <td>{cell}</td>))}</tr>
+          ))}
+        </table></div>
+      ))}
+    </section>
+  )}
+
+  {isCircular && note.key_entities?.length > 0 && (
+    <div class="reg-entities">{note.key_entities.map(e => <span class="reg-tag">{e}</span>)}</div>
+  )}
+
+  {note.source_url && (
+    <p class="reg-source">Primary source: <a href={note.source_url} target="_blank" rel="noopener">{isCircular ? 'official circular (PDF)' : 'rbi.org.in'}</a></p>
+  )}
+</article>
+
+<style>
+  .reg-note { max-width: 720px; margin: 0 auto; padding: 8px 16px 48px; }
+  .reg-head .kicker { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+  .reg-headline { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(28px, 4vw, 40px); line-height: 1.12; margin: 0 0 12px; }
+  .reg-dek { font-size: 18px; color: var(--text-muted); line-height: 1.5; margin: 0 0 16px; }
+  .reg-meta { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-muted); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 10px 0; margin-bottom: 24px; }
+  .reg-block { margin: 24px 0; }
+  .reg-block h2 { font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 10px; }
+  .reg-block ul { margin: 0; padding-left: 18px; }
+  .reg-block li { margin: 6px 0; line-height: 1.5; }
+  .reg-read p { font-size: 17px; line-height: 1.7; margin: 0 0 14px; }
+  .reg-nums li { font-variant-numeric: tabular-nums; }
+  .reg-table-wrap { overflow-x: auto; }
+  .reg-table { border-collapse: collapse; width: 100%; font-size: 14px; margin-bottom: 14px; }
+  .reg-table th, .reg-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+  .reg-table th { font-weight: 600; }
+  .reg-entities { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+  .reg-tag { font-size: 12px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); }
+  .reg-source { font-size: 13px; color: var(--text-muted); margin-top: 28px; border-top: 1px solid var(--border); padding-top: 14px; }
+</style>

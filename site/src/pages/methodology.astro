@@ -4,59 +4,67 @@ import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 ---
 <Base
-  title="Methodology — The Architecture of Tipsheet"
-  description="How we fuse computational scale with elite editorial judgment. Discover the scoring rubric and grounding rules that power Tipsheet."
+  title="How Tipsheet works — sources, AI, and editorial rules"
+  description="How Tipsheet works: which filings from India's listed companies get published, where every fact comes from, how AI drafts each note, and the rules it has to follow. Every story links to the original BSE or NSE filing."
 >
   <Masthead activeNav="methodology" />
   <main>
     <article class="editorial-page">
       <div class="kicker"><span>Methodology</span></div>
-      <h1>The Architecture of Intelligence.</h1>
-      <p class="dek" style="font-family: var(--serif); font-style: italic; font-weight: 300; font-size: 21px; line-height: 1.45; color: var(--text-soft); max-width: 36ch; text-wrap: balance;">
-        How we fuse computational scale with elite editorial judgment to extract truth from regulatory noise.
+      <h1>How this actually works.</h1>
+      <p class="dek" style="font-family: var(--serif); font-style: italic; font-weight: 300; font-size: 21px; line-height: 1.45; color: var(--text-soft); max-width: 40ch; text-wrap: balance;">
+        No magic, no mystery. Here's where the facts come from, what gets published, and how the writing is kept honest.
       </p>
 
-      <h2>The Materiality Index</h2>
-      <p>Every disclosure fed into our pipeline is computationally scored on a 5–10 scale. This score measures <em>materiality</em>—how severely a filing alters the investment thesis—not the dramatic flair of the corporate language.</p>
+      <h2>What gets published — and what doesn't</h2>
+      <p>
+        Every trading day, India's listed companies file thousands of disclosures with the BSE and NSE. The vast majority are routine: board-meeting notices, compliance certificates, small administrative housekeeping. Tipsheet skips those. A filing only becomes a story here if it clears a real bar for importance — if it genuinely changes how you'd think about the company.
+      </p>
+      <p>Roughly, that bar sorts into three:</p>
       <ul>
-        <li><strong>9–10 (Catalytic)</strong> — Structural shifts. Governance breaks, massive capital raises, unguided M&amp;A, or severe regulatory actions.</li>
-        <li><strong>7–8 (Consequential)</strong> — Meaningful deviations. Unanticipated order wins, credit rating upgrades/downgrades, and shifting margin guidance.</li>
-        <li><strong>5–6 (Routine)</strong> — Expected cadence. Scheduled earnings releases and routine board approvals.</li>
+        <li><strong>The big ones</strong> — acquisitions, large fundraises, governance breaks, serious regulatory action. Anything structural.</li>
+        <li><strong>Worth knowing</strong> — surprise order wins, credit-rating changes, real shifts in margins or guidance.</li>
+        <li><strong>Routine</strong> — scheduled results, ordinary approvals. These get filtered out, not dressed up.</li>
       </ul>
-      <p>Filings scoring below 5 are categorized as noise. They are purged by our upstream classifiers and never see the light of publication.</p>
+      <p>If a filing doesn't matter, you won't find it here. That's the whole idea.</p>
 
-      <h2>The Computational Editorial Workflow</h2>
-      <p>Tipsheet represents a paradigm shift in financial media: the synthesis of large language models (LLMs) with ruthless editorial constraints.</p>
-      <p>Every article originates from a primary source—a BSE/NSE filing or an earnings transcript. Our extraction engine reads the raw document, isolating the mathematical realities and corporate admissions. This raw rationale is then passed to our LLM synthesis layer, which writes the final prose.</p>
-      <p><strong>Crucially, the AI operates in a closed loop.</strong> It is mathematically forbidden from introducing external facts, scraping secondary news, or inventing sentiment. It cannot predict prices. It cannot invent quotes. Every output must survive an automated verification pass against the source document before it is committed to our database.</p>
+      <h2>Where the facts come from</h2>
+      <p>
+        Every story traces back to a primary source — the company's own filing with the BSE or NSE, or its earnings call. Nothing here is spun from another outlet's article. I don't summarise Mint, ET, Moneycontrol, or the wires, because rewriting other people's reporting isn't reporting. The filing is read and boiled down to its essentials — the real numbers, the actual admissions — and the story is written from that.
+      </p>
+      <p>
+        And you never have to take my word for it. Every note links straight to the original filing. If you want to check a figure, the source is one click away.
+      </p>
 
-      <h2>The Anatomy of a Note</h2>
-      <p>We respect the reader's time. Therefore, every filing note adheres to a strict, scannable architecture:</p>
+      <h2>Yes, AI writes these. Here's how.</h2>
+      <p>
+        I don't type each note by hand — there are far too many, and pretending otherwise would be dishonest. The drafting is done by a large language model, working only from that boiled-down filing and nothing else. The judgment, though, is mine: what's worth covering, how a note should read, what's off-limits. I built the rules; the model writes inside them. The thinking is human. The typing is the machine.
+      </p>
+
+      <h2>What the writing is never allowed to do</h2>
       <ul>
-        <li><strong>The Headline</strong> — Uncompromising, sentence-case declarations. The company is the subject; the verb is active.</li>
-        <li><strong>The Number</strong> — The single most devastating or impressive metric from the filing, isolated for clarity.</li>
-        <li><strong>What Happened</strong> — Three bullet points stripping the event down to its bare, undeniable facts.</li>
-        <li><strong>Why This Matters</strong> — The editorial verdict. Contextualized consequence in two to three sentences.</li>
-        <li><strong>The Full Read</strong> — A tightly wound narrative (120–200 words) that weaves the math and the implication into a singular thesis.</li>
+        <li>It can't invent a fact, a quote, or a number. If it isn't in the filing, it doesn't appear.</li>
+        <li>It can't predict prices, or tell you what to do with a stock.</li>
+        <li>It can't reach for outside news or "what the market thinks." It won't say investors are worried unless management actually says so.</li>
+        <li>It can't lean on the corporate filler that makes most financial writing unreadable.</li>
       </ul>
+      <p>
+        On that last point: a few words and phrases you will simply never read here — <em>going forward</em>, <em>robust</em>, <em>synergies</em>, <em>paves the way</em>, <em>marks a milestone</em>, <em>underscores management's commitment</em>. If a sentence could have come from a press release, it's cut.
+      </p>
 
-      <h2>Absolute Grounding</h2>
-      <p>Every metric, date, and percentage published on Tipsheet is tethered to the exchange filing. We do not engage in narrative spin. We do not write that "investors are worried" unless management explicitly addresses investor anxiety in the document. We describe the blast radius of an event; we do not presume to speak for the market.</p>
-      <p>Outputs that fail our cryptographic or semantic grounding tests are incinerated by the pipeline.</p>
-
-      <h2>The Banned Lexicon</h2>
-      <p>Corporate communications and traditional financial media rely on a shared vocabulary of empty filler. We have hard-coded our models to reject it. You will never read the following phrases on Tipsheet:</p>
+      <h2>How a note is built</h2>
+      <p>Every piece follows the same shape, so you can read it in seconds:</p>
       <ul>
-        <li><em>"Going forward", "In today's dynamic environment", "Notably"</em> (Padding)</li>
-        <li><em>"Leverage", "Synergies", "Transformative", "Robust"</em> (Corporate clichés)</li>
-        <li><em>"Paves the way", "Marks a milestone", "Underscores management's commitment"</em> (Manufactured narratives)</li>
+        <li><strong>The headline</strong> — plain, active, sentence case. The company does something; the verb says what.</li>
+        <li><strong>The number</strong> — the single figure that matters most, pulled out on its own.</li>
+        <li><strong>What's new</strong> — the bare facts, in a few lines.</li>
+        <li><strong>Why this matters</strong> — the part that's actual judgment: what the event changes.</li>
+        <li><strong>The full read</strong> — a short, tight paragraph tying the math to the meaning.</li>
       </ul>
 
-      <h2>Verification & Provenance</h2>
-      <p>Trust requires auditability. Every single note published on Tipsheet includes a direct, outbound link to the raw BSE or NSE filing. We do not ask you to trust our computational pipeline; we invite you to verify our reading against the immutable primary source.</p>
-
-      <p style="margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--hairline); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-size: 10px;">
-        V 2.0 // This methodology is computationally enforced.
+      <h2>When I get it wrong</h2>
+      <p>
+        This is an honest experiment, and experiments have errors. When something here is wrong, I'd rather fix it in the open than quietly. If you spot a mistake, tell me on the <a href="/contact/">contact</a> page. How corrections are handled is written down in the <a href="/corrections/">corrections policy</a>, the standards I hold the whole thing to are in the <a href="/editorial-standards/">editorial standards</a>, and the longer story of why this exists is on the <a href="/about/">about</a> page.
       </p>
     </article>
   </main>

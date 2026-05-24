@@ -2,11 +2,12 @@
 import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import { listConcalls } from '../lib/queries.mjs';
+import { listConcalls, listConcallNotes } from '../lib/queries.mjs';
 
 const items = listConcalls({ limit: 200 });
 const withFlag = items.filter(c => c.inconsistency_flag);
 const withoutFlag = items.filter(c => !c.inconsistency_flag);
+const transcriptNotes = listConcallNotes({ limit: 60 });  // AlphaStreet-sourced, summarised same-day
 
 function dateOf(iso) {
   const d = new Date(String(iso).replace(' ', 'T'));
@@ -31,7 +32,7 @@ function dateOf(iso) {
         </p>
       </header>
 
-      {items.length === 0 && (
+      {items.length === 0 && transcriptNotes.length === 0 && (
         <p class="empty-note">No Concall Notes yet — they land here as the season picks up.</p>
       )}
 
@@ -80,6 +81,29 @@ function dateOf(iso) {
                   </div>
                   <h3 class="concall-headline">{c.headline}</h3>
                   {c.dek && <p class="concall-dek">{c.dek}</p>}
+                  {c.the_take && <p class="concall-take">{c.the_take}</p>}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {transcriptNotes.length > 0 && (
+        <section class="concall-section">
+          <h2 class="section-title">From the earnings calls</h2>
+          <p class="section-dek">Summarised straight from the company's earnings-call transcript, same day. We cite the call and link the transcript; we don't reproduce it.</p>
+          <ol class="concall-list">
+            {transcriptNotes.map(c => (
+              <li>
+                <a href={c.canonical_url} class="concall-row">
+                  <div class="concall-meta">
+                    <span class="concall-symbol">{c.ticker}</span>
+                    {c.quarter && <><span class="concall-dot">·</span><span class="concall-sector">{c.quarter}</span></>}
+                    <span class="concall-dot">·</span>
+                    <span class="concall-date">{c.date_label}</span>
+                  </div>
+                  <h3 class="concall-headline">{c.headline}</h3>
                   {c.the_take && <p class="concall-take">{c.the_take}</p>}
                 </a>
               </li>

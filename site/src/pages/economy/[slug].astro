@@ -1,0 +1,19 @@
+---
+import Base from '../../layouts/Base.astro';
+import Masthead from '../../components/Masthead.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import RegNote from '../../components/RegNote.astro';
+import { listEconomy } from '../../lib/queries.mjs';
+
+export function getStaticPaths() {
+  return listEconomy({ limit: 5000 }).map(note => ({ params: { slug: note.slug }, props: { note } }));
+}
+const { note } = Astro.props;
+---
+<Base title={`${note.headline} — Economy`} description={note.dek || note.headline}>
+  <Masthead activeNav="economy" />
+  <main>
+    <RegNote note={note} />
+  </main>
+  <SiteFooter />
+</Base>

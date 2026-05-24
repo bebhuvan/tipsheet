@@ -1,0 +1,73 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Masthead from '../../../components/Masthead.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { listConcallNotes } from '../../../lib/queries.mjs';
+
+export function getStaticPaths() {
+  return listConcallNotes({ limit: 5000 }).map(note => ({ params: { slug: note.slug }, props: { note } }));
+}
+const { note } = Astro.props;
+const mdBold = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+const paras = (s) => String(s || '').split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+---
+<Base title={`${note.headline} — Concall Note`} description={note.the_take || note.headline}>
+  <Masthead activeNav="concalls" />
+  <main>
+    <article class="reg-note">
+      <header class="reg-head">
+        <div class="kicker"><span>{note.ticker}</span> · {note.quarter} concall{note.guidance_signal && note.guidance_signal !== 'None' ? ` · guidance ${note.guidance_signal}` : ''}{note.sentiment ? ` · ${note.sentiment}` : ''}</div>
+        <h1 class="reg-headline">{note.headline}</h1>
+        {note.the_take && <p class="reg-dek">{note.the_take}</p>}
+        <div class="reg-meta">
+          <span>{note.company}</span>
+          {note.date_label && <span>{note.date_label}</span>}
+        </div>
+      </header>
+
+      {note.whats_new?.length > 0 && (
+        <section class="reg-block">
+          <h2>What management said</h2>
+          <ul>{note.whats_new.map(x => <li>{x}</li>)}</ul>
+        </section>
+      )}
+
+      {note.the_brief && (
+        <section class="reg-block reg-read">
+          <h2>The brief</h2>
+          {paras(note.the_brief).map(p => <p set:html={mdBold(p)} />)}
+        </section>
+      )}
+
+      {note.key_quotes?.length > 0 && (
+        <section class="reg-block">
+          <h2>In their words</h2>
+          {note.key_quotes.map(q => (
+            <blockquote class="reg-quote">“{q.quote}”<cite>— {q.attribution}</cite></blockquote>
+          ))}
+        </section>
+      )}
+
+      {note.source_url && (
+        <p class="reg-source">Summarised from the {note.company} {note.quarter} earnings-call transcript. <a href={note.source_url} target="_blank" rel="noopener">View transcript</a>.</p>
+      )}
+    </article>
+  </main>
+  <SiteFooter />
+</Base>
+
+<style>
+  .reg-note { max-width: 720px; margin: 0 auto; padding: 8px 16px 48px; }
+  .reg-head .kicker { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+  .reg-headline { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(28px, 4vw, 40px); line-height: 1.12; margin: 0 0 12px; }
+  .reg-dek { font-size: 18px; color: var(--text-muted); line-height: 1.5; margin: 0 0 16px; }
+  .reg-meta { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-muted); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 10px 0; margin-bottom: 24px; }
+  .reg-block { margin: 24px 0; }
+  .reg-block h2 { font-size: 13px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 10px; }
+  .reg-block ul { margin: 0; padding-left: 18px; }
+  .reg-block li { margin: 6px 0; line-height: 1.5; }
+  .reg-read p { font-size: 17px; line-height: 1.7; margin: 0 0 14px; }
+  .reg-quote { margin: 0 0 14px; padding: 8px 0 8px 16px; border-left: 3px solid var(--border); font-style: italic; line-height: 1.55; }
+  .reg-quote cite { display: block; font-style: normal; font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+  .reg-source { font-size: 13px; color: var(--text-muted); margin-top: 28px; border-top: 1px solid var(--border); padding-top: 14px; }
+</style>

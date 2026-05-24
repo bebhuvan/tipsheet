@@ -2,10 +2,14 @@
 import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import { getHomepageBundle, listBriefings } from '../lib/queries.mjs';
+import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes } from '../lib/queries.mjs';
 import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
 
 const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalToday, hiScore } = getHomepageBundle();
+// Regulation / Economy / Concall-note rails (separate content streams; not in the filings bundle).
+const regItems     = listRegulation({ limit: 6 });
+const econItems    = listEconomy({ limit: 5 });
+const concallNotes = listConcallNotes({ limit: 5 });
 // Show every active section, ordered by editorial weight.
 const SECTION_ORDER = ['Earnings', 'Order Wins', 'M&A', 'Concalls', 'Credit', 'Regulatory', 'Capital Markets', 'Buybacks', 'Other'];
 const orderedBriefs = [...briefs].sort((a, b) => {
@@ -175,7 +179,7 @@ const schema = {
                 {b.items.slice(0, 4).map(item => (
                   <li>
                     <a href={item.canonical_url} class="brief-item">
-                      <span class:list={['bi-ticker', scoreBand(item.score)]}>{item.symbol}</span>
+                      <span class:list={['bi-ticker', scoreBand(item.score)]} title={item.score >= 9 ? 'High-conviction read — top of the desk today' : undefined}>{item.symbol}</span>
                       <h4 class="bi-headline">{item.headline}</h4>
                     </a>
                   </li>
@@ -185,6 +189,59 @@ const schema = {
             </section>
             );
           })}
+        </div>
+      </section>
+    )}
+
+    {(regItems.length > 0 || econItems.length > 0 || concallNotes.length > 0) && (
+      <section class="briefs">
+        <div class="briefs-head">
+          <h2><em>Regulation · economy · concalls</em></h2>
+          <span class="meta">SEBI · exchanges · RBI · earnings calls</span>
+        </div>
+        <div class="briefs-grid">
+          {regItems.length > 0 && (
+            <section class="brief">
+              <header class="brief-head"><h3>Regulation</h3><span class="ct"><span class="ct-num">{regItems.length}</span> latest</span></header>
+              <ol class="brief-list">
+                {regItems.slice(0, 5).map(n => (
+                  <li><a href={n.canonical_url} class="brief-item">
+                    <span class="bi-ticker">{n.source}</span>
+                    <h4 class="bi-headline">{n.headline}</h4>
+                  </a></li>
+                ))}
+              </ol>
+              <a href="/regulation/" class="brief-more">All regulation →</a>
+            </section>
+          )}
+          {econItems.length > 0 && (
+            <section class="brief">
+              <header class="brief-head"><h3>Economy</h3><span class="ct"><span class="ct-num">{econItems.length}</span> latest</span></header>
+              <ol class="brief-list">
+                {econItems.slice(0, 5).map(n => (
+                  <li><a href={n.canonical_url} class="brief-item">
+                    <span class="bi-ticker">{n.source}</span>
+                    <h4 class="bi-headline">{n.headline}</h4>
+                  </a></li>
+                ))}
+              </ol>
+              <a href="/economy/" class="brief-more">All economy →</a>
+            </section>
+          )}
+          {concallNotes.length > 0 && (
+            <section class="brief">
+              <header class="brief-head"><h3>Concall notes</h3><span class="ct"><span class="ct-num">{concallNotes.length}</span> latest</span></header>
+              <ol class="brief-list">
+                {concallNotes.slice(0, 5).map(n => (
+                  <li><a href={n.canonical_url} class="brief-item">
+                    <span class="bi-ticker">{n.ticker}</span>
+                    <h4 class="bi-headline">{n.headline}</h4>
+                  </a></li>
+                ))}
+              </ol>
+              <a href="/concalls/" class="brief-more">All concalls →</a>
+            </section>
+          )}
         </div>
       </section>
     )}

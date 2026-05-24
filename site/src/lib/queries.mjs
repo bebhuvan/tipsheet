@@ -860,3 +860,142 @@ export function getMarketSignals() {
     .sort((a, b) => rank(a.label) - rank(b.label));
   return { groups, fetched_at: rows[0].fetched_at };
 }
+
+// ─── Regulation + Economy (circulars_enriched + rbi_enriched) ────────
+// New content streams: SEBI/NSE/BSE circulars and RBI. Routed by section:
+//   /regulation = all circulars + RBI {Monetary Policy, Banking Regulation, Enforcement}
+//   /economy    = RBI {Macro Data, Report}
+// hasTable() guards keep the site build green even before the pipeline has created the tables.
+
+function _slugify(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80); }
+function _shortHash(s) { let h = 5381; const str = String(s || ''); for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0; return h.toString(16).slice(0, 8); }
+function _ts(rfc822) { const t = Date.parse(String(rfc822 || '')); return Number.isFinite(t) ? t : 0; }
+function _dateLabel(rfc822) {
+  const d = new Date(_ts(rfc822));
+  if (!_ts(rfc822)) return '';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+function shapeCircularNote(row) {
+  const slug = `${_slugify(row.headline)}-${row.circular_id}`;
+  return {
+    kind: 'circular', id: row.circular_id, section: 'regulation',
+    headline: row.headline, dek: row.dek,
+    what_changed: parseJsonArray(row.what_changed),
+    who_is_affected: row.who_is_affected, effective_date: row.effective_date,
+    the_read: row.the_read, category_label: row.reg_category, severity: row.severity,
+    key_entities: parseJsonArray(row.key_entities),
+    source: String(row.source || '').toUpperCase(),
+    stocks: parseJsonArray(row.stocks), source_url: row.pdf_url,
+    tables: parseJsonArray(row.pdf_tables),
+    pub_date: row.pub_date, ts: _ts(row.pub_date), date_label: _dateLabel(row.pub_date),
+    slug, canonical_url: `/regulation/${slug}/`,
+  };
+}
+
+function shapeRbiNote(row) {
+  const section = row.section === 'economy' ? 'economy' : 'regulation';
+  const slug = `${_slugify(row.headline)}-${_shortHash(row.link)}`;
+  return {
+    kind: 'rbi', id: row.link, section,
+    headline: row.headline, dek: row.dek,
+    what_changed: parseJsonArray(row.what_changed),
+    the_read: row.the_read, category_label: row.category,
+    key_numbers: parseJsonArray(row.key_numbers),
+    source: 'RBI', source_url: row.link,
+    pub_date: row.pub_date, ts: _ts(row.pub_date), date_label: _dateLabel(row.pub_date),
+    slug, canonical_url: `/${section}/${slug}/`,
+  };
+}
+
+// Collapse the same event arriving as multiple circulars (e.g. a Central Bank OFS = 4 procedural
+// circulars; an ITC F&O adjustment filed on both NSE and BSE). Conservative key: first affected
+// ticker + category + calendar day — distinct stories for one company on one day in one category
+// are rare. Notes with no ticker (SEBI policy, RBI) key by id, so they never collapse. Keep the
+// richest (longest the_read).
+function dedupeNotes(notes) {
+  const best = new Map();
+  for (const n of notes) {
+    const firstStock = (n.kind === 'circular' && n.stocks?.length) ? n.stocks[0] : null;
+    const day = n.ts ? new Date(n.ts).toISOString().slice(0, 10) : '';
+    const key = firstStock ? `${firstStock}|${n.category_label}|${day}` : `id:${n.id}`;
+    const cur = best.get(key);
+    if (!cur || (n.the_read?.length || 0) > (cur.the_read?.length || 0)) best.set(key, n);
+  }
+  return [...best.values()];
+}
+
+/** Regulation feed: all published circulars + RBI regulation notes, deduped, newest first. */
+export function listRegulation({ limit = 200 } = {}) {
+  const out = [];
+  if (hasTable('circulars_enriched')) {
+    out.push(...db().prepare(`
+      SELECT ce.*, cr.source, cr.pub_date, cr.stocks, cr.pdf_url, cr.pdf_tables
+      FROM circulars_enriched ce JOIN circulars_raw cr ON cr.circular_id = ce.circular_id
+      WHERE ce.validation_ok = 1 ORDER BY ce.enriched_at DESC LIMIT ?
+    `).all(limit).map(shapeCircularNote));
+  }
+  if (hasTable('rbi_enriched')) {
+    out.push(...db().prepare(`
+      SELECT re.*, rr.pub_date FROM rbi_enriched re JOIN rbi_raw rr ON rr.link = re.link
+      WHERE re.validation_ok = 1 AND re.section = 'regulation' ORDER BY re.enriched_at DESC LIMIT ?
+    `).all(limit).map(shapeRbiNote));
+  }
+  return dedupeNotes(out).sort((a, b) => b.ts - a.ts).slice(0, limit);
+}
+
+function shapeMacroNote(row) {
+  const slug = `${_slugify(row.headline)}-${_shortHash(row.id)}`;
+  return {
+    kind: 'macro', id: row.id, section: 'economy',
+    headline: row.headline, dek: row.dek,
+    the_read: row.the_read, category_label: row.category || 'Macro Data',
+    key_numbers: parseJsonArray(row.key_numbers),
+    source: 'India Data Hub', source_url: null,
+    pub_date: row.release_date, ts: _ts(row.release_date), date_label: _dateLabel(row.release_date),
+    slug, canonical_url: `/economy/${slug}/`,
+  };
+}
+
+/** Economy feed: RBI macro-data + reports + macro data-release notes, newest first. */
+export function listEconomy({ limit = 200 } = {}) {
+  const out = [];
+  if (hasTable('rbi_enriched')) {
+    out.push(...db().prepare(`
+      SELECT re.*, rr.pub_date FROM rbi_enriched re JOIN rbi_raw rr ON rr.link = re.link
+      WHERE re.validation_ok = 1 AND re.section = 'economy' ORDER BY re.enriched_at DESC LIMIT ?
+    `).all(limit).map(shapeRbiNote));
+  }
+  if (hasTable('macro_enriched')) {
+    out.push(...db().prepare(`
+      SELECT * FROM macro_enriched WHERE validation_ok = 1 ORDER BY enriched_at DESC LIMIT ?
+    `).all(limit).map(shapeMacroNote));
+  }
+  return out.sort((a, b) => b.ts - a.ts).slice(0, limit);
+}
+
+// ─── Concall notes (AlphaStreet transcripts → DeepSeek summaries) ────
+function shapeConcallNote(row) {
+  const q = String(row.quarter || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const slug = `${_slugify(row.company)}${q ? '-' + q : ''}-${_shortHash(row.link)}`;
+  return {
+    ticker: row.ticker, company: row.company, quarter: row.quarter,
+    headline: row.headline, the_take: row.the_take,
+    whats_new: parseJsonArray(row.whats_new),
+    key_quotes: parseJsonArray(row.key_quotes),
+    the_brief: row.the_brief,
+    guidance_signal: row.guidance_signal, sentiment: row.sentiment,
+    source_url: row.link,
+    pub_date: row.pub_date, ts: _ts(row.pub_date), date_label: _dateLabel(row.pub_date),
+    slug, canonical_url: `/concalls/transcript/${slug}/`,
+  };
+}
+
+/** Concall Notes summarised from AlphaStreet transcripts, newest first. */
+export function listConcallNotes({ limit = 200 } = {}) {
+  if (!hasTable('alphastreet_enriched')) return [];
+  return db().prepare(`
+    SELECT * FROM alphastreet_enriched WHERE validation_ok = 1 ORDER BY enriched_at DESC LIMIT ?
+  `).all(limit).map(shapeConcallNote);
+}

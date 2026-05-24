@@ -1,0 +1,19 @@
+---
+import Base from '../../layouts/Base.astro';
+import Masthead from '../../components/Masthead.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import RegNote from '../../components/RegNote.astro';
+import { listRegulation } from '../../lib/queries.mjs';
+
+export function getStaticPaths() {
+  return listRegulation({ limit: 5000 }).map(note => ({ params: { slug: note.slug }, props: { note } }));
+}
+const { note } = Astro.props;
+---
+<Base title={`${note.headline} — Regulation`} description={note.dek || note.headline}>
+  <Masthead activeNav="regulation" />
+  <main>
+    <RegNote note={note} />
+  </main>
+  <SiteFooter />
+</Base>

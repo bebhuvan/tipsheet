@@ -1,0 +1,38 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { listEconomy } from '../lib/queries.mjs';
+
+const items = listEconomy({ limit: 150 });
+---
+<Base
+  title="Economy — India's macro data, read for the signal"
+  description="RBI and official data — forex reserves, lending and deposit rates, trade, the RBI Bulletin — turned into short, sourced reads on what each print signals for markets and policy."
+>
+  <Masthead activeNav="economy" />
+  <main>
+    <article class="archive-page">
+      <header class="archive-header">
+        <div class="kicker"><span>Economy</span></div>
+        <h1 class="page-title">Economy.</h1>
+        <p class="page-dek">India's macro prints — RBI data, rates, trade — read for the signal, not the press release. {items.length} published.</p>
+      </header>
+      <div class="archive-list">
+        {items.length === 0 && <p style="font-style: italic; color: var(--text-muted); padding: 24px 0;">No economy notes yet.</p>}
+        {items.map(n => (
+          <a href={n.canonical_url} class="archive-row">
+            <span class="archive-date">{n.date_label}</span>
+            <span class="archive-score">{n.source}</span>
+            <div class="archive-body">
+              <div class="kicker">{n.category_label}</div>
+              <h3>{n.headline}</h3>
+              {n.dek && <p class="archive-dek">{n.dek}</p>}
+            </div>
+          </a>
+        ))}
+      </div>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>
