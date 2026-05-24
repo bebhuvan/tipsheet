@@ -1361,7 +1361,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   }
   /* Article: headline + dek span the full width; the headline scales down a
      touch so long titles don't stack into a tall narrow column. */
-  article.filing h1.headline { max-width: none; font-size: clamp(32px, 8.5vw, 44px); }
+  article.filing h1.headline { max-width: none; font-size: clamp(28px, 7.4vw, 40px); text-wrap: pretty; }
   article.filing .dek { max-width: none; }
 }
 
