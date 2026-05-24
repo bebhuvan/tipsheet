@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { listAllForStaticPaths, getFiling, priorFilingsForSymbol, recordIdFromSlug, sourceLinks, getFundamentals, getFundamentalContext, tierFor, filingsCountForSymbol, tijoriCompanyUrl } from '../lib/queries.mjs';
+import { renderInline, renderProse } from '../lib/prose.mjs';
 import '../styles/snapshot.css';
 
 export async function getStaticPaths() {
@@ -371,19 +372,19 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
 
           <h2>What's new with {filing.company || filing.symbol}</h2>
           <ul class="bullets">
-            {filing.whats_new.map(b => <li>{b}</li>)}
+            {filing.whats_new.map(b => <li set:html={renderInline(b)} />)}
           </ul>
 
           <h2>Why this matters for {filing.company || filing.symbol}</h2>
-          <p>{filing.why_it_matters}</p>
+          <p set:html={renderInline(filing.why_it_matters)} />
 
           <h2>What we're watching</h2>
           <ul class="bullets">
-            {filing.what_were_watching.map(b => <li>{b}</li>)}
+            {filing.what_were_watching.map(b => <li set:html={renderInline(b)} />)}
           </ul>
 
           <h2>The full read</h2>
-          {String(filing.the_full_read || '').split(/\n+/).filter(Boolean).map(para => <p>{para}</p>)}
+          <Fragment set:html={renderProse(filing.the_full_read)} />
 
           {faqs.length > 0 && (
             <div class="faq-block">
@@ -392,7 +393,7 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
                 {faqs.map(faq => (
                   <div>
                     <dt>{faq.question}</dt>
-                    <dd>{faq.answer}</dd>
+                    <dd set:html={renderInline(faq.answer)} />
                   </div>
                 ))}
               </dl>
