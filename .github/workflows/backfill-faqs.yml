@@ -1,0 +1,89 @@
+name: Backfill FAQs (one-off)
+
+# Manual-only. Regenerates ONLY the faqs column on existing articles (4–6 sharper
+# Q&As via the enrichment model), then rebuilds + deploys. Never touches the
+# headline / dek / body / slug, so published URLs and analysis are unchanged.
+# Operates on the canonical CI database (the rolling filings-db-* cache).
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max articles to process (0 = all that still have < 4 FAQs)'
+        type: string
+        default: '0'
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Pull the live DB (most recent pipeline cache; release seed on miss).
+      - name: Restore DB cache
+        uses: actions/cache/restore@v4
+        id: db-cache
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_id }}
+          restore-keys: |
+            filings-db-
+
+      - name: Download seed DB from release (cache miss)
+        if: steps.db-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p data
+          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
+          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+
+      - name: Install pipeline deps
+        run: cd pipeline && npm ci
+
+      - name: Backfill FAQs (FAQs-only; leaves headline/body/slug untouched)
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LIMIT: ${{ inputs.limit }}
+        run: cd pipeline && node --env-file=../.env.ci backfill_faqs.mjs --limit "$LIMIT" --concurrency 5
+
+      # Persist the backfilled DB so future pipeline runs build from it.
+      - name: Save DB cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_id }}
+
+      # Headlines are unchanged, so the OG cache fully hits (no re-render).
+      - name: Restore + persist OG image cache
+        uses: actions/cache@v4
+        with:
+          path: site/.og-cache
+          key: og-cache-${{ github.run_id }}
+          restore-keys: |
+            og-cache-
+
+      - name: Install site deps
+        run: cd site && npm ci
+
+      - name: Build site
+        run: cd site && npm run build
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: deploy
