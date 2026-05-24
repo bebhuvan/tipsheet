@@ -1016,23 +1016,70 @@ section.wire-section { padding: 104px 0 128px; }
 .market-section-title:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
 
 /* ─── footer ────────────────────────────────────────────────────── */
-footer.site-footer { max-width: 1240px; margin: 96px auto 56px; padding: 48px 56px 0; border-top: 1px solid var(--hairline); display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 56px; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.14em; color: var(--text-muted); }
+footer.site-footer {
+  max-width: 1240px;
+  margin: 120px auto 0;
+  padding: 56px 56px 48px;
+  border-top: 2px solid var(--text);
+  display: grid;
+  grid-template-columns: 1.7fr 1fr 1fr 1fr;
+  gap: 56px;
+  align-items: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.footer-wordmark {
+  display: inline-block;
+  font-family: 'Newsreader', serif;
+  font-weight: 400;
+  font-size: 34px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text);
+  font-variation-settings: "opsz" 40;
+  margin-bottom: 20px;
+  transition: color 160ms ease;
+}
+/* echo the masthead / OG wordmark "tip" — a small crimson triangle */
+.footer-wordmark::after {
+  content: '';
+  display: inline-block;
+  margin-left: 0.12em;
+  border-left: 0.1em solid transparent;
+  border-right: 0.1em solid transparent;
+  border-bottom: 0.17em solid var(--accent);
+  transform: translateY(-0.14em);
+}
+.footer-wordmark:hover { color: var(--accent); }
+.footer-about-text {
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: 16px;
+  letter-spacing: 0;
+  line-height: 1.55;
+  color: var(--text-soft);
+  max-width: 38ch;
+  margin: 0;
+  font-variation-settings: "opsz" 18;
+}
 footer.site-footer h5 {
   font-family: 'Newsreader', serif;
   font-style: italic;
   font-weight: 400;
-  font-size: 16px;
+  font-size: 17px;
   letter-spacing: 0;
   text-transform: none;
   color: var(--text);
-  margin: 0 0 20px;
+  margin: 0 0 18px;
   font-variation-settings: "opsz" 18;
 }
-footer.site-footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+footer.site-footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
 footer.site-footer a { color: var(--text-muted); transition: color 160ms ease; }
-footer.site-footer a:hover { color: var(--text); }
-footer.site-footer .col-about { font-family: 'Newsreader', serif; font-style: italic; font-weight: 300; font-size: 16px; letter-spacing: 0; text-transform: none; line-height: 1.55; color: var(--text-soft); max-width: 36ch; font-variation-settings: "opsz" 18; }
-.site-footer-bottom { max-width: 1240px; margin: 32px auto 40px; padding: 0 56px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-faint); }
+footer.site-footer a:hover { color: var(--accent); }
+.site-footer-bottom { max-width: 1240px; margin: 28px auto 44px; padding: 0 56px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); }
 
 /* ─── filing-page specific ──────────────────────────────────────── */
 article.filing { padding: 112px 0 80px; max-width: 1080px; margin: 0 auto; }
@@ -1173,7 +1220,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   font-family: 'Newsreader', serif;
   font-style: italic;
   font-weight: 400;
-  font-size: 18px;
+  font-size: 22px;
   letter-spacing: -0.005em;
   text-transform: none;
   color: var(--text);
@@ -1299,6 +1346,23 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   .site-nav ul { gap: 18px; overflow-x: auto; }
   .briefs-grid { grid-template-columns: 1fr; row-gap: 56px; column-gap: 0; }
   article.filing { padding-top: 56px; }
+}
+
+/* ─── mobile reading fixes: full-width headlines/deks, no truncation ── */
+@media (max-width: 700px) {
+  /* Homepage cards: use the full column and show the whole summary instead of
+     capping width (the "clamped" look) and cutting the dek off with an ellipsis. */
+  .lc-headline, .hero-sec .sec-headline, .mt-headline { max-width: none; }
+  .lc-dek, .hero-sec .sec-dek {
+    max-width: none;
+    -webkit-line-clamp: unset;
+    display: block;
+    overflow: visible;
+  }
+  /* Article: headline + dek span the full width; the headline scales down a
+     touch so long titles don't stack into a tall narrow column. */
+  article.filing h1.headline { max-width: none; font-size: clamp(32px, 8.5vw, 44px); }
+  article.filing .dek { max-width: none; }
 }
 
 /* ─── markets page ──────────────────────────────────────────────── */
