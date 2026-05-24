@@ -528,20 +528,116 @@ export function topByMarketCap(n = 20) {
 
 function shapeBriefing(row) {
   if (!row) return null;
-  let sections = [];
-  try { sections = JSON.parse(row.sections || '[]'); } catch {}
+  let body = {};
+  try { body = JSON.parse(row.sections || '{}'); } catch {}
+  // Tolerate both the legacy array shape (v2 sections[]) and the v3 object shape.
+  const events    = Array.isArray(body) ? [] : (Array.isArray(body.events) ? body.events : []);
+  const mgmtFlags = Array.isArray(body) ? [] : (Array.isArray(body.mgmt_flags) ? body.mgmt_flags : []);
+  const calendar  = Array.isArray(body) ? [] : (Array.isArray(body.calendar) ? body.calendar : []);
   return {
     type:           row.type,
     date:           row.date,
     headline:       row.headline,
     dek:            row.dek,
     the_take:       row.the_take,
-    sections,
+    events,
+    mgmt_flags:     mgmtFlags,
+    calendar,
+    legacy_sections: Array.isArray(body) ? body : null,  // old briefings still render
     generated_at:   row.generated_at,
     model_used:     row.model_used,
     canonical_url:  `/briefings/the-${row.type}/${row.date}/`,
     label:          row.type === 'open' ? 'The Open' : 'The Close',
   };
+}
+
+const fmtCrShort = (n) => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  if (v >= 100000) return `₹${(v / 100000).toFixed(2)} L cr`;   // ≥ 1 lakh cr
+  if (v >= 1000)   return `₹${Math.round(v).toLocaleString('en-IN')} cr`;
+  return `₹${v.toLocaleString('en-IN')} cr`;
+};
+const fmtPctSigned = (n) => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  return `${v > 0 ? '+' : ''}${v}%`;
+};
+
+/** A compact 3-5 metric line for a briefing event, straight from fundamentals (no LLM numbers). */
+function compactFinancials(row) {
+  const out = [];
+  if (row.market_cap != null)     out.push({ label: 'Mkt cap', value: fmtCrShort(row.market_cap) });
+  // Only show P/E when it's a meaningful positive multiple — skip losses (≤0) and
+  // absurd readings from near-zero earnings (a "10,759x P/E" reads as broken, not a fact).
+  const pe = Number(row.pe);
+  if (Number.isFinite(pe) && pe > 0 && pe <= 200) out.push({ label: 'P/E', value: `${pe}x` });
+  if (row.pat_growth != null)     out.push({ label: 'PAT', value: fmtPctSigned(row.pat_growth) });
+  else if (row.roe != null)       out.push({ label: 'ROE', value: `${row.roe}%` });
+  if (row.revenue_growth != null) out.push({ label: 'Rev', value: fmtPctSigned(row.revenue_growth) });
+  if (row.debt_to_equity != null) out.push({ label: 'D/E', value: `${row.debt_to_equity}x` });
+  return out.filter(m => m.value).slice(0, 5);
+}
+
+/**
+ * Resolve briefing events (LLM gives { filing_id, prose }) into render-ready rows:
+ * accurate financials + 1-week price history come from Tipsheet's own data, never the LLM.
+ * Order is preserved; events whose filing_id is missing are dropped.
+ */
+export function getBriefingEvents(events, { historyDays = 7 } = {}) {
+  if (!Array.isArray(events) || events.length === 0) return [];
+  const ids = [...new Set(events.map(e => Number(e?.filing_id)).filter(Number.isFinite))];
+  if (ids.length === 0) return [];
+
+  const rows = db().prepare(`
+    SELECT r.record_id, r.symbol, r.company, r.score,
+           r.event_category_canonical AS category,
+           e.headline, e.the_number_value, e.the_number_label,
+           f.market_cap, f.pe, f.roe, f.debt_to_equity, f.revenue_growth, f.pat_growth
+    FROM filings_raw r
+    JOIN filings_enriched e ON e.record_id = r.record_id
+    LEFT JOIN fundamentals f ON f.symbol = r.symbol
+    WHERE r.record_id IN (${ids.map(() => '?').join(',')})
+  `).all(...ids);
+  const byId = new Map(rows.map(r => [Number(r.record_id), r]));
+
+  const histBulk = getMarketHistoryBulk(rows.map(r => r.symbol).filter(Boolean), historyDays);
+
+  return events.map(ev => {
+    const row = byId.get(Number(ev?.filing_id));
+    if (!row) return null;
+    const history = histBulk.get(row.symbol) || [];
+    const change = history.length >= 2 && history[0].close
+      ? ((history.at(-1).close - history[0].close) / Math.abs(history[0].close)) * 100
+      : null;
+    return {
+      filing_id:     row.record_id,
+      symbol:        row.symbol,
+      company:       row.company,
+      category:      row.category,
+      score:         row.score,
+      prose:         String(ev?.prose || ''),
+      canonical_url: `/${buildSlug(row.symbol, row.headline, row.record_id)}/`,
+      financials:    compactFinancials(row),
+      history,                               // [{date, close}] chronological, for <Sparkline points>
+      history_change: change,                // % over the window, for the chart caption
+    };
+  }).filter(Boolean);
+}
+
+/** Latest Nifty / Sensex / Bank Nifty / India VIX snapshot for the briefing market strip. */
+export function getBriefingMarketStrip() {
+  return db().prepare(`
+    SELECT s.symbol, s.name, s.price, s.change_abs, s.change_pct, s.prev_close
+    FROM market_snapshots s
+    INNER JOIN (
+      SELECT symbol, MAX(fetched_at) AS max_t FROM market_snapshots
+      WHERE symbol IN ('^NSEI', '^BSESN', '^NSEBANK', '^INDIAVIX')
+      GROUP BY symbol
+    ) latest ON latest.symbol = s.symbol AND latest.max_t = s.fetched_at
+    ORDER BY CASE s.symbol
+      WHEN '^NSEI' THEN 1 WHEN '^BSESN' THEN 2 WHEN '^NSEBANK' THEN 3 WHEN '^INDIAVIX' THEN 4 ELSE 9 END
+  `).all();
 }
 
 export function getBriefing(type, dateYmd) {
@@ -556,131 +652,6 @@ export function listBriefings(limit = 30) {
 
 export function listAllBriefingsForStaticPaths() {
   return db().prepare('SELECT type, date FROM briefings').all();
-}
-
-export function getBriefingVisuals(type, dateYmd, focusRecordIds = []) {
-  if (!dateYmd) {
-    return { type, date: dateYmd, market: [], filings: [], categories: [], sectors: [], scoreBands: [] };
-  }
-
-  const start = new Date(`${dateYmd}T00:00:00+05:30`);
-  if (Number.isNaN(start.valueOf())) {
-    return { type, date: dateYmd, market: [], filings: [], categories: [], sectors: [], scoreBands: [] };
-  }
-  const end = new Date(start);
-  if (type === 'close') end.setDate(end.getDate() + 1);
-  else start.setDate(start.getDate() - 1);
-
-  const startIso = start.toISOString().replace('T', ' ').slice(0, 19);
-  const endIso = end.toISOString().replace('T', ' ').slice(0, 19);
-  const whereWindow = `e.validation_ok = 1 AND r.created_on >= ? AND r.created_on < ?`;
-  const includeTijoriWidgets = hasTable('tijori_widgets');
-  const tijoriWidgetCols = includeTijoriWidgets
-    ? 'tw.payload_json AS tijori_widget_json, tw.fetched_at AS tijori_widget_fetched_at'
-    : 'NULL AS tijori_widget_json, NULL AS tijori_widget_fetched_at';
-  const tijoriWidgetJoin = includeTijoriWidgets
-    ? 'LEFT JOIN tijori_widgets tw ON tw.symbol = r.symbol'
-    : '';
-  const filingCols = `
-    r.record_id, r.symbol, r.company, r.score, r.event_type,
-    r.event_category_canonical AS category, r.major_order, r.major_order_size,
-    r.created_on, e.headline, e.dek, e.the_number_value, e.the_number_label,
-    e.why_it_matters, f.sector, f.market_cap, f.pe, f.roe, f.debt_to_equity,
-    f.revenue_growth, f.pat_growth, f.tijori_slug,
-    ${tijoriWidgetCols}
-  `;
-  const filingJoins = `
-    FROM filings_raw r
-    JOIN filings_enriched e ON e.record_id = r.record_id
-    LEFT JOIN fundamentals f ON f.symbol = r.symbol
-    ${tijoriWidgetJoin}
-  `;
-  const shapeBriefingVisualFiling = row => ({
-    ...row,
-    canonical_url: `/${buildSlug(row.symbol, row.headline, row.record_id)}/`,
-  });
-
-  const filings = db().prepare(`
-    SELECT ${filingCols}
-    ${filingJoins}
-    WHERE ${whereWindow}
-    ORDER BY r.score DESC, r.created_on DESC
-    LIMIT 14
-  `).all(startIso, endIso).map(shapeBriefingVisualFiling);
-
-  const focusIds = Array.isArray(focusRecordIds)
-    ? [...new Set(focusRecordIds.map(Number).filter(Number.isFinite))]
-    : [];
-  const focusFilings = focusIds.length
-    ? db().prepare(`
-        SELECT ${filingCols}
-        ${filingJoins}
-        WHERE e.validation_ok = 1 AND r.record_id IN (${focusIds.map(() => '?').join(',')})
-      `).all(...focusIds).map(shapeBriefingVisualFiling)
-    : [];
-  const focusById = new Map(focusFilings.map(row => [row.record_id, row]));
-  const orderedFocus = focusIds.map(id => focusById.get(id)).filter(Boolean);
-  const focusSet = new Set(orderedFocus.map(row => row.record_id));
-  const signalFilings = [
-    ...orderedFocus,
-    ...filings.filter(row => !focusSet.has(row.record_id)),
-  ].slice(0, 14);
-
-  const categories = db().prepare(`
-    SELECT COALESCE(r.event_category_canonical, 'Other') AS name, COUNT(*) AS count,
-           ROUND(AVG(r.score), 2) AS avg_score
-    FROM filings_raw r
-    JOIN filings_enriched e ON e.record_id = r.record_id
-    WHERE ${whereWindow}
-    GROUP BY COALESCE(r.event_category_canonical, 'Other')
-    ORDER BY count DESC, avg_score DESC
-    LIMIT 8
-  `).all(startIso, endIso);
-
-  const sectors = db().prepare(`
-    SELECT COALESCE(f.sector, e.sector, 'Unclassified') AS name, COUNT(*) AS count,
-           MAX(r.score) AS top_score
-    FROM filings_raw r
-    JOIN filings_enriched e ON e.record_id = r.record_id
-    LEFT JOIN fundamentals f ON f.symbol = r.symbol
-    WHERE ${whereWindow}
-    GROUP BY COALESCE(f.sector, e.sector, 'Unclassified')
-    ORDER BY count DESC, top_score DESC
-    LIMIT 8
-  `).all(startIso, endIso);
-
-  const scoreBands = db().prepare(`
-    SELECT
-      CASE WHEN r.score >= 9 THEN 'Alert'
-           WHEN r.score >= 7 THEN 'Lead'
-           ELSE 'Brief' END AS name,
-      COUNT(*) AS count
-    FROM filings_raw r
-    JOIN filings_enriched e ON e.record_id = r.record_id
-    WHERE ${whereWindow}
-    GROUP BY CASE WHEN r.score >= 9 THEN 'Alert'
-                  WHEN r.score >= 7 THEN 'Lead'
-                  ELSE 'Brief' END
-    ORDER BY MIN(r.score) DESC
-  `).all(startIso, endIso);
-
-  const market = db().prepare(`
-    SELECT s.symbol, s.name, s.price, s.change_abs, s.change_pct, s.prev_close
-    FROM market_snapshots s
-    INNER JOIN (
-      SELECT symbol, MAX(fetched_at) AS max_t FROM market_snapshots
-      WHERE symbol IN ('^NSEI', '^BSESN', '^NSEBANK', '^INDIAVIX')
-      GROUP BY symbol
-    ) latest ON latest.symbol = s.symbol AND latest.max_t = s.fetched_at
-    ORDER BY CASE s.symbol
-      WHEN '^NSEI' THEN 1
-      WHEN '^BSESN' THEN 2
-      WHEN '^NSEBANK' THEN 3
-      WHEN '^INDIAVIX' THEN 4
-      ELSE 9 END
-  `).all();
-
-  return { type, date: dateYmd, start: startIso, end: endIso, market, filings: signalFilings, categories, sectors, scoreBands };
 }
 
 // ─── Radar ──────────────────────────────────────────────────────────

@@ -1,0 +1,326 @@
+---
+// Scannable, editorial-grade briefing body: a market ticker, a pull-quote "take",
+// then discrete event items (prose + sized stat tiles + a 1-week sparkline), with a
+// per-edition accent (amber for The Open, navy for The Close).
+import Sparkline from './Sparkline.astro';
+
+const {
+  theme = 'close',      // 'open' | 'close' — drives the accent colour
+  theTake = '',
+  market = [],          // [{symbol, name, price, change_pct}]
+  events = [],          // resolved by getBriefingEvents()
+  mgmtFlags = [],       // [{symbol, date, prose}]
+  calendar = [],        // [string]
+  eventsLabel = 'What moved',
+  calendarLabel = 'On the calendar',
+} = Astro.props;
+
+const indexName = {
+  '^NSEI': 'Nifty 50', '^BSESN': 'Sensex', '^NSEBANK': 'Bank Nifty', '^INDIAVIX': 'India VIX',
+};
+function num(value, digits = 2) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: digits, minimumFractionDigits: digits }) : '—';
+}
+function pct(value, signed = true) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const sign = signed && n > 0 ? '+' : '';
+  return `${sign}${n.toFixed(2)}%`;
+}
+function trend(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return 'flat';
+  return n > 0 ? 'up' : 'down';
+}
+function tone(value) {
+  const s = String(value || '').trim();
+  if (s.startsWith('+')) return 'up';
+  if (s.startsWith('-') || s.startsWith('−')) return 'down';
+  return 'flat';
+}
+function arrow(t) { return t === 'up' ? '▲' : t === 'down' ? '▼' : '·'; }
+function concallUrl(symbol, date) {
+  if (!symbol || !date) return null;
+  return `/concalls/${String(symbol).toLowerCase()}/${date}/`;
+}
+---
+
+<div class={`bf bf-${theme === 'open' ? 'open' : 'close'}`}>
+
+  {market.length > 0 && (
+    <div class="bf-ticker" aria-label="Market snapshot">
+      {market.map(m => (
+        <div class="bf-tick">
+          <span class="bf-tick-name">{indexName[m.symbol] || m.name || m.symbol}</span>
+          <span class="bf-tick-val">{num(m.price, m.symbol === '^BSESN' || m.symbol === '^NSEBANK' ? 0 : 2)}</span>
+          <span class={`bf-tick-chg ${trend(m.change_pct)}`}>
+            <i aria-hidden="true">{arrow(trend(m.change_pct))}</i>{pct(m.change_pct) || 'Flat'}
+          </span>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {theTake && (
+    <aside class="bf-take">
+      <span class="bf-take-label">The take</span>
+      <p>{theTake}</p>
+    </aside>
+  )}
+
+  {events.length > 0 && (
+    <section class="bf-events" aria-label={eventsLabel}>
+      <div class="bf-sec-head"><span class="bf-eyebrow">{eventsLabel}</span><span class="bf-sec-count">{events.length}</span></div>
+
+      {events.map((ev, i) => (
+        <article class="bf-ev">
+          <span class="bf-ev-num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+          <div class="bf-ev-main">
+            <a class="bf-ev-head" href={ev.canonical_url}>
+              <span class="bf-ev-eyebrow">
+                {ev.symbol && <em class="bf-ev-sym">{ev.symbol}</em>}
+                {ev.category && <em class="bf-ev-cat">{ev.category}</em>}
+              </span>
+              <h3>{ev.company || ev.symbol}</h3>
+            </a>
+            <p class="bf-ev-prose">{ev.prose}</p>
+
+            <div class="bf-ev-foot">
+              {ev.financials.length > 0 && (
+                <dl class="bf-stats">
+                  {ev.financials.map(f => (
+                    <div class="bf-stat">
+                      <dd class={`bf-stat-v ${tone(f.value)}`}>{f.value}</dd>
+                      <dt class="bf-stat-l">{f.label}</dt>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {ev.history && ev.history.length >= 2 && (
+                <a class={`bf-ev-chart ${trend(ev.history_change)}`} href={ev.canonical_url} aria-label={`${ev.symbol} one-week price chart`}>
+                  <Sparkline points={ev.history} width={148} height={40} ariaLabel={`${ev.symbol} 1-week trend`} />
+                  <span class="bf-chart-cap"><i aria-hidden="true">{arrow(trend(ev.history_change))}</i>{pct(ev.history_change) || '—'} · 1wk</span>
+                </a>
+              )}
+            </div>
+
+            <a class="bf-ev-more" href={ev.canonical_url}>Read the note <span aria-hidden="true">→</span></a>
+          </div>
+        </article>
+      ))}
+    </section>
+  )}
+
+  {mgmtFlags.length > 0 && (
+    <section class="bf-block" aria-label="Management consistency">
+      <div class="bf-sec-head"><span class="bf-eyebrow">Management changed its story</span></div>
+      <ul class="bf-flags">
+        {mgmtFlags.map(f => (
+          <li>
+            <p>{f.prose}</p>
+            {concallUrl(f.symbol, f.date) && (
+              <a href={concallUrl(f.symbol, f.date)}>{f.symbol} concall note <span aria-hidden="true">→</span></a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {calendar.length > 0 && (
+    <section class="bf-block" aria-label={calendarLabel}>
+      <div class="bf-sec-head"><span class="bf-eyebrow">{calendarLabel}</span></div>
+      <ul class="bf-cal">
+        {calendar.map(line => <li>{line}</li>)}
+      </ul>
+    </section>
+  )}
+
+</div>
+
+<style>
+  .bf {
+    --bf-accent: var(--brief-close);
+    margin-top: 30px;
+  }
+  .bf-open  { --bf-accent: var(--brief-open); }
+  .bf-close { --bf-accent: var(--brief-close); }
+
+  /* ── Market ticker ─────────────────────────────────────────── */
+  .bf-ticker {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1.5px solid var(--text);
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+  .bf-tick {
+    min-width: 0;
+    padding: 14px 18px 13px;
+    border-right: 1px solid var(--hairline);
+  }
+  .bf-tick:last-child { border-right: 0; }
+  .bf-tick-name {
+    display: block; margin-bottom: 9px;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--text-muted);
+  }
+  .bf-tick-val {
+    display: block;
+    font-family: var(--mono); font-size: 21px; font-weight: 500; line-height: 1;
+    color: var(--text); font-feature-settings: "tnum" 1; letter-spacing: -0.01em;
+  }
+  .bf-tick-chg {
+    display: flex; align-items: center; gap: 4px; margin-top: 8px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em; color: var(--text-muted);
+  }
+  .bf-tick-chg i { font-style: normal; font-size: 8px; }
+  .bf-tick-chg.up   { color: var(--up); }
+  .bf-tick-chg.down { color: var(--down); }
+
+  /* ── The take (pull-quote) ─────────────────────────────────── */
+  .bf-take {
+    margin: 30px 0 8px;
+    padding: 4px 0 4px 24px;
+    border-left: 2px solid var(--bf-accent);
+  }
+  .bf-take-label {
+    display: block; margin-bottom: 9px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--bf-accent); font-weight: 500;
+  }
+  .bf-take p {
+    margin: 0; max-width: 32ch;
+    font-family: var(--serif); font-style: italic; font-weight: 300;
+    font-size: clamp(21px, 2.4vw, 27px); line-height: 1.34; color: var(--text);
+    font-variation-settings: "opsz" 36; text-wrap: balance;
+  }
+
+  /* ── Section headers ───────────────────────────────────────── */
+  .bf-sec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 0 0 4px; padding-bottom: 12px;
+    border-bottom: 1.5px solid var(--text);
+  }
+  .bf-eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--bf-accent); font-weight: 500;
+  }
+  .bf-sec-count {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text-faint);
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* ── Events ────────────────────────────────────────────────── */
+  .bf-events { margin-top: 34px; }
+  .bf-ev {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 0 18px;
+    padding: 26px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .bf-ev:last-child { border-bottom: 0; }
+  .bf-ev-num {
+    font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: 0.04em;
+    color: var(--bf-accent); padding-top: 5px; font-feature-settings: "tnum" 1;
+  }
+  .bf-ev-main { min-width: 0; }
+  .bf-ev-head { display: block; text-decoration: none; color: var(--text); }
+  .bf-ev-eyebrow {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; margin-bottom: 7px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .bf-ev-sym { font-style: normal; color: var(--bf-accent); font-weight: 600; }
+  .bf-ev-cat { font-style: normal; color: var(--text-muted); }
+  .bf-ev-head h3 {
+    margin: 0; font-family: var(--serif); font-weight: 500;
+    font-size: clamp(22px, 2.3vw, 27px); line-height: 1.12; letter-spacing: -0.012em;
+    color: var(--text); font-variation-settings: "opsz" 32; text-wrap: balance;
+    transition: color 140ms ease;
+  }
+  .bf-ev-head:hover h3 { color: var(--bf-accent); }
+  .bf-ev-prose {
+    margin: 13px 0 0; max-width: 58ch;
+    font-family: var(--serif); font-size: 18px; line-height: 1.58; color: var(--text-soft);
+  }
+
+  .bf-ev-foot {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    gap: 18px 36px; margin-top: 20px; flex-wrap: wrap;
+  }
+  .bf-stats {
+    margin: 0; display: flex; flex-wrap: wrap; gap: 18px 26px; flex: 1 1 320px;
+  }
+  .bf-stat { min-width: 0; }
+  .bf-stat-v {
+    margin: 0; font-family: var(--mono); font-size: 17px; font-weight: 500; line-height: 1;
+    color: var(--text); font-feature-settings: "tnum" 1; letter-spacing: -0.01em;
+  }
+  .bf-stat-v.up   { color: var(--up); }
+  .bf-stat-v.down { color: var(--down); }
+  .bf-stat-l {
+    margin: 6px 0 0; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-muted);
+  }
+
+  .bf-ev-chart { flex: 0 0 auto; display: block; text-decoration: none; text-align: right; }
+  .bf-ev-chart :global(svg.spark) { display: block; width: 148px; height: 40px; margin-left: auto; }
+  .bf-chart-cap {
+    display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 7px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .bf-chart-cap i { font-style: normal; font-size: 8px; }
+  .bf-ev-chart.up   .bf-chart-cap { color: var(--up); }
+  .bf-ev-chart.down .bf-chart-cap { color: var(--down); }
+
+  .bf-ev-more {
+    display: inline-block; margin-top: 16px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-muted); text-decoration: none; transition: color 140ms ease;
+  }
+  .bf-ev-more span { transition: margin-left 140ms ease; }
+  .bf-ev-more:hover { color: var(--bf-accent); }
+  .bf-ev-more:hover span { margin-left: 3px; }
+
+  /* ── Mgmt flags + calendar ─────────────────────────────────── */
+  .bf-block { margin-top: 48px; }
+  .bf-flags { list-style: none; padding: 0; margin: 22px 0 0; }
+  .bf-flags li { margin: 0 0 22px; padding-left: 16px; border-left: 2px solid var(--hairline-strong); }
+  .bf-flags li:last-child { margin-bottom: 0; }
+  .bf-flags p { margin: 0; max-width: 60ch; font-family: var(--serif); font-size: 18px; line-height: 1.56; color: var(--text-soft); }
+  .bf-flags a, .bf-cal a {
+    display: inline-block; margin-top: 8px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-muted); text-decoration: none; transition: color 140ms ease;
+  }
+  .bf-flags a:hover { color: var(--bf-accent); }
+  .bf-cal { list-style: none; padding: 0; margin: 20px 0 0; }
+  .bf-cal li {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 13px 0; border-bottom: 1px solid var(--hairline);
+    font-family: var(--serif); font-size: 17px; line-height: 1.45; color: var(--text-soft);
+  }
+  .bf-cal li::before {
+    content: ''; flex: 0 0 auto; width: 5px; height: 5px; margin-top: 9px;
+    background: var(--bf-accent); border-radius: 50%;
+  }
+  .bf-cal li:last-child { border-bottom: 0; }
+
+  /* ── Responsive ────────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    .bf-ticker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bf-tick:nth-child(2n) { border-right: 0; }
+    .bf-tick:nth-child(n + 3) { border-top: 1px solid var(--hairline); }
+    .bf-tick-val { font-size: 19px; }
+    .bf-ev { grid-template-columns: 1fr; gap: 0; }
+    .bf-ev-num { display: none; }
+    .bf-ev-foot { align-items: flex-start; }
+    .bf-ev-chart { text-align: left; }
+    .bf-ev-chart :global(svg.spark) { margin-left: 0; }
+    .bf-chart-cap { justify-content: flex-start; }
+    .bf-take p { font-size: 21px; }
+  }
+</style>

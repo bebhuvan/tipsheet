@@ -1,6 +1,7 @@
 /* ─── design tokens ─────────────────────────────────────────────── */
 :root {
   --bg: #ffffff;
+  --bg-fade: #ffffff00;
   --bg-soft: #f7f4ed;
   --text: #111111;
   --text-soft: #2a2a2a;
@@ -25,6 +26,7 @@
 }
 [data-theme="dark"] {
   --bg: #0c0c0c;
+  --bg-fade: #0c0c0c00;
   --bg-soft: #1c1916;
   --text: #ece8e0;
   --text-soft: #cac6be;
@@ -72,27 +74,22 @@ html { -webkit-text-size-adjust: 100%; }
 
 .tijori-sidebar-btn {
   display: block;
-  margin-top: 40px;
-  padding: 16px 0;
+  margin-top: 28px;
+  padding-top: 22px;
   border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
   text-decoration: none;
-  transition: all 300ms ease;
-}
-.tijori-sidebar-btn:hover {
-  border-top-color: var(--text);
-  border-bottom-color: var(--text);
 }
 .tijori-sidebar-btn .tijori-title {
   display: block;
   font-family: var(--serif);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.3;
   font-style: italic;
-  font-weight: 300;
+  font-weight: 400;
   color: var(--text);
-  margin-bottom: 8px;
-  transition: color 300ms ease;
+  margin-bottom: 7px;
+  transition: color 200ms ease;
+  font-variation-settings: "opsz" 18;
 }
 .tijori-sidebar-btn:hover .tijori-title {
   color: var(--accent);
@@ -100,21 +97,21 @@ html { -webkit-text-size-adjust: 100%; }
 .tijori-sidebar-btn .tijori-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 7px;
   font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
 .tijori-sidebar-btn .tijori-arrow {
   font-family: var(--data);
-  font-size: 15px;
+  font-size: 13px;
   font-style: normal;
-  transition: transform 300ms ease;
+  transition: transform 200ms ease;
 }
 .tijori-sidebar-btn:hover .tijori-arrow {
-  color: var(--text);
+  color: var(--accent);
   transform: translate(2px, -2px);
 }
 
@@ -171,6 +168,21 @@ a.inline {
   padding-bottom: 1px;
 }
 a.inline:hover { background-size: 100% 2px; }
+
+/* Prose / editorial pages (About, Contact, Standards, etc.) — links read as
+   links: a quiet underline at rest, accent on hover. */
+.prose-page a:not(.headline-link):not(.inline) {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--text-faint);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color 180ms ease, text-decoration-color 180ms ease;
+}
+.prose-page a:not(.headline-link):not(.inline):hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
 
 .mono {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -450,11 +462,23 @@ section.hero {
   gap: 12px;
   flex-wrap: wrap;
 }
-.lead-tier .tier { font-weight: 500; color: var(--text); letter-spacing: 0.18em; }
-.lead-tier.score-hi  .tier { color: var(--accent); }
-.lead-tier.score-low .tier { color: var(--text-muted); }
 .lead-tier .sep    { color: var(--text-faint); }
 .lead-tier .sector { color: var(--text-muted); }
+
+/* Eyebrow category lead-in — the one spot of colour that gives each card a
+   branded anchor without the old "LEAD/BRIEF" newsroom jargon. */
+.lead-tier .cat, .lc-kicker .cat, .sec-kicker .cat, .mt-kicker .cat,
+article.filing .kicker .cat {
+  color: var(--accent);
+  font-weight: 500;
+}
+/* On the article eyebrow the sector is a link; keep it a clean label (no heavy
+   full-width underline under an all-caps tag) with an accent shift on hover. */
+article.filing .kicker a.inline {
+  background-image: none;
+  padding-bottom: 0;
+}
+article.filing .kicker a.inline:hover { color: var(--accent); }
 .lead-headline {
   font-family: 'Newsreader', serif;
   font-weight: 400;
@@ -674,9 +698,11 @@ section.midtier {
 .midtier-head h2::before {
   content: '';
   display: inline-block;
-  width: 18px; height: 1px;
+  width: 22px; height: 2px;
+  border-radius: 2px;
   background: var(--accent);
   flex-shrink: 0;
+  align-self: center;
 }
 .midtier-head .meta {
   font-family: 'Newsreader', serif; font-style: italic; font-weight: 300;
@@ -797,9 +823,11 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
 .briefs-head h2::before {
   content: '';
   display: inline-block;
-  width: 24px; height: 1px;
+  width: 22px; height: 2px;
+  border-radius: 2px;
   background: var(--accent);
   flex-shrink: 0;
+  align-self: center;
 }
 .briefs-head .meta {
   font-family: 'Newsreader', serif; font-style: italic; font-weight: 300;
@@ -915,9 +943,11 @@ section.wire-section { padding: 104px 0 128px; }
 .wire-head h2::before {
   content: '';
   display: inline-block;
-  width: 24px; height: 1px;
+  width: 22px; height: 2px;
+  border-radius: 2px;
   background: var(--accent);
   flex-shrink: 0;
+  align-self: center;
 }
 .wire-head .meta {
   font-family: 'Newsreader', serif; font-style: italic; font-weight: 300;
@@ -928,7 +958,7 @@ section.wire-section { padding: 104px 0 128px; }
 .wire-list { border-top: 1px solid var(--text); }
 .wire-row {
   display: grid;
-  grid-template-columns: 70px 70px 1fr 110px;
+  grid-template-columns: 76px 1fr 110px;
   gap: 32px;
   align-items: baseline;
   padding: 22px 0 24px;
@@ -944,17 +974,8 @@ section.wire-section { padding: 104px 0 128px; }
   letter-spacing: 0.12em; color: var(--text-muted);
   font-feature-settings: "tnum" 1;
 }
-.wire-tier {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  font-weight: 500;
-  color: var(--text);
-}
-.wire-tier.score-hi  { color: var(--accent); }
-.wire-tier.score-mid { color: var(--text); }
-.wire-tier.score-low { color: var(--text-muted); }
+/* High-impact rows get a quiet accent on the ticker rather than a "tier" word. */
+.wire-row.score-hi .wire-ticker { color: var(--accent); }
 .wire-body { min-width: 0; }
 .wire-body .kicker {
   font-family: 'Newsreader', serif; font-style: italic; font-weight: 300;
@@ -1215,7 +1236,7 @@ ol.timeline li:last-child::after { display: none; }
 ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); letter-spacing: 0.04em; margin-top: 3px; }
 
 .body { max-width: 640px; }
-.body p { margin: 0 0 1.45em; font-size: 20px; line-height: 1.65; color: var(--text); font-variation-settings: "opsz" 18; }
+.body p { margin: 0 0 1.45em; font-size: 20px; line-height: 1.65; color: var(--text); font-variation-settings: "opsz" 18; text-wrap: pretty; }
 .body h2 {
   font-family: 'Newsreader', serif;
   font-style: italic;
@@ -1232,10 +1253,23 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .body h2::before {
   content: '';
   display: inline-block;
-  width: 14px; height: 1px;
+  width: 22px; height: 2px;
+  border-radius: 2px;
   background: var(--accent);
-  vertical-align: 5px;
-  margin-right: 14px;
+  vertical-align: 0.28em;
+  margin-right: 16px;
+}
+
+/* Drop cap on the opening of the main read — a classic editorial signal. */
+.full-read > p:first-of-type::first-letter {
+  float: left;
+  font-family: 'Newsreader', serif;
+  font-weight: 400;
+  font-size: 3.5em;
+  line-height: 0.78;
+  padding: 0.06em 0.12em 0 0;
+  color: var(--text);
+  font-variation-settings: "opsz" 72;
 }
 
 .the-number {
@@ -1273,8 +1307,8 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .dateline .source-links .src-sep { color: var(--text-faint); }
 
 .primary-source {
-  margin: 44px 0 0;
-  padding: 20px 0 0;
+  margin: 56px 0 0;
+  padding: 24px 0 0;
   border-top: 1px solid var(--hairline-strong);
 }
 .ps-head {
@@ -1305,14 +1339,14 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
 .ps-links a:hover { color: var(--accent); }
 .ps-dot { color: var(--text-faint); }
 .ps-note {
-  margin: 18px 0 0;
+  margin: 30px 0 0;
   font-family: 'Newsreader', serif;
   font-style: italic;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
   letter-spacing: 0;
-  max-width: 60ch;
+  max-width: 56ch;
 }
 @media (max-width: 520px) {
   .ps-head { flex-direction: column; gap: 8px; }
@@ -1340,10 +1374,21 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   .masthead::after { left: 24px; right: 24px; }
   section.briefs { padding: 64px 0 56px; }
   section.wire-section { padding: 64px 0 80px; }
-  .wire-row { grid-template-columns: 64px 32px 1fr; gap: 20px; }
+  .wire-row { grid-template-columns: 58px 1fr; gap: 18px; }
   .wire-ticker { display: none; }
   footer.site-footer { grid-template-columns: 1fr; gap: 32px; }
-  .site-nav ul { gap: 18px; overflow-x: auto; }
+  /* Section nav becomes a horizontal rail; a soft right-edge fade signals more
+     sections sit off-screen, and the scrollbar is hidden for a clean masthead.
+     Full-width list means the fade lands on empty space when everything fits. */
+  .site-nav ul {
+    gap: 22px;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 34px), #0000);
+            mask-image: linear-gradient(to right, #000 calc(100% - 34px), #0000);
+  }
+  .site-nav ul::-webkit-scrollbar { display: none; }
   .briefs-grid { grid-template-columns: 1fr; row-gap: 56px; column-gap: 0; }
   article.filing { padding-top: 56px; }
 }
@@ -1353,6 +1398,14 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   /* Homepage cards: use the full column and show the whole summary instead of
      capping width (the "clamped" look) and cutting the dek off with an ellipsis. */
   .lc-headline, .hero-sec .sec-headline, .mt-headline { max-width: none; }
+  /* On a narrow column, `text-wrap: balance` equalises line lengths and produces
+     awkward "too-early" breaks (line 1 shorter than line 2). `wrap` is plain greedy
+     (fills line 1, overflows the rest) and reads like a normal news headline; `pretty`
+     layers orphan-safety on top where supported. The `wrap` fallback matters because
+     Firefox / Chrome <128 drop the unknown `pretty` value and would otherwise fall
+     back to the base `balance` rule. */
+  .lc-headline, .hero-sec .sec-headline, .mt-headline,
+  .bi-headline, .wire-body h3, .brief-head h3 { text-wrap: wrap; text-wrap: pretty; }
   .lc-dek, .hero-sec .sec-dek {
     max-width: none;
     -webkit-line-clamp: unset;
@@ -1361,7 +1414,7 @@ ol.timeline li time { display: block; font-family: 'JetBrains Mono', monospace; 
   }
   /* Article: headline + dek span the full width; the headline scales down a
      touch so long titles don't stack into a tall narrow column. */
-  article.filing h1.headline { max-width: none; font-size: clamp(28px, 7.4vw, 40px); text-wrap: pretty; }
+  article.filing h1.headline { max-width: none; font-size: clamp(28px, 7.4vw, 40px); text-wrap: wrap; text-wrap: pretty; }
   article.filing .dek { max-width: none; }
 }
 

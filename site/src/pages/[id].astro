@@ -242,14 +242,11 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
   <main>
     <article class="filing">
       <div class="kicker">
-        <span class:list={[filing.score >= 9 && 'tier-alert']}>{tierFor(filing.score)}</span>
-        {filing.canonical_category && filing.canonical_category !== 'Other' && <>
-          <span class="sep">/</span><span>{filing.canonical_category}</span>
-        </>}
-        {filing.sector && <>
-          <span class="sep">/</span>
+        {filing.canonical_category && filing.canonical_category !== 'Other' && <span class="cat">{filing.canonical_category}</span>}
+        {filing.canonical_category && filing.canonical_category !== 'Other' && filing.sector && <span class="sep">·</span>}
+        {filing.sector && (
           <a href={`/sector/${(filing.sector || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}/`} class="inline">{filing.sector}</a>
-        </>}
+        )}
       </div>
 
       <h1 class="headline">{filing.headline}</h1>
@@ -358,12 +355,12 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
             </aside>
           )}
 
-          <h2>What's new with {filing.company || filing.symbol}</h2>
+          <h2>What's new</h2>
           <ul class="bullets">
             {filing.whats_new.map(b => <li set:html={renderInline(b)} />)}
           </ul>
 
-          <h2>Why this matters for {filing.company || filing.symbol}</h2>
+          <h2>Why this matters</h2>
           <p set:html={renderInline(filing.why_it_matters)} />
 
           <h2>What we're watching</h2>
@@ -372,7 +369,7 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
           </ul>
 
           <h2>The full read</h2>
-          <Fragment set:html={renderProse(filing.the_full_read)} />
+          <div class="full-read" set:html={renderProse(filing.the_full_read)} />
 
           {faqs.length > 0 && (
             <div class="faq-block">
@@ -408,7 +405,7 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
                   {tijoriUrl && <a href={tijoriUrl} target="_blank" rel="noopener" aria-label={`Research ${filing.symbol} on Tijori Finance`}>Tijori</a>}
                 </span>
               </div>
-              <p class="ps-note">Our reading of the company's own disclosure. Always confirm against the original source.</p>
+              <p class="ps-note">An independent reading of the company's own disclosure — the primary filing above is the final word.</p>
             </div>
           )}
         </div>

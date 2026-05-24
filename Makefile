@@ -49,10 +49,15 @@ concalls:
 macro:
 	$(PIPE) poll-macro-calendar
 
-briefing-open:
+# Index moves + per-stock weekly history (Python — yfinance). Runs before each
+# briefing so the market strip and event sparklines are fresh.
+market-yf:
+	cd pipeline && python3 market_yf.py --hours $(or $(H),36)
+
+briefing-open: market-yf
 	$(PIPE) briefing-open
 
-briefing-close:
+briefing-close: market-yf
 	$(PIPE) briefing-close
 
 stats:
@@ -127,6 +132,7 @@ help:
 	@echo "  make radar [N=80]     Generate/refresh Radar items"
 	@echo "  make concalls [N=100] Poll + enrich concalls"
 	@echo "  make macro            Poll IDH macro calendar"
+	@echo "  make market-yf [H=36] Fetch index moves + stock weekly history (yfinance)"
 	@echo "  make briefing-open    Generate The Open briefing"
 	@echo "  make briefing-close   Generate The Close briefing"
 	@echo "  make stats            Show DB statistics"

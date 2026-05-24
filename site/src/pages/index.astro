@@ -30,8 +30,15 @@ function scoreBand(s) {
   return 'score-low';
 }
 function timeOf(iso) {
-  const m = String(iso || '').match(/(\d{2}:\d{2})/);
-  return m ? `${m[1]} IST` : '';
+  const m = String(iso || '').match(/(\d{2}):(\d{2})/);
+  if (!m) return '';
+  let h = +m[1]; const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12;
+  return `${h}:${m[2]} ${ap} IST`;
+}
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function prettyYmd(ymd) {
+  const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${Number(m[3])} ${MONTHS_SHORT[Number(m[2]) - 1]}` : (ymd || '');
 }
 function pct(score, max) { return Math.round((score / max) * 100); }
 const maxDistCount = Math.max(1, ...dist.map(d => d.c));
@@ -58,7 +65,7 @@ const schema = {
           <a href={b.canonical_url} class:list={['ribbon-card', b.type]}>
             <div class="ribbon-meta">
               <span class="ribbon-label">{b.label}</span>
-              <span class="ribbon-date">{b.date}</span>
+              <span class="ribbon-date">{prettyYmd(b.date)}</span>
             </div>
             <div class="ribbon-headline">{b.headline}</div>
           </a>
@@ -69,12 +76,8 @@ const schema = {
     {lead && (
       <section class="hero">
         <article class="hero-lead">
-          <div class:list={['lead-tier', scoreBand(lead.score)]}>
-            <span class="tier">{tierLabel(lead.score)}</span>
-            {lead.sector && <>
-              <span class="sep">·</span>
-              <span class="sector">{lead.sector}</span>
-            </>}
+          <div class="lead-tier">
+            {(lead.sector || lead.canonical_category) && <span class="cat">{lead.sector || lead.canonical_category}</span>}
           </div>
 
           <h1 class="lead-headline">
@@ -93,12 +96,8 @@ const schema = {
             <div class="lead-companions">
               {leadCompanions.map(f => (
                 <a href={f.canonical_url} class="lc-item">
-                  <div class:list={['lc-kicker', scoreBand(f.score)]}>
-                    <span class="lc-tier">{tierLabel(f.score)}</span>
-                    {f.sector && <>
-                      <span class="lc-dot">·</span>
-                      <span>{f.sector}</span>
-                    </>}
+                  <div class="lc-kicker">
+                    {(f.sector || f.canonical_category) && <span class="cat">{f.sector || f.canonical_category}</span>}
                   </div>
                   <h3 class="lc-headline">{f.headline}</h3>
                   {f.dek && <p class="lc-dek">{f.dek}</p>}
@@ -116,12 +115,8 @@ const schema = {
           <aside class="hero-rail">
             {secondaries.map(f => (
               <article class="hero-sec">
-                <div class:list={['sec-kicker', scoreBand(f.score)]}>
-                  <span class="sec-tier">{tierLabel(f.score)}</span>
-                  {f.sector && <>
-                    <span class="sec-dot">·</span>
-                    <span>{f.sector}</span>
-                  </>}
+                <div class="sec-kicker">
+                  {(f.sector || f.canonical_category) && <span class="cat">{f.sector || f.canonical_category}</span>}
                 </div>
                 <h2 class="sec-headline">
                   <a class="headline-link" href={f.canonical_url}>{f.headline}</a>
@@ -147,12 +142,8 @@ const schema = {
         <div class="midtier-grid">
           {midtier.map(f => (
             <a href={f.canonical_url} class="mt-item">
-              <div class:list={['mt-kicker', scoreBand(f.score)]}>
-                <span class="mt-tier">{tierLabel(f.score)}</span>
-                {f.canonical_category && f.canonical_category !== 'Other' && <>
-                  <span class="mt-dot">·</span>
-                  <span>{f.canonical_category}</span>
-                </>}
+              <div class="mt-kicker">
+                {(f.sector || f.canonical_category) && <span class="cat">{f.sector || f.canonical_category}</span>}
               </div>
               <h3 class="mt-headline">{f.headline}</h3>
               <div class="mt-meta">
@@ -205,12 +196,13 @@ const schema = {
       </div>
       <div class="wire-list">
         {wire.map(f => (
-          <a href={f.canonical_url} class="wire-row">
-            <span class="wire-time">{timeOf(f.created_on)}</span>
-            <span class:list={['wire-tier', scoreBand(f.score)]}>{tierLabel(f.score)}</span>
+          <a href={f.canonical_url} class:list={['wire-row', scoreBand(f.score)]}>
+            <span class="wire-time">{timeOf(f.created_on).replace(' IST', '')}</span>
             <div class="wire-body">
               <div class="kicker">
-                {f.canonical_category && f.canonical_category !== 'Other' ? <>{f.canonical_category} · {f.sector}</> : f.sector}
+                {f.canonical_category && f.canonical_category !== 'Other'
+                  ? <><span class="cat">{f.canonical_category}</span> · {f.sector}</>
+                  : f.sector}
               </div>
               <h3>{f.headline}</h3>
             </div>

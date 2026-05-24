@@ -19,7 +19,7 @@ const companyName = filings[0]?.company || fund?.symbol || SYMBOL;
 
 if (filings.length === 0 && !fund) return Astro.redirect('/404');
 
-function timeOf(iso) { const m = String(iso || '').match(/(\d{2}:\d{2})/); return m ? `${m[1]} IST` : ''; }
+function timeOf(iso) { const m = String(iso || '').match(/(\d{2}):(\d{2})/); if (!m) return ''; let h = +m[1]; const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; return `${h}:${m[2]} ${ap} IST`; }
 function dateOf(iso) {
   const d = new Date(String(iso).replace(' ', 'T'));
   if (Number.isNaN(d.valueOf())) return iso;

@@ -2,8 +2,8 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import BriefingVisuals from '../../../components/BriefingVisuals.astro';
-import { getBriefing, getBriefingVisuals, listAllBriefingsForStaticPaths } from '../../../lib/queries.mjs';
+import BriefingBody from '../../../components/BriefingBody.astro';
+import { getBriefing, getBriefingEvents, getBriefingMarketStrip, listAllBriefingsForStaticPaths } from '../../../lib/queries.mjs';
 
 export async function getStaticPaths() {
   return listAllBriefingsForStaticPaths()
@@ -15,18 +15,8 @@ const { date } = Astro.params;
 const briefing = getBriefing('close', date);
 if (!briefing) return Astro.redirect('/404');
 
-function mentionedFilingRecordIds(sections) {
-  const ids = [];
-  for (const section of sections || []) {
-    for (const item of section.items || []) {
-      const match = String(item?.ref_url || '').match(/\/filings\/[^/]*-(\d+)\/?$/);
-      if (match) ids.push(Number(match[1]));
-    }
-  }
-  return [...new Set(ids)];
-}
-
-const visuals = getBriefingVisuals('close', date, mentionedFilingRecordIds(briefing.sections));
+const events = getBriefingEvents(briefing.events);
+const market = getBriefingMarketStrip();
 
 function dateOf(ymd) {
   const d = new Date(ymd + 'T00:00:00');
@@ -64,50 +54,26 @@ const schema = {
       <div class="kicker">
         <span class="brief-tag-close">The Close</span>
         <span class="sep">/</span>
-        <span>{dateOf(date)} · 16:00 IST</span>
+        <span>{dateOf(date)} · 4:00 PM IST</span>
       </div>
 
       <h1 class="headline">{briefing.headline}</h1>
       <p class="dek">{briefing.dek}</p>
 
-      <hr class="rule" />
-
-      {briefing.the_take && (
-        <div class="take-block">
-          <span class="take-label">The take</span>
-          <p>{briefing.the_take}</p>
-        </div>
-      )}
-
-      <BriefingVisuals visuals={visuals} />
-
-      <div class="sections">
-        {briefing.sections.map(section => (
-          <section class="briefing-section">
-            <h2>{section.label}</h2>
-            {section.body && String(section.body).split(/\n\n+/).filter(Boolean).map(para => <p class="section-body">{para}</p>)}
-            {(section.items || []).filter(i => i?.ref_url).length > 0 && (
-              <div class="section-mentions">
-                <span class="mentions-label">Mentioned in this section</span>
-                <ul>
-                  {(section.items || []).filter(i => i?.ref_url).map(item => (
-                    <li>
-                      <a href={item.ref_url}>
-                        {item.ref_symbol && <span class="mention-ref">{item.ref_symbol}</span>}
-                        <span class="mention-text">{item.text}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </section>
-        ))}
-      </div>
+      <BriefingBody
+        theme="close"
+        theTake={briefing.the_take}
+        market={market}
+        events={events}
+        mgmtFlags={briefing.mgmt_flags}
+        calendar={briefing.calendar}
+        eventsLabel="What moved today"
+        calendarLabel="Tomorrow"
+      />
 
       <footer class="briefing-foot">
         <a href="/briefings/" class="inline">← All briefings</a>
-        <span>The Open runs before market open at 09:15 IST</span>
+        <span>The Open runs before market open at 9:15 AM IST</span>
       </footer>
     </article>
   </main>
@@ -115,59 +81,15 @@ const schema = {
 </Base>
 
 <style>
-  .briefing-page { max-width: 980px; margin: 0 auto; padding: 0 var(--gutter); }
-  .kicker, .headline, .dek, .rule, .take-block, .sections, .briefing-foot { max-width: 760px; }
-  .take-block { margin: 24px 0; padding: 16px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-  .take-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); display: block; margin-bottom: 6px; }
-  .take-block p { margin: 0; font-family: var(--serif); font-size: 18px; font-style: italic; line-height: 1.45; }
-  .sections { margin-top: 32px; }
-  .briefing-section { margin-bottom: 48px; }
-  .briefing-section h2 {
-    font-family: var(--serif); font-size: 24px; font-weight: 500;
-    margin: 0 0 14px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-  .section-body {
-    font-family: var(--serif);
-    color: var(--text);
-    margin: 0 0 16px;
-    font-size: 18px;
-    line-height: 1.6;
-  }
-  .section-body:last-of-type { margin-bottom: 12px; }
-  .section-mentions {
-    margin-top: 22px;
-    padding: 16px 0 0;
-    border-top: 1px solid var(--hairline);
-  }
-  .mentions-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-    display: block;
-    margin-bottom: 8px;
-  }
-  .section-mentions ul { list-style: none; padding: 0; margin: 0; }
-  .section-mentions li { margin: 4px 0; }
-  .section-mentions a {
-    display: flex; align-items: baseline; gap: 10px; color: var(--text); text-decoration: none;
-    font-size: 13px; padding: 4px 0;
-  }
-  .section-mentions a:hover .mention-text { text-decoration: underline; }
-  .mention-ref {
-    font-family: var(--mono); font-size: 10px;
-    color: var(--text); font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.06em;
-    min-width: 80px; flex-shrink: 0;
-  }
-  .mention-text { color: var(--text-muted); }
+  .briefing-page { max-width: 760px; margin: 0 auto; padding: 72px 0 0; }
   .briefing-foot {
-    margin-top: 48px; padding-top: 20px;
-    border-top: 1px solid var(--border);
-    display: flex; justify-content: space-between;
-    font-size: 13px; color: var(--text-muted);
+    margin-top: 56px; padding-top: 22px;
+    border-top: 1.5px solid var(--text);
+    display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-muted);
   }
+  .briefing-foot a { color: var(--text-muted); text-decoration: none; }
+  .briefing-foot a:hover { color: var(--accent); }
+  @media (max-width: 700px) { .briefing-page { padding-top: 40px; } }
 </style>

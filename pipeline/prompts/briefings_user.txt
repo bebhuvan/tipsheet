@@ -2,14 +2,14 @@ BRIEFING REQUEST
 - briefing_type: {briefing_type}
 - date (IST): {date}
 
-LATEST MARKET SNAPSHOT
+LATEST MARKET SNAPSHOT (context only — do not restate index levels in prose):
 {market_snapshot}
 
-TOP FILINGS FROM THE LAST {window_hours}h (highest score first):
+TOP FILINGS FROM THE LAST {window_hours}h (highest score first). Build your events from these; reference each by its filing_id:
 {top_filings}
 
-CONCALL MANAGEMENT-CONSISTENCY FLAGS (recent flip-flops worth surfacing):
+CONCALL MANAGEMENT-CONSISTENCY FLAGS (recent flip-flops worth surfacing as mgmt_flags):
 {mgmt_consistency_flags}
 
-MACRO EVENTS — scheduled for today, India-relevant first:
+MACRO EVENTS — scheduled for today, India-relevant first (use for calendar):
 {macro_events_today}

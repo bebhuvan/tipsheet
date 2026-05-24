@@ -47,9 +47,88 @@ async function send(html) {
   }
 }
 
+const monthsShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function briefingDate(ymd) {
+  const m = String(ymd || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${+m[3]} ${monthsShort[+m[2] - 1]}` : String(ymd || '');
+}
+
+// Pull the event companies (symbol + filing headline) behind a briefing, in order.
+function resolveBriefingEvents(db, sectionsJson) {
+  let body = {};
+  try { body = JSON.parse(sectionsJson || '{}'); } catch { /* ignore */ }
+  const events = Array.isArray(body?.events) ? body.events : [];
+  const ids = [...new Set(events.map(e => Number(e?.filing_id)).filter(Number.isFinite))];
+  if (!ids.length) return [];
+  const rows = db.prepare(
+    `SELECT r.record_id, r.symbol, e.headline
+       FROM filings_raw r JOIN filings_enriched e ON e.record_id = r.record_id
+      WHERE r.record_id IN (${ids.map(() => '?').join(',')})`
+  ).all(...ids);
+  const byId = new Map(rows.map(r => [Number(r.record_id), r]));
+  return events.map(e => byId.get(Number(e?.filing_id))).filter(Boolean);
+}
+
+function buildBriefingMessage(b, events) {
+  const label = b.type === 'open' ? 'The Open' : 'The Close';
+  const emoji = b.type === 'open' ? '🌅' : '🔔';
+  const url = `${SITE}/briefings/the-${b.type}/${b.date}/`;
+  let msg = `${emoji} <b>${escapeHtml(label)}</b> · ${escapeHtml(briefingDate(b.date))}\n\n`;
+  msg += `<b>${escapeHtml(b.headline)}</b>\n`;
+  if (b.dek) msg += `${escapeHtml(b.dek)}\n`;
+  if (b.the_take) msg += `\n<i>${escapeHtml(b.the_take)}</i>\n`;
+  if (events.length) {
+    msg += `\n<b>What moved</b>\n`;
+    for (const e of events.slice(0, 6)) msg += `• <b>${escapeHtml(e.symbol)}</b> — ${escapeHtml(e.headline)}\n`;
+    if (events.length > 6) msg += `…and ${events.length - 6} more\n`;
+  }
+  msg += `\n<a href="${escapeHtml(url)}">Read the full digest →</a>`;
+  return msg;
+}
+
+// Push newly-published briefings (The Open / The Close). Idempotent via
+// briefings.notified_at, with the same back-catalogue guard as articles.
+async function notifyBriefings(db, TEST) {
+  let columnAdded = false;
+  try { db.prepare('ALTER TABLE briefings ADD COLUMN notified_at INTEGER').run(); columnAdded = true; } catch { /* exists */ }
+  if (columnAdded && !TEST) {
+    db.prepare('UPDATE briefings SET notified_at = ? WHERE notified_at IS NULL').run(Date.now());
+    console.log('[telegram] briefings: first run — back-catalogue marked notified');
+    return;
+  }
+
+  const rows = TEST
+    ? db.prepare(`SELECT type, date, headline, dek, the_take, sections FROM briefings
+                  WHERE validation_ok = 1 ORDER BY generated_at DESC LIMIT 1`).all()
+    : db.prepare(`SELECT type, date, headline, dek, the_take, sections FROM briefings
+                  WHERE validation_ok = 1 AND notified_at IS NULL
+                  ORDER BY date ASC, generated_at ASC LIMIT 4`).all();
+  if (!rows.length) { console.log('[telegram] no new briefings'); return; }
+
+  const mark = db.prepare('UPDATE briefings SET notified_at = ? WHERE type = ? AND date = ?');
+  let sent = 0;
+  for (const b of rows) {
+    const events = resolveBriefingEvents(db, b.sections);
+    try {
+      const text = buildBriefingMessage(b, events);
+      await send(TEST ? `🧪 <i>Test digest</i>\n\n${text}` : text);
+      if (!TEST) mark.run(Date.now(), b.type, b.date);
+      sent++;
+      await new Promise((res) => setTimeout(res, 1200));
+    } catch (e) {
+      console.error('[telegram] briefing send failed:', e.message);
+      break;
+    }
+  }
+  console.log(`[telegram] briefings sent ${sent}/${rows.length}`);
+}
+
 async function main() {
   const TEST = process.argv.includes('--test');
   const db = openDb();
+
+  // Briefings first — they're the day's summary, ahead of individual article pushes.
+  await notifyBriefings(db, TEST);
   // notified_at marks articles already pushed. Add the column if an older DB
   // predates it (SQLite has no ADD COLUMN IF NOT EXISTS).
   let columnAdded = false;

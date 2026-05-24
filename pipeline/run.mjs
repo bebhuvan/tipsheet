@@ -389,7 +389,7 @@ export async function generateBriefing(type, dateYmd = null) {
     headline:        p.headline,
     dek:             p.dek,
     the_take:        p.the_take,
-    sections:        JSON.stringify(p.sections || []),
+    sections:        JSON.stringify({ events: p.events || [], mgmt_flags: p.mgmt_flags || [], calendar: p.calendar || [] }),
     input_summary:   JSON.stringify({
       filings_count: inputs.top_filings.length,
       mgmt_flags_count: inputs.mgmt_consistency_flags.length,

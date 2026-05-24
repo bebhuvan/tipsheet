@@ -17,7 +17,7 @@ import { PHRASE_PATTERNS, STRUCTURAL_RULES } from './banned-patterns.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PATH = resolve(__dirname, 'prompts/briefings_system.txt');
 const USER_PATH   = resolve(__dirname, 'prompts/briefings_user.txt');
-export const BRIEFING_PROMPT_VERSION = 'briefing.v2';
+export const BRIEFING_PROMPT_VERSION = 'briefing.v3';
 
 const CFG = {
   baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
@@ -60,7 +60,7 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 24 } = {
     LEFT JOIN fundamentals f ON f.symbol = r.symbol
     WHERE e.validation_ok = 1 AND r.created_on >= ?
     ORDER BY r.score DESC, r.created_on DESC
-    LIMIT 6
+    LIMIT 14
   `).all(cutoffIso);
 
   // Recent mgmt-consistency flags (last 7 days)
@@ -120,7 +120,7 @@ function renderTopFilings(rows) {
       r.revenue_growth != null ? `revenue growth ${fmt(r.revenue_growth, '%')}` : null,
       r.pat_growth != null ? `PAT growth ${fmt(r.pat_growth, '%')}` : null,
     ].filter(Boolean).join(' · ');
-    return `- [${r.symbol || '?'} · score ${r.score} · ${r.category}] ${r.headline}\n  Dek: ${r.dek || ''}\n  Number: ${r.the_number_value || ''} (${r.the_number_label || ''})\n  Financial context: ${financial || 'n/a'}\n  Why: ${r.why_it_matters || ''}\n  URL: /filings/${(r.symbol || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${r.record_id}/  filing_id: ${r.record_id}`;
+    return `[filing_id ${r.record_id}] ${r.symbol || '?'} · ${r.company || ''} · score ${r.score} · ${r.category}\n  Headline: ${r.headline}\n  Number: ${r.the_number_value || ''} (${r.the_number_label || ''})\n  Financial context: ${financial || 'n/a'}\n  Why: ${r.why_it_matters || ''}`;
   }).join('\n\n');
 }
 function renderMgmtFlags(rows) {
@@ -220,6 +220,12 @@ export async function enrichBriefing(inputs, previousAttempt = null) {
 
 function buildFeedbackMessage(validation) {
   const lines = ['Your previous briefing had these problems. Rewrite the entire JSON without them.'];
+  if (validation.eventIssues?.length) {
+    lines.push('');
+    lines.push('Event problems:');
+    for (const e of validation.eventIssues) lines.push(`  - ${e}`);
+    lines.push('  Each event needs a real filing_id from top_filings and 2-3 sentences of prose. Aim for 8-12 events.');
+  }
   if (validation.banned?.length) {
     lines.push('');
     lines.push(`Banned phrases you used: ${validation.banned.map(b => `"${b}"`).join(', ')}`);
@@ -252,12 +258,34 @@ function validate(parsed, inputs) {
   else if (parsed.headline.length > 100) issues.push(`headline_too_long:${parsed.headline.length}`);
   if (typeof parsed?.dek !== 'string') issues.push('dek_missing');
   if (typeof parsed?.the_take !== 'string' || parsed.the_take.length < 15) issues.push('the_take_thin');
-  if (!Array.isArray(parsed?.sections) || parsed.sections.length === 0) issues.push('sections_empty');
 
-  // Collect all prose into one blob for the validator
+  // Events: must reference real filing_ids and carry real prose.
+  const events = Array.isArray(parsed?.events) ? parsed.events : null;
+  const mgmt = Array.isArray(parsed?.mgmt_flags) ? parsed.mgmt_flags : [];
+  const calendar = Array.isArray(parsed?.calendar) ? parsed.calendar : [];
+  const eventIssues = [];
+  if (!events || events.length === 0) {
+    issues.push('events_empty');
+    eventIssues.push('No events array. Produce 8-12 events, each tied to a filing_id.');
+  } else {
+    const validIds = new Set(inputs.top_filings.map(f => Number(f.record_id)));
+    let badId = 0, thin = 0;
+    for (const ev of events) {
+      if (!validIds.has(Number(ev?.filing_id))) badId++;
+      if (typeof ev?.prose !== 'string' || ev.prose.trim().length < 40) thin++;
+    }
+    if (badId)  { issues.push(`event_filing_id_unknown:${badId}`); eventIssues.push(`${badId} event(s) used a filing_id not in top_filings.`); }
+    if (thin)   { issues.push(`event_prose_thin:${thin}`);          eventIssues.push(`${thin} event(s) under 2-3 sentences.`); }
+    const wantMin = Math.min(6, inputs.top_filings.length);
+    if (events.length < wantMin) { issues.push(`events_too_few:${events.length}`); eventIssues.push(`Only ${events.length} events; cover more of the day (${inputs.top_filings.length} filings available).`); }
+  }
+
+  // Collect all prose into one blob for the banned/structural validators.
   const prose = [
     parsed?.headline, parsed?.dek, parsed?.the_take,
-    ...((parsed?.sections || []).flatMap(s => [s?.label, s?.body, ...((s?.items || []).map(i => i?.text))])),
+    ...(events || []).map(e => e?.prose),
+    ...mgmt.map(m => m?.prose),
+    ...calendar,
   ].filter(Boolean).join(' ');
 
   const banned = [];
@@ -274,5 +302,5 @@ function validate(parsed, inputs) {
   }
   if (structural.length) issues.push(`structural:${structural.map(s => s.name).join('|')}`);
 
-  return { ok: issues.length === 0, issues, banned, structural };
+  return { ok: issues.length === 0, issues, banned, structural, eventIssues };
 }

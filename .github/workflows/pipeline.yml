@@ -110,6 +110,19 @@ jobs:
           INDIA_DATAHUB_BASE_URL: ${{ secrets.INDIA_DATAHUB_BASE_URL }}
         continue-on-error: true
 
+      # Index moves + per-stock weekly history for the briefing market strip and
+      # event sparklines. Must run before briefing generation (snapshot freshness).
+      - name: Setup Python (market data)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch market data (yfinance)
+        run: |
+          pip install --quiet yfinance
+          cd pipeline && python3 market_yf.py --hours 36
+        continue-on-error: true
+
       - name: Generate briefings
         run: |
           cd pipeline
