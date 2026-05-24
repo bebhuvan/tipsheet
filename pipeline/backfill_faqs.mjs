@@ -37,6 +37,7 @@ const flag = (name, def) => {
 const LIMIT = Number(flag('limit', 0)) || 0;          // 0 = all
 const DRY_RUN = !!flag('dry-run', false);
 const MIN_FAQS = Number(flag('min', 4));               // backfill anything with fewer than this
+const IDS = String(flag('ids', '')).split(',').map(s => s.trim()).filter(Boolean); // target exact record_ids
 const CONCURRENCY = Math.max(1, Number(flag('concurrency', 4)));
 const DB_PATH = String(flag('db', resolve(__dirname, '..', 'data', 'filings.db')));
 
@@ -87,26 +88,32 @@ function bannedHit(text) {
   return null;
 }
 
-// Shape + anti-slop validation. Returns { ok, issues, faqs }.
+// Per-FAQ anti-slop validation with SALVAGE: a single bad answer shouldn't sink
+// 5 brilliant ones. Keep the clean FAQs, drop the offenders, and pass as long as
+// >= 4 clean ones remain (capped at 6). Returns { ok, issues, faqs: <clean subset> }.
 function validateFaqs(faqs) {
-  const issues = [];
-  if (!Array.isArray(faqs) || faqs.length < 4 || faqs.length > 6) issues.push(`count ${faqs?.length}`);
-  const seen = new Set();
-  for (const f of (faqs || [])) {
+  if (!Array.isArray(faqs)) return { ok: false, issues: ['not an array'], faqs: [] };
+  const clean = [], issues = [], seen = new Set();
+  for (const f of faqs) {
     const q = String(f?.question || '').trim();
     const a = String(f?.answer || '').trim();
-    if (!q || !a) { issues.push('empty q/a'); continue; }
-    if (!q.endsWith('?')) issues.push(`q not a question: "${q.slice(0, 40)}"`);
-    if (q.split(/\s+/).length < 4) issues.push(`q too short: "${q}"`);
-    const words = a.split(/\s+/).length;
-    if (words < 10) issues.push(`a too short (${words}w): "${a.slice(0, 40)}"`);
-    if (words > 90) issues.push(`a too long (${words}w)`);
-    const key = q.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    if (seen.has(key)) issues.push('duplicate question'); else seen.add(key);
-    const hit = bannedHit(`${q} ${a}`);
-    if (hit) issues.push(`banned phrase /${hit}/ in "${q.slice(0, 30)}"`);
+    const bad = [];
+    if (!q || !a) bad.push('empty');
+    else {
+      if (!q.endsWith('?')) bad.push('not a question');
+      if (q.split(/\s+/).length < 4) bad.push('q too short');
+      const words = a.split(/\s+/).length;
+      if (words < 10) bad.push(`a too short (${words}w)`);
+      if (words > 90) bad.push(`a too long (${words}w)`);
+      const key = q.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (seen.has(key)) bad.push('duplicate'); else seen.add(key);
+      const hit = bannedHit(`${q} ${a}`);
+      if (hit) bad.push(`banned /${hit}/`);
+    }
+    if (bad.length === 0) clean.push({ question: q, answer: a });
+    else issues.push(`"${q.slice(0, 28)}…": ${bad.join(', ')}`);
   }
-  return { ok: issues.length === 0, issues, faqs };
+  return { ok: clean.length >= 4, issues, faqs: clean.slice(0, 6) };
 }
 
 async function generateFaqs(ai, system, article) {
@@ -132,7 +139,7 @@ async function generateFaqs(ai, system, article) {
     let parsed;
     try { parsed = JSON.parse(res.text || '{}'); } catch { lastIssues = ['invalid JSON']; continue; }
     const v = validateFaqs(parsed.faqs);
-    if (v.ok) return { ok: true, faqs: parsed.faqs, usage: res.usageMetadata || null, attempts: attempt };
+    if (v.ok) return { ok: true, faqs: v.faqs, usage: res.usageMetadata || null, attempts: attempt };
     lastIssues = v.issues;
   }
   return { ok: false, error: 'validation', issues: lastIssues };
@@ -154,9 +161,15 @@ async function main() {
      ORDER BY e.enriched_at DESC
   `).all();
 
-  const candidates = rows.filter(r => parseJsonArray(r.faqs).length < MIN_FAQS);
+  let candidates;
+  if (IDS.length) {
+    const set = new Set(IDS.map(String));
+    candidates = rows.filter(r => set.has(String(r.record_id)));   // retry exactly these, regardless of current faq count
+  } else {
+    candidates = rows.filter(r => parseJsonArray(r.faqs).length < MIN_FAQS);
+  }
   const work = LIMIT ? candidates.slice(0, LIMIT) : candidates;
-  console.log(`[backfill-faqs] ${rows.length} enriched · ${candidates.length} need >=${MIN_FAQS} faqs · processing ${work.length}${DRY_RUN ? ' (dry-run)' : ''} · model ${CFG.model}`);
+  console.log(`[backfill-faqs] ${rows.length} enriched · ${candidates.length} ${IDS.length ? 'targeted by id' : `need >=${MIN_FAQS} faqs`} · processing ${work.length}${DRY_RUN ? ' (dry-run)' : ''} · model ${CFG.model}`);
 
   const update = db.prepare('UPDATE filings_enriched SET faqs = ? WHERE record_id = ?');
   let ok = 0, fail = 0, tokIn = 0, tokOut = 0, done = 0;
