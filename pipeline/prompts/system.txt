@@ -152,8 +152,8 @@ OUTPUT FORMAT — return ONLY a JSON object. No markdown fences, no preamble, no
   "what_were_watching": ["forward-looking ≤120 chars", "≤120 chars", "≤120 chars"],
   "faqs": [
     {
-      "question": "The most obvious question an investor would have about this news.",
-      "answer": "Direct, 1-2 sentence answer based only on facts in the rationale."
+      "question": "Provide 4-6 FAQs. Each is a sharp, specific question a serious investor would actually ask about this filing — distinct from the others and answerable from the facts. Prefer why / how / what-does-it-mean over yes-no. No rhetorical questions.",
+      "answer": "Direct 2-3 sentence answer grounded ONLY in facts in the rationale. Lead with the answer, then the number or caveat that supports it."
     }
   ],
   "the_full_read": "120-200 words narrative prose. Synthesise the news angle, the material facts, and the editorial judgment into one cohesive argument. Must not restate the bullets — connect, extend, or supply the synthesis the bullets imply.",
@@ -197,11 +197,19 @@ The correct output is:
   "faqs": [
     {
       "question": "Why did CARE Ratings stop monitoring Mehai Technology?",
-      "answer": "Mehai failed to provide requested documentation about the use of its rights-issue proceeds despite repeated follow-ups over 40 days."
+      "answer": "CARE was hired to verify how Mehai used its rights-issue proceeds but never received the documentation it asked for. After 40 days of unanswered follow-ups it filed a report saying it can no longer confirm the use of funds."
     },
     {
-      "question": "How much money was raised in the rights issue?",
-      "answer": "Mehai Technology raised ₹74.11 crore from investors at ₹6.22 per share."
+      "question": "How much did Mehai raise, and where does the stock trade now?",
+      "answer": "Mehai raised ₹74.11 crore from public investors in a rights issue priced at ₹6.22 a share. The stock has since lost 77% to trade at ₹1.41."
+    },
+    {
+      "question": "What else did the company do during the same period?",
+      "answer": "In the same window that CARE's follow-ups went unanswered, Mehai changed its registered office and amended its memorandum of association. The filing gives no reason for either move."
+    },
+    {
+      "question": "What does the monitoring withdrawal actually signal?",
+      "answer": "It shifts the burden of proof onto the company: the agency hired to track the money has publicly given up. A monitoring agency disengaging like this is rare, and it leaves the use of ₹74 crore unaccounted for."
     }
   ],
   "the_full_read": "Mehai raised **₹74.11 crore** from public investors in a rights issue at **₹6.22** a share. CARE Ratings was hired to watch where that money went. Today, after **40 days** of unanswered follow-ups, CARE filed a report saying it can't verify anything — not the use of funds, not what Mehai did with the cash. In the same window, the company changed its registered office and amended its MOA, and the stock has lost **77%** to trade at **₹1.41**. The headline number isn't the **₹74 crore**. It's that the agency hired to do the verifying gave up. That is rare. And it means the burden of proof has shifted to Mehai, not the regulator.",
