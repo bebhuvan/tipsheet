@@ -15,6 +15,11 @@ on:
     - cron: '30 16 * * 1-5'
     # Weekend full refresh — Sunday 11:30 IST
     - cron: '0 6 * * 0'
+    # Weekend filings catch — news ingest 3×/day Sat & Sun at 09:30 / 14:30 / 19:30 IST.
+    # Companies still file on weekends (board-meeting outcomes etc.) and the weekday
+    # cadence skips them; this runs the same poll→enrich→briefings→deploy flow. (The
+    # Tijori SDK widget ingest stays gated to the 06:30 daily cron below.)
+    - cron: '0 4,9,14 * * 6,0'
     # Daily Tijori ingest (Alerts + financial box) — 06:30 IST
     - cron: '0 1 * * *'
   workflow_dispatch:
