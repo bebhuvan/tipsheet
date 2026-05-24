@@ -244,6 +244,12 @@ function openDb() {
   const db = new Database(path);
   db.pragma('journal_mode = WAL');
   for (const stmt of SCHEMA) db.prepare(stmt).run();
+  // Ensure the PDF-extract columns exist even before pdf_extract.py has run, so the site's
+  // listRegulation query (which selects pdf_tables) never hits a missing column in CI.
+  const cols = db.prepare('PRAGMA table_info(circulars_raw)').all().map(r => r.name);
+  for (const [c, t] of [['pdf_text', 'TEXT'], ['pdf_tables', 'TEXT'], ['pdf_extracted_at', 'INTEGER']]) {
+    if (!cols.includes(c)) db.prepare(`ALTER TABLE circulars_raw ADD COLUMN ${c} ${t}`).run();
+  }
   return db;
 }
 

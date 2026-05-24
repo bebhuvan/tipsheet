@@ -31,6 +31,18 @@ function hasTable(name) {
   return found;
 }
 
+// Guard against pipeline-added columns the site build can't assume exist (e.g. circulars_raw
+// gains pdf_tables only after pdf_extract runs). Keeps the build green regardless.
+const columnPresence = new Map();
+function hasColumn(table, col) {
+  const key = `${table}.${col}`;
+  if (columnPresence.has(key)) return columnPresence.get(key);
+  let found = false;
+  try { found = db().prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === col); } catch {}
+  columnPresence.set(key, found);
+  return found;
+}
+
 function shapeFiling(row) {
   if (!row) return null;
   return {
@@ -930,8 +942,9 @@ function dedupeNotes(notes) {
 export function listRegulation({ limit = 200 } = {}) {
   const out = [];
   if (hasTable('circulars_enriched')) {
+    const pdfTablesCol = hasColumn('circulars_raw', 'pdf_tables') ? 'cr.pdf_tables' : "'[]' AS pdf_tables";
     out.push(...db().prepare(`
-      SELECT ce.*, cr.source, cr.pub_date, cr.stocks, cr.pdf_url, cr.pdf_tables
+      SELECT ce.*, cr.source, cr.pub_date, cr.stocks, cr.pdf_url, ${pdfTablesCol}
       FROM circulars_enriched ce JOIN circulars_raw cr ON cr.circular_id = ce.circular_id
       WHERE ce.validation_ok = 1 ORDER BY ce.enriched_at DESC LIMIT ?
     `).all(limit).map(shapeCircularNote));
