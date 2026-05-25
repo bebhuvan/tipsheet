@@ -15,6 +15,7 @@ const CHAT = process.env.TELEGRAM_CHAT_ID;
 const SITE = (process.env.SITE_URL || 'https://tipsheet.markets').replace(/\/+$/, '');
 const SCORE_MIN = Number(process.env.NOTIFY_SCORE_MIN || 5);
 const MAX_PER_RUN = 15;
+const BACKLOG_KEEP_LATEST = 20;
 
 if (!TOKEN || !CHAT) {
   console.log('[telegram] TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set — skipping');
@@ -92,9 +93,19 @@ async function notifyBriefings(db, TEST) {
   let columnAdded = false;
   try { db.prepare('ALTER TABLE briefings ADD COLUMN notified_at INTEGER').run(); columnAdded = true; } catch { /* exists */ }
   if (columnAdded && !TEST) {
-    db.prepare('UPDATE briefings SET notified_at = ? WHERE notified_at IS NULL').run(Date.now());
-    console.log('[telegram] briefings: first run — back-catalogue marked notified');
-    return;
+    db.prepare(`
+      UPDATE briefings
+         SET notified_at = ?
+       WHERE notified_at IS NULL
+         AND (type || ':' || date) NOT IN (
+           SELECT type || ':' || date
+             FROM briefings
+            WHERE validation_ok = 1
+            ORDER BY generated_at DESC
+            LIMIT 2
+         )
+    `).run(Date.now());
+    console.log('[telegram] briefings: first run — older back-catalogue marked notified');
   }
 
   const rows = TEST
@@ -134,13 +145,25 @@ async function main() {
   let columnAdded = false;
   try { db.prepare('ALTER TABLE filings_enriched ADD COLUMN notified_at INTEGER').run(); columnAdded = true; } catch { /* exists */ }
 
-  // First time the column appears, mark the whole back-catalogue as already
-  // notified so we don't flood the channel with hundreds of old articles.
-  // Only genuinely new articles (enriched after this point) get pushed.
+  // First time the column appears, mark older back-catalogue as already
+  // notified so we don't flood the channel, but keep the newest eligible
+  // rows available for the first channel push.
   if (columnAdded && !TEST) {
-    db.prepare('UPDATE filings_enriched SET notified_at = ? WHERE notified_at IS NULL').run(Date.now());
-    console.log('[telegram] first run — back-catalogue marked as notified; only new articles push from now on');
-    return;
+    db.prepare(`
+      UPDATE filings_enriched
+         SET notified_at = ?
+       WHERE notified_at IS NULL
+         AND record_id NOT IN (
+           SELECT e.record_id
+             FROM filings_enriched e
+             JOIN filings_raw r ON r.record_id = e.record_id
+            WHERE e.validation_ok = 1
+              AND r.score >= ?
+            ORDER BY e.enriched_at DESC
+            LIMIT ?
+         )
+    `).run(Date.now(), SCORE_MIN, BACKLOG_KEEP_LATEST);
+    console.log(`[telegram] first run — older back-catalogue marked notified; latest ${BACKLOG_KEEP_LATEST} remain eligible`);
   }
 
   const rows = TEST
