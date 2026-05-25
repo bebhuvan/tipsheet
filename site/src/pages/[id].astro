@@ -165,6 +165,7 @@ const showQualityGroup = showRoe || showDebt || isMetric(fund?.free_cash_flow);
 const showGrowthGroup = showRevenueGrowth || showPatGrowth;
 const earningsYield = showPe ? 100 / Number(fund.pe) : null;
 const fcfYield = pctOf(fund?.free_cash_flow, fund?.market_cap);
+const hasArticleKickerBeforeCap = (filing.canonical_category && filing.canonical_category !== 'Other') || filing.sector;
 const pegRatio = (showPe && showPatGrowth && Number(fund.pat_growth) > 0) ? Number(fund.pe) / Number(fund.pat_growth) : null;
 const valuationRead = showPe && fundContext?.median_pe
   ? `P/E is ${fmtRelative(fund.pe, fundContext.median_pe)}.`
@@ -247,6 +248,8 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
         {filing.sector && (
           <a href={`/sector/${(filing.sector || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}/`} class="inline">{filing.sector}</a>
         )}
+        {filing.market_cap_label && hasArticleKickerBeforeCap && <span class="sep">·</span>}
+        {filing.market_cap_label && <span>{filing.market_cap_label}</span>}
       </div>
 
       <h1 class="headline">{filing.headline}</h1>

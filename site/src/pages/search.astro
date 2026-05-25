@@ -107,6 +107,7 @@ import SiteFooter from '../components/SiteFooter.astro';
     const kicker = [];
     if (e.cat && e.cat !== 'Other') kicker.push(e.cat);
     if (e.sec) kicker.push(e.sec);
+    if (e.cap) kicker.push(e.cap);
     body.appendChild(h('div', 'r-kicker',   kicker.join(' · ')));
     body.appendChild(h('div', 'r-headline', e.h));
     a.appendChild(body);

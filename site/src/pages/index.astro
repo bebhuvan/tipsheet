@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes } from '../lib/queries.mjs';
+import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes, filingEyebrow } from '../lib/queries.mjs';
 import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
 
 const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalToday, hiScore } = getHomepageBundle();
@@ -81,7 +81,7 @@ const schema = {
       <section class="hero">
         <article class="hero-lead">
           <div class="lead-tier">
-            {(lead.sector || lead.canonical_category) && <span class="cat">{lead.sector || lead.canonical_category}</span>}
+            {filingEyebrow(lead, { category: false }) && <span class="cat">{filingEyebrow(lead, { category: false })}</span>}
           </div>
 
           <h1 class="lead-headline">
@@ -101,7 +101,7 @@ const schema = {
               {leadCompanions.map(f => (
                 <a href={f.canonical_url} class="lc-item">
                   <div class="lc-kicker">
-                    {(f.sector || f.canonical_category) && <span class="cat">{f.sector || f.canonical_category}</span>}
+                    {filingEyebrow(f, { category: false }) && <span class="cat">{filingEyebrow(f, { category: false })}</span>}
                   </div>
                   <h3 class="lc-headline">{f.headline}</h3>
                   {f.dek && <p class="lc-dek">{f.dek}</p>}
@@ -120,7 +120,7 @@ const schema = {
             {secondaries.map(f => (
               <article class="hero-sec">
                 <div class="sec-kicker">
-                  {(f.sector || f.canonical_category) && <span class="cat">{f.sector || f.canonical_category}</span>}
+                  {filingEyebrow(f, { category: false }) && <span class="cat">{filingEyebrow(f, { category: false })}</span>}
                 </div>
                 <h2 class="sec-headline">
                   <a class="headline-link" href={f.canonical_url}>{f.headline}</a>
@@ -147,7 +147,7 @@ const schema = {
           {midtier.map(f => (
             <a href={f.canonical_url} class="mt-item">
               <div class="mt-kicker">
-                {(f.sector || f.canonical_category) && <span class="cat">{f.sector || f.canonical_category}</span>}
+                {filingEyebrow(f, { category: false }) && <span class="cat">{filingEyebrow(f, { category: false })}</span>}
               </div>
               <h3 class="mt-headline">{f.headline}</h3>
               <div class="mt-meta">
@@ -257,9 +257,7 @@ const schema = {
             <span class="wire-time">{timeOf(f.created_on).replace(' IST', '')}</span>
             <div class="wire-body">
               <div class="kicker">
-                {f.canonical_category && f.canonical_category !== 'Other'
-                  ? <><span class="cat">{f.canonical_category}</span> · {f.sector}</>
-                  : f.sector}
+                {filingEyebrow(f)}
               </div>
               <h3>{f.headline}</h3>
             </div>

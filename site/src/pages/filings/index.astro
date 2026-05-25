@@ -2,7 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import Masthead from '../../components/Masthead.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
-import { listFilings } from '../../lib/queries.mjs';
+import { listFilings, filingEyebrow } from '../../lib/queries.mjs';
 
 // Page 1 — redirects pagination users to /filings/page/2/, /page/3/, etc.
 const PER_PAGE = 25;
@@ -48,7 +48,7 @@ const categories = ['Earnings','Concalls','Order Wins','M&A','Credit','Regulator
             <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
             <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
             <div class="archive-body">
-              <div class="kicker">{f.canonical_category} · {f.sector}</div>
+              <div class="kicker">{filingEyebrow(f)}</div>
               <h3>{f.headline}</h3>
             </div>
             <span class="archive-ticker">{f.symbol}</span>

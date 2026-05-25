@@ -2,7 +2,7 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { listFilings } from '../../../lib/queries.mjs';
+import { listFilings, filingEyebrow } from '../../../lib/queries.mjs';
 
 const CATEGORIES = [
   { slug: 'earnings',    name: 'Earnings',    dek: 'Quarterly and annual results, audited financials, board outcomes on results.' },
@@ -67,7 +67,7 @@ function dateOf(iso) {
             <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
             <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
             <div class="archive-body">
-              <div class="kicker">{f.sector}</div>
+              <div class="kicker">{filingEyebrow(f, { category: false })}</div>
               <h3>{f.headline}</h3>
             </div>
             <span class="archive-ticker">{f.symbol}</span>

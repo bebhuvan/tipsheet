@@ -1086,6 +1086,26 @@ footer.site-footer {
   margin: 0;
   font-variation-settings: "opsz" 18;
 }
+.footer-powered {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+}
+.footer-powered a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent);
+}
 footer.site-footer h5 {
   font-family: 'Newsreader', serif;
   font-style: italic;

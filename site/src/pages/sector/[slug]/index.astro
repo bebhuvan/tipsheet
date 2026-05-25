@@ -2,7 +2,7 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { distinctSectorsWithFilings, sectorBySlug, sectorSlug, filingsForSector, companiesInSector, tierFor } from '../../../lib/queries.mjs';
+import { distinctSectorsWithFilings, sectorBySlug, sectorSlug, filingsForSector, companiesInSector, tierFor, filingEyebrow } from '../../../lib/queries.mjs';
 
 export async function getStaticPaths() {
   const sectors = distinctSectorsWithFilings();
@@ -64,7 +64,7 @@ function fmtCr(n) {
               <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
               <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
               <div class="archive-body">
-                <div class="kicker">{tierFor(f.score)} · {f.canonical_category}</div>
+                <div class="kicker">{[tierFor(f.score), filingEyebrow(f, { sector: false })].filter(Boolean).join(' · ')}</div>
                 <h3>{f.headline}</h3>
               </div>
               <span class="archive-ticker">{f.symbol}</span>

@@ -1,4 +1,4 @@
-import { listFilings, listAllCompanies, listAllSectors, sectorSlug, tierFor } from '../lib/queries.mjs';
+import { listFilings, listAllCompanies, listAllSectors, sectorSlug } from '../lib/queries.mjs';
 
 // One flat index, fetched once by /search/ and filtered client-side.
 // Kept compact: short field names, only what's needed to display a result row.
@@ -20,6 +20,7 @@ export async function GET() {
       h: f.headline,
       sym: f.symbol,
       sec: f.sector || '',
+      cap: f.market_cap_label || '',
       cat: f.canonical_category || '',
       sc: f.score,
       t: f.created_on || '',

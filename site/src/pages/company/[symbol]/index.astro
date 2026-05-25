@@ -2,7 +2,7 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { distinctSymbolsWithFilings, filingsForCompany, getFundamentals, sectorSlug, tierFor, tijoriCompanyUrl } from '../../../lib/queries.mjs';
+import { distinctSymbolsWithFilings, filingsForCompany, getFundamentals, sectorSlug, tierFor, tijoriCompanyUrl, filingEyebrow } from '../../../lib/queries.mjs';
 
 export async function getStaticPaths() {
   const symbols = distinctSymbolsWithFilings();
@@ -127,7 +127,7 @@ const schema = {
                     <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
                     <span class:list={['archive-tier', f.score >= 9 ? 'score-hi' : f.score >= 7 ? 'score-mid' : 'score-low']}>{tierFor(f.score)}</span>
                     <div class="archive-body">
-                      <div class="kicker">{tierFor(f.score)}{f.canonical_category && f.canonical_category !== 'Other' ? ` · ${f.canonical_category}` : ''}</div>
+                      <div class="kicker">{[tierFor(f.score), filingEyebrow(f, { sector: false })].filter(Boolean).join(' · ')}</div>
                       <h4 class="row-headline">{f.headline}</h4>
                       <p class="row-dek">{f.dek}</p>
                     </div>

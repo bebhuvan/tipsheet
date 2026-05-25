@@ -45,6 +45,7 @@ function hasColumn(table, col) {
 
 function shapeFiling(row) {
   if (!row) return null;
+  const marketCap = row.market_cap == null ? null : Number(row.market_cap);
   return {
     record_id:          row.record_id,
     symbol:             row.symbol,
@@ -56,6 +57,8 @@ function shapeFiling(row) {
     event_category_raw: row.event_category_raw,
     canonical_category: row.canonical_category,
     sector:             row.sector,
+    market_cap:         Number.isFinite(marketCap) ? marketCap : null,
+    market_cap_label:   marketCapLabel(marketCap),
     created_on:         row.created_on,
     headline:           row.headline,
     dek:                row.dek,
@@ -76,6 +79,27 @@ function shapeFiling(row) {
     slug:               buildSlug(row.symbol, row.headline, row.record_id),
     canonical_url:      `/${buildSlug(row.symbol, row.headline, row.record_id)}/`,
   };
+}
+
+export function marketCapLabel(marketCap) {
+  const v = Number(marketCap);
+  if (!Number.isFinite(v) || v <= 0) return null;
+  if (v >= 100000) return 'Mega cap';
+  if (v >= 20000) return 'Large cap';
+  if (v >= 5000) return 'Mid cap';
+  if (v >= 1000) return 'Small cap';
+  return 'Micro cap';
+}
+
+export function filingEyebrow(filing, { category = true, sector = true, cap = true } = {}) {
+  if (!filing) return '';
+  const parts = [];
+  if (category && filing.canonical_category && filing.canonical_category !== 'Other') {
+    parts.push(filing.canonical_category);
+  }
+  if (sector && filing.sector) parts.push(filing.sector);
+  if (cap && filing.market_cap_label) parts.push(filing.market_cap_label);
+  return parts.join(' · ');
 }
 
 export function buildSlug(symbol, headline, recordId) {
@@ -129,6 +153,7 @@ const ALL_COLS = `
   r.record_id, r.symbol, r.scripcode, r.company, r.score, r.sentiment,
   r.event_type, r.event_category_raw, r.event_category_canonical AS canonical_category,
   e.sector, r.created_on,
+  (SELECT f.market_cap FROM fundamentals f WHERE f.symbol = r.symbol LIMIT 1) AS market_cap,
   e.headline, e.dek, e.the_number_value, e.the_number_label,
   e.whats_new, e.why_it_matters, e.what_were_watching, e.faqs, e.the_full_read,
   e.editorial_tone, e.tone_score, e.tone_confidence, e.tone_reason,
