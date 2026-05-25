@@ -75,6 +75,12 @@ function json(data, status = 200, maxAge = 300) {
   });
 }
 
+function redirectPath(url, pathname, status = 301) {
+  const target = new URL(url);
+  target.pathname = pathname;
+  return Response.redirect(target.toString(), status);
+}
+
 async function handleWidgetApi(pathname, env) {
   const match = pathname.match(/^\/api\/widget\/([a-zA-Z0-9_-]+)$/);
   if (!match) return null;
@@ -113,6 +119,20 @@ export default {
     // a static _redirects file wouldn't apply here).
     if (url.pathname === '/smart-money' || url.pathname === '/smart-money/') {
       return Response.redirect(new URL('/alerts/', url).toString(), 301);
+    }
+    if (url.pathname === '/company' || url.pathname === '/company/') {
+      return redirectPath(url, '/companies/', 301);
+    }
+    if (url.pathname === '/sector' || url.pathname === '/sector/') {
+      return redirectPath(url, '/sectors/', 301);
+    }
+    if (
+      url.pathname === '/category' ||
+      url.pathname === '/category/' ||
+      url.pathname === '/categories' ||
+      url.pathname === '/categories/'
+    ) {
+      return redirectPath(url, '/filings/', 301);
     }
 
     const widget = await handleWidgetApi(url.pathname, env);
