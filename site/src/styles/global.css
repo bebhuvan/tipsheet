@@ -880,14 +880,34 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
   padding-left: 16px;
   padding-right: 4px;
 }
-.bi-ticker {
-  display: inline-block;
+.bi-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.bi-ticker,
+.bi-cap {
+  display: inline-flex;
+  align-items: center;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 500;
   color: var(--text-muted);
+}
+.bi-cap {
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.bi-cap::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--text-faint);
+}
+.brief-item > .bi-ticker {
   margin-bottom: 10px;
 }
 /* Binary signal: only top-conviction filings (score >= 9) carry the accent;

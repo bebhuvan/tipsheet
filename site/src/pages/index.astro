@@ -179,7 +179,10 @@ const schema = {
                 {b.items.slice(0, 4).map(item => (
                   <li>
                     <a href={item.canonical_url} class="brief-item">
-                      <span class:list={['bi-ticker', scoreBand(item.score)]} title={item.score >= 9 ? 'High-conviction read — top of the desk today' : undefined}>{item.symbol}</span>
+                      <span class="bi-meta">
+                        <span class:list={['bi-ticker', scoreBand(item.score)]} title={item.score >= 9 ? 'High-conviction read — top of the desk today' : undefined}>{item.symbol}</span>
+                        {item.market_cap_label && <span class="bi-cap">{item.market_cap_label}</span>}
+                      </span>
                       <h4 class="bi-headline">{item.headline}</h4>
                     </a>
                   </li>
