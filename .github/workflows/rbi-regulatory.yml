@@ -1,0 +1,130 @@
+name: RBI + Regulatory + Deploy
+
+on:
+  schedule:
+    # Regulatory notices before market, after close, evening, and late catch.
+    - cron: '32 2 * * 1-5'
+    - cron: '52 10,13,16 * * 1-5'
+    # Weekend public-source sweep.
+    - cron: '22 5,11 * * 6,0'
+  workflow_dispatch:
+    inputs:
+      include_bulletin:
+        description: 'Also ingest RBI Bulletin PDFs'
+        type: boolean
+        default: true
+      skip_deploy:
+        description: 'Skip Cloudflare Workers deploy'
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '22'
+
+concurrency:
+  group: tipsheet-db-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rbi-regulatory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore DB cache
+        uses: actions/cache/restore@v4
+        id: db-cache
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_id }}
+          restore-keys: |
+            filings-db-
+
+      - name: Download seed DB from release
+        if: steps.db-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p data
+          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
+          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+
+      - name: Install pipeline deps
+        run: cd pipeline && npm ci
+
+      - name: Poll exchange circulars (NSE/BSE/SEBI)
+        run: cd pipeline && node circulars_poller.mjs
+        continue-on-error: true
+
+      - name: Poll RBI RSS
+        run: cd pipeline && node rbi_poller.mjs
+        continue-on-error: true
+
+      - name: Setup Python (PDF extract)
+        if: ${{ github.event_name == 'schedule' && (github.event.schedule == '32 2 * * 1-5' || github.event.schedule == '22 5,11 * * 6,0') || github.event_name == 'workflow_dispatch' && inputs.include_bulletin }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Ingest RBI Bulletin articles
+        if: ${{ github.event_name == 'schedule' && (github.event.schedule == '32 2 * * 1-5' || github.event.schedule == '22 5,11 * * 6,0') || github.event_name == 'workflow_dispatch' && inputs.include_bulletin }}
+        run: |
+          pip install --quiet pdfplumber
+          cd pipeline && python3 pdf_extract.py bulletin --limit 4
+        continue-on-error: true
+
+      - name: Enrich + persist circulars
+        run: cd pipeline && node --env-file=../.env.ci circulars_enricher.mjs run 30
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        continue-on-error: true
+
+      - name: Enrich + persist RBI
+        run: cd pipeline && node --env-file=../.env.ci rbi_enricher.mjs run 30
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        continue-on-error: true
+
+      - name: Show stats
+        run: cd pipeline && node --env-file=../.env.ci run.mjs stats
+
+      - name: Save DB cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_id }}
+
+      - name: Restore + persist OG image cache
+        if: ${{ !inputs.skip_deploy }}
+        uses: actions/cache@v4
+        with:
+          path: site/.og-cache
+          key: og-cache-${{ github.run_id }}
+          restore-keys: |
+            og-cache-
+
+      - name: Install site deps
+        if: ${{ !inputs.skip_deploy }}
+        run: cd site && npm ci
+
+      - name: Build site
+        if: ${{ !inputs.skip_deploy }}
+        run: cd site && npm run build
+
+      - name: Deploy to Cloudflare Workers
+        if: ${{ !inputs.skip_deploy }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: deploy

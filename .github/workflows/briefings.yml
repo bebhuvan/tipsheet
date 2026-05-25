@@ -1,32 +1,25 @@
-name: Fast News + Deploy
+name: Market Briefings + Deploy
 
 on:
   schedule:
-    # Market hours: every ~30 min, 09:15-15:37 IST = UTC 03:45-10:07, weekdays.
-    - cron: '45 3 * * 1-5'
-    - cron: '15,45 4,5,6,7,8,9 * * 1-5'
-    - cron: '7 10 * * 1-5'
-    # Post-market catch: 16:07-17:07 IST = UTC 10:37-11:37.
-    - cron: '37 10 * * 1-5'
-    - cron: '7,37 11 * * 1-5'
-    # Late-night catch: 22:00 IST weekdays.
-    - cron: '30 16 * * 1-5'
-    # Weekend coverage: every ~2h, 08:47-20:47 IST.
-    - cron: '17 3,5,7,9,11,13,15 * * 6,0'
+    # The Open: 08:45 IST weekdays.
+    - cron: '15 3 * * 1-5'
+    # The Close: 17:00 IST weekdays.
+    - cron: '30 11 * * 1-5'
   workflow_dispatch:
     inputs:
+      briefing:
+        description: 'Briefing to generate'
+        type: choice
+        options:
+          - all
+          - open
+          - close
+        default: all
       skip_deploy:
         description: 'Skip Cloudflare Workers deploy'
         type: boolean
         default: false
-      skip_pipeline:
-        description: 'Skip pipeline (rebuild site only)'
-        type: boolean
-        default: false
-      enrich_limit:
-        description: 'Max filings to enrich'
-        type: string
-        default: '50'
 
 env:
   NODE_VERSION: '22'
@@ -36,10 +29,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  pipeline:
+  briefings:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
-    if: ${{ !inputs.skip_pipeline }}
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
 
@@ -66,9 +58,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
 
-      - name: Ensure data directory
-        run: mkdir -p data
-
       - name: Install pipeline deps
         run: cd pipeline && npm ci
 
@@ -78,18 +67,32 @@ jobs:
           KITE_SCREENER_URL: ${{ secrets.KITE_SCREENER_URL }}
         continue-on-error: true
 
-      - name: Poll filings
-        run: cd pipeline && node --env-file=../.env.ci run.mjs poll
-        env:
-          TIJORI_FEED_URL: ${{ secrets.TIJORI_FEED_URL }}
+      - name: Setup Python (market data)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Enrich filings
-        run: cd pipeline && node --env-file=../.env.ci run.mjs enrich "$LIMIT"
+      - name: Fetch market data (yfinance)
+        run: |
+          pip install --quiet yfinance
+          cd pipeline && python3 market_yf.py --hours 36
+        continue-on-error: true
+
+      - name: Generate The Open briefing
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.briefing == 'all' || inputs.briefing == 'open') || github.event.schedule == '15 3 * * 1-5' }}
+        run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-open
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
-          LIMIT: ${{ inputs.enrich_limit || '50' }}
+
+      - name: Generate The Close briefing
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.briefing == 'all' || inputs.briefing == 'close') || github.event.schedule == '30 11 * * 1-5' }}
+        run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-close
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
 
       - name: Show stats
         run: cd pipeline && node --env-file=../.env.ci run.mjs stats
@@ -101,53 +104,8 @@ jobs:
           path: data/filings.db
           key: filings-db-${{ github.run_id }}
 
-      - name: Upload DB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: filings-db
-          path: data/filings.db
-          retention-days: 7
-
-  build-deploy:
-    needs: pipeline
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: ${{ always() && !inputs.skip_deploy && (needs.pipeline.result == 'success' || inputs.skip_pipeline) }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Download DB artifact
-        if: ${{ !inputs.skip_pipeline }}
-        uses: actions/download-artifact@v4
-        with:
-          name: filings-db
-          path: data/
-
-      - name: Restore DB from cache
-        if: ${{ inputs.skip_pipeline }}
-        uses: actions/cache/restore@v4
-        id: build-cache
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
-          restore-keys: |
-            filings-db-
-
-      - name: Download seed DB from release
-        if: ${{ inputs.skip_pipeline && steps.build-cache.outputs.cache-hit != 'true' }}
-        run: |
-          mkdir -p data
-          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
-          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-
       - name: Restore + persist OG image cache
+        if: ${{ !inputs.skip_deploy }}
         uses: actions/cache@v4
         with:
           path: site/.og-cache
@@ -156,12 +114,15 @@ jobs:
             og-cache-
 
       - name: Install site deps
+        if: ${{ !inputs.skip_deploy }}
         run: cd site && npm ci
 
       - name: Build site
+        if: ${{ !inputs.skip_deploy }}
         run: cd site && npm run build
 
       - name: Deploy to Cloudflare Workers
+        if: ${{ !inputs.skip_deploy }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -169,22 +130,18 @@ jobs:
           workingDirectory: site
           command: deploy
 
-      - name: Install pipeline deps for Telegram notifier
-        if: success() && !inputs.skip_pipeline
-        run: cd pipeline && npm ci
-
       - name: Notify Telegram
-        if: success() && !inputs.skip_pipeline
+        if: ${{ !inputs.skip_deploy }}
         run: cd pipeline && node --env-file=../.env.ci notify_telegram.mjs
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_SCOPE: all
+          TELEGRAM_SCOPE: briefings
           SITE_URL: https://tipsheet.markets
 
       - name: Save post-notification DB cache
         uses: actions/cache/save@v4
-        if: always() && !inputs.skip_pipeline
+        if: always()
         with:
           path: data/filings.db
           key: filings-db-${{ github.run_id }}-post-notify

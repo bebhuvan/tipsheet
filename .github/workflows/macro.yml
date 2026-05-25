@@ -1,0 +1,115 @@
+name: Macro + Radar + Deploy
+
+on:
+  schedule:
+    # Early reference refresh after SDK, before market open.
+    - cron: '2 2 * * 1-5'
+    # Late-night macro release and radar refresh.
+    - cron: '42 16 * * 1-5'
+    # Weekend refresh.
+    - cron: '42 6 * * 0'
+  workflow_dispatch:
+    inputs:
+      skip_deploy:
+        description: 'Skip Cloudflare Workers deploy'
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '22'
+
+concurrency:
+  group: tipsheet-db-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore DB cache
+        uses: actions/cache/restore@v4
+        id: db-cache
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_id }}
+          restore-keys: |
+            filings-db-
+
+      - name: Download seed DB from release
+        if: steps.db-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p data
+          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
+          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+
+      - name: Install pipeline deps
+        run: cd pipeline && npm ci
+
+      - name: Poll macro calendar
+        run: cd pipeline && node --env-file=../.env.ci run.mjs poll-macro-calendar
+        env:
+          INDIA_DATAHUB_API_KEY: ${{ secrets.INDIA_DATAHUB_API_KEY }}
+          INDIA_DATAHUB_BASE_URL: ${{ secrets.INDIA_DATAHUB_BASE_URL }}
+        continue-on-error: true
+
+      - name: Macro data-release notes
+        run: cd pipeline && node --env-file=../.env.ci macro_release.mjs run 15
+        env:
+          INDIA_DATAHUB_API_KEY: ${{ secrets.INDIA_DATAHUB_API_KEY }}
+          INDIA_DATAHUB_BASE_URL: ${{ secrets.INDIA_DATAHUB_BASE_URL }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        continue-on-error: true
+
+      - name: Generate radar
+        run: cd pipeline && node --env-file=../.env.ci run.mjs generate-radar
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        continue-on-error: true
+
+      - name: Show stats
+        run: cd pipeline && node --env-file=../.env.ci run.mjs stats
+
+      - name: Save DB cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_id }}
+
+      - name: Restore + persist OG image cache
+        if: ${{ !inputs.skip_deploy }}
+        uses: actions/cache@v4
+        with:
+          path: site/.og-cache
+          key: og-cache-${{ github.run_id }}
+          restore-keys: |
+            og-cache-
+
+      - name: Install site deps
+        if: ${{ !inputs.skip_deploy }}
+        run: cd site && npm ci
+
+      - name: Build site
+        if: ${{ !inputs.skip_deploy }}
+        run: cd site && npm run build
+
+      - name: Deploy to Cloudflare Workers
+        if: ${{ !inputs.skip_deploy }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: site
+          command: deploy

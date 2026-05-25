@@ -136,10 +136,19 @@ async function notifyBriefings(db, TEST) {
 
 async function main() {
   const TEST = process.argv.includes('--test');
+  const SCOPE = (process.env.TELEGRAM_SCOPE || 'all').toLowerCase();
   const db = openDb();
 
+  const sendBriefings = SCOPE === 'all' || SCOPE === 'briefings';
+  const sendArticles = SCOPE === 'all' || SCOPE === 'articles';
+  if (!sendBriefings && !sendArticles) {
+    throw new Error(`Invalid TELEGRAM_SCOPE "${SCOPE}". Use all, briefings, or articles.`);
+  }
+
   // Briefings first — they're the day's summary, ahead of individual article pushes.
-  await notifyBriefings(db, TEST);
+  if (sendBriefings) await notifyBriefings(db, TEST);
+  if (!sendArticles) return;
+
   // notified_at marks articles already pushed. Add the column if an older DB
   // predates it (SQLite has no ADD COLUMN IF NOT EXISTS).
   let columnAdded = false;
