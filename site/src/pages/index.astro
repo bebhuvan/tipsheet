@@ -5,7 +5,7 @@ import SiteFooter from '../components/SiteFooter.astro';
 import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes, filingEyebrow } from '../lib/queries.mjs';
 import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
 
-const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalToday, hiScore } = getHomepageBundle();
+const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalToday, totalPublished, hiScore, hiScoreToday } = getHomepageBundle();
 // Regulation / Economy / Concall-note rails (separate content streams; not in the filings bundle).
 const regItems     = listRegulation({ limit: 6 });
 const econItems    = listEconomy({ limit: 5 });
@@ -40,12 +40,43 @@ function timeOf(iso) {
   return `${h}:${m[2]} ${ap} IST`;
 }
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function istYmd(date = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+function ymdOf(iso) {
+  return String(iso || '').match(/^(\d{4}-\d{2}-\d{2})/)?.[1] || '';
+}
 function prettyYmd(ymd) {
   const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return m ? `${Number(m[3])} ${MONTHS_SHORT[Number(m[2]) - 1]}` : (ymd || '');
 }
+const todayYmd = istYmd();
+const yesterdayYmd = istYmd(new Date(Date.now() - 24 * 60 * 60 * 1000));
+function whenOf(iso) {
+  const ymd = ymdOf(iso);
+  const time = timeOf(iso);
+  if (!ymd) return time;
+  if (ymd === todayYmd) return time;
+  if (ymd === yesterdayYmd) return `Yesterday · ${time}`;
+  return `${prettyYmd(ymd)} · ${time}`;
+}
+function wireWhenOf(iso) {
+  const ymd = ymdOf(iso);
+  if (!ymd || ymd === todayYmd) return timeOf(iso).replace(' IST', '');
+  if (ymd === yesterdayYmd) return 'Yday';
+  return prettyYmd(ymd);
+}
 function pct(score, max) { return Math.round((score / max) * 100); }
 const maxDistCount = Math.max(1, ...dist.map(d => d.c));
+const wireSummary = totalToday > 0
+  ? `${totalToday} filings today · ${hiScoreToday} alerts today`
+  : `${totalPublished} filings indexed · ${hiScore} alerts indexed`;
 
 const schema = {
   '@context': 'https://schema.org',
@@ -91,7 +122,7 @@ const schema = {
 
           <div class="lead-meta">
             <span class="ticker">{lead.symbol}</span>
-            <span>{timeOf(lead.created_on)}</span>
+            <span>{whenOf(lead.created_on)}</span>
             <a class="read inline" href={lead.canonical_url}>Read the filing</a>
           </div>
 
@@ -106,7 +137,7 @@ const schema = {
                   {f.dek && <p class="lc-dek">{f.dek}</p>}
                   <div class="lc-meta">
                     <span class="ticker">{f.symbol}</span>
-                    <span>{timeOf(f.created_on)}</span>
+                    <span>{whenOf(f.created_on)}</span>
                   </div>
                 </a>
               ))}
@@ -127,7 +158,7 @@ const schema = {
                 <p class="sec-dek">{f.dek}</p>
                 <div class="sec-meta">
                   <span class="ticker">{f.symbol}</span>
-                  <span>{timeOf(f.created_on)}</span>
+                  <span>{whenOf(f.created_on)}</span>
                 </div>
               </article>
             ))}
@@ -139,7 +170,7 @@ const schema = {
     {midtier && midtier.length > 0 && (
       <section class="midtier">
         <div class="midtier-head">
-          <h2><em>Also today</em></h2>
+          <h2><em>Also in the feed</em></h2>
           <span class="meta">A wider net across the desks</span>
         </div>
         <div class="midtier-grid">
@@ -151,7 +182,7 @@ const schema = {
               <h3 class="mt-headline">{f.headline}</h3>
               <div class="mt-meta">
                 <span class="ticker">{f.symbol}</span>
-                <span>{timeOf(f.created_on)}</span>
+                <span>{whenOf(f.created_on)}</span>
               </div>
             </a>
           ))}
@@ -163,7 +194,7 @@ const schema = {
       <section class="briefs">
         <div class="briefs-head">
           <h2><em>By section</em></h2>
-          <span class="meta">Today, top of each desk</span>
+          <span class="meta">Top of each desk</span>
         </div>
         <div class="briefs-grid">
           {orderedBriefs.map(b => {
@@ -172,7 +203,7 @@ const schema = {
             <section class="brief">
               <header class="brief-head">
                 <h3>{b.name}</h3>
-                <span class="ct"><span class="ct-num">{b.total}</span> today</span>
+                <span class="ct"><span class="ct-num">{b.total}</span> published</span>
               </header>
               <ol class="brief-list">
                 {b.items.slice(0, 4).map(item => (
@@ -251,12 +282,12 @@ const schema = {
     <section class="wire-section">
       <div class="wire-head">
         <h2><em>The Wire</em></h2>
-        <span class="meta">{totalToday} filings today · {hiScore} alerts</span>
+        <span class="meta">{wireSummary}</span>
       </div>
       <div class="wire-list">
         {wire.map(f => (
           <a href={f.canonical_url} class:list={['wire-row', scoreBand(f.score)]}>
-            <span class="wire-time">{timeOf(f.created_on).replace(' IST', '')}</span>
+            <span class="wire-time">{wireWhenOf(f.created_on)}</span>
             <div class="wire-body">
               <div class="kicker">
                 {filingEyebrow(f)}

@@ -203,6 +203,7 @@ export function priorFilingsForSymbol(symbol, excludeRecordId, limit = 5) {
 
 /** Homepage data bundle: lead + secondaries + midtier + briefs + wire. */
 export function getHomepageBundle() {
+  const todayYmd = currentIstYmd();
   const top = listFilings({ limit: 160 });
   const sorted = [...top].sort((a, b) => b.score - a.score || (a.created_on < b.created_on ? 1 : -1));
   const lead = sorted[0] || null;
@@ -253,10 +254,32 @@ export function getHomepageBundle() {
     ORDER BY r.score
   `).all();
 
-  const totalToday = db().prepare(`SELECT COUNT(*) AS c FROM filings_raw r JOIN filings_enriched e ON e.record_id = r.record_id WHERE e.validation_ok = 1`).get().c;
+  const totalPublished = db().prepare(`SELECT COUNT(*) AS c FROM filings_raw r JOIN filings_enriched e ON e.record_id = r.record_id WHERE e.validation_ok = 1`).get().c;
   const hiScore = db().prepare(`SELECT COUNT(*) AS c FROM filings_raw r JOIN filings_enriched e ON e.record_id = r.record_id WHERE r.score >= 8 AND e.validation_ok = 1`).get().c;
+  const totalToday = db().prepare(`
+    SELECT COUNT(*) AS c
+    FROM filings_raw r
+    JOIN filings_enriched e ON e.record_id = r.record_id
+    WHERE e.validation_ok = 1 AND substr(r.created_on, 1, 10) = ?
+  `).get(todayYmd).c;
+  const hiScoreToday = db().prepare(`
+    SELECT COUNT(*) AS c
+    FROM filings_raw r
+    JOIN filings_enriched e ON e.record_id = r.record_id
+    WHERE r.score >= 8 AND e.validation_ok = 1 AND substr(r.created_on, 1, 10) = ?
+  `).get(todayYmd).c;
 
-  return { lead, secondaries, leadCompanions, midtier: midtierRest, briefs, wire, dist, totalToday, hiScore };
+  return { lead, secondaries, leadCompanions, midtier: midtierRest, briefs, wire, dist, totalToday, totalPublished, hiScore, hiScoreToday };
+}
+
+function currentIstYmd(date = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function countByCategory(cat) {

@@ -423,7 +423,7 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
           </div>
           <ol class="ssf-timeline">
             <li class="current">
-              <span class="ssf-when">Today · {timeOf(filing.created_on)}</span>
+              <span class="ssf-when">{dateOf(filing.created_on)} · {timeOf(filing.created_on)}</span>
               <span class="ssf-headline">{filing.headline}</span>
             </li>
             {prior.map(p => (
