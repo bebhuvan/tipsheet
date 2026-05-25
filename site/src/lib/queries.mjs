@@ -205,30 +205,18 @@ export function priorFilingsForSymbol(symbol, excludeRecordId, limit = 5) {
 export function getHomepageBundle() {
   const todayYmd = currentIstYmd();
   const top = listFilings({ limit: 160 });
-  const sorted = [...top].sort((a, b) => b.score - a.score || (a.created_on < b.created_on ? 1 : -1));
+  const sorted = [...top].sort(compareHomepageOrder);
   const lead = sorted[0] || null;
   const secondaries = sorted.slice(1, 4);
 
-  // Mid-tier: 6 items mixed across categories so the strip below the hero
-  // doesn't collapse into one section's filings. Greedy round-robin picker.
+  // Mid-tier stays feed-first for a high-frequency news homepage. Section
+  // discovery happens lower down in "By section"; this area should not make
+  // older stories look current just to vary categories.
   const heroIds = new Set([lead?.record_id, ...secondaries.map(f => f.record_id)].filter(Boolean));
   const remaining = sorted.filter(f => !heroIds.has(f.record_id));
-  const seenCats = new Map();
-  const midtier = [];
-  // 2 used as lead-companions + 6 in the "Also today" 3×2 grid below the hero.
+  // 2 used as lead-companions + 6 in the "Also in the feed" 3×2 grid below the hero.
   const MIDTIER_TARGET = 8;
-  for (let pass = 1; pass <= 4 && midtier.length < MIDTIER_TARGET; pass++) {
-    for (const f of remaining) {
-      if (midtier.length >= MIDTIER_TARGET) break;
-      if (midtier.includes(f)) continue;
-      const cat = f.canonical_category || f.event_type || 'Other';
-      const count = seenCats.get(cat) || 0;
-      if (count < pass) {
-        midtier.push(f);
-        seenCats.set(cat, count + 1);
-      }
-    }
-  }
+  const midtier = remaining.slice(0, MIDTIER_TARGET);
 
   // Lead companions: the next 2 items, shown below the lead in the lead column
   // so the wide hero-lead block isn't visually empty next to the stacked rail.
@@ -280,6 +268,13 @@ function currentIstYmd(date = new Date()) {
     day: '2-digit',
   }).formatToParts(date).map(part => [part.type, part.value]));
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function compareHomepageOrder(a, b) {
+  const at = String(a?.created_on || '');
+  const bt = String(b?.created_on || '');
+  if (at !== bt) return at < bt ? 1 : -1;
+  return (b.score || 0) - (a.score || 0);
 }
 
 function countByCategory(cat) {
