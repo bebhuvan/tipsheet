@@ -7,19 +7,28 @@ interface Props {
   activeNav?: string;
 }
 const today = new Date();
-const weekdays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const monthsLong = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const monthsShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-// 12-hour clock, e.g. "4:26 PM".
-const time12 = (() => {
-  const h = today.getHours();
-  return `${h % 12 || 12}:${String(today.getMinutes()).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
-})();
+const istParts = Object.fromEntries(
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(today).map(part => [part.type, part.value])
+);
+const monthShort = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kolkata',
+  month: 'short',
+}).format(today);
+const time12 = `${istParts.hour}:${istParts.minute} ${istParts.dayPeriod.toUpperCase()}`;
 const {
-  weekday = weekdays[today.getDay()],
-  dateline = `${weekdays[today.getDay()]}, ${today.getDate()} ${monthsLong[today.getMonth()]} ${today.getFullYear()}`,
+  weekday = istParts.weekday,
+  dateline = `${istParts.weekday}, ${istParts.day} ${istParts.month} ${istParts.year}`,
   timeIst = `${time12} IST`,
-  stamp = `${today.getDate()} ${monthsShort[today.getMonth()]} · ${time12} IST`,
+  stamp = `${istParts.day} ${monthShort} · ${time12} IST`,
   activeNav = 'today',
 } = Astro.props;
 

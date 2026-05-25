@@ -190,4 +190,4 @@ async function main() {
   console.log(`[telegram] sent ${sent}/${rows.length}`);
 }
 
-main().catch((e) => { console.error('[telegram] FAIL:', e.message); process.exit(0); });
+main().catch((e) => { console.error('[telegram] FAIL:', e.message); process.exit(1); });

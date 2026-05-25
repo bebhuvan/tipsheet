@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS concalls_enriched (
   FOREIGN KEY (isin, event_time) REFERENCES concalls_raw(isin, event_time)
 );
 
--- Per-symbol fundamentals from Tijori Kite Screener. Refreshed daily (slow-moving data).
+-- Per-symbol fundamentals from Tijori Kite Screener. Refreshed on each fast news run.
 -- Authoritative sector taxonomy lives here.
 CREATE TABLE IF NOT EXISTS fundamentals (
   symbol           TEXT PRIMARY KEY,

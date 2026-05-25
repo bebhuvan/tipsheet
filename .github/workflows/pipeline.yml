@@ -2,26 +2,28 @@ name: Pipeline + Deploy
 
 on:
   schedule:
-    # Market hours: every 30 min, 09:15–15:30 IST = UTC 03:45–10:00, weekdays
-    - cron: '15,45 3,4,5,6,7,8,9 * * 1-5'
-    - cron: '0 10 * * 1-5'
-    # Post-market: 15:30–17:00 IST = UTC 10:00–11:30
-    - cron: '0,30 10,11 * * 1-5'
+    # Market hours: every ~30 min, 09:15–15:37 IST = UTC 03:45–10:07, weekdays
+    - cron: '45 3 * * 1-5'
+    - cron: '15,45 4,5,6,7,8,9 * * 1-5'
+    - cron: '7 10 * * 1-5'
+    # Post-market: 16:07–17:07 IST = UTC 10:37–11:37
+    - cron: '37 10 * * 1-5'
+    - cron: '7,37 11 * * 1-5'
     # Morning open briefing — 08:45 IST weekdays
     - cron: '15 3 * * 1-5'
     # Evening close briefing — 17:00 IST weekdays
     - cron: '30 11 * * 1-5'
     # Late-night catch — 22:00 IST weekdays
     - cron: '30 16 * * 1-5'
-    # Weekend full refresh — Sunday 11:30 IST
-    - cron: '0 6 * * 0'
-    # Weekend coverage — news ingest every ~2h Sat & Sun, 08:30–20:30 IST. Companies file on
+    # Weekend full refresh — Sunday 11:37 IST
+    - cron: '7 6 * * 0'
+    # Weekend coverage — news ingest every ~2h Sat & Sun, 08:47–20:47 IST. Companies file on
     # weekends (board-meeting outcomes), and RBI / regulatory circulars / concalls land then too;
     # the weekday cadence skips them, so this runs the same poll→enrich→briefings→deploy flow.
-    # (The Tijori SDK widget ingest stays gated to the 06:30 daily cron below.)
-    - cron: '0 3,5,7,9,11,13,15 * * 6,0'
-    # Daily Tijori ingest (Alerts + financial box) — 06:30 IST
-    - cron: '0 1 * * *'
+    # (The Tijori SDK widget ingest stays gated to the 06:47 daily cron below.)
+    - cron: '17 3,5,7,9,11,13,15 * * 6,0'
+    # Daily Tijori SDK ingest (Alerts + deep financial widgets) — 06:47 IST
+    - cron: '17 1 * * *'
   workflow_dispatch:
     inputs:
       skip_deploy:
@@ -32,9 +34,20 @@ on:
         description: 'Skip pipeline (rebuild site only)'
         type: boolean
         default: false
+      run_profile:
+        description: 'Pipeline scope for manual runs'
+        type: choice
+        options:
+          - full
+          - fast-news
+        default: full
 
 env:
   NODE_VERSION: '22'
+
+concurrency:
+  group: pipeline-deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   pipeline:
@@ -74,7 +87,15 @@ jobs:
       - name: Install pipeline deps
         run: cd pipeline && npm ci
 
-      # ─── Core pipeline steps ───────────────────────────────────────
+      # ─── Fast news lane: every scheduled run ───────────────────────
+      # Kite Screener fundamentals are a fast feed used directly by article
+      # metric strips, sidebars, company pages, sector pages, and briefings.
+      - name: Fetch fundamentals
+        run: cd pipeline && node --env-file=../.env.ci run.mjs fetch-fundamentals
+        env:
+          KITE_SCREENER_URL: ${{ secrets.KITE_SCREENER_URL }}
+        continue-on-error: true
+
       - name: Poll filings
         run: cd pipeline && node --env-file=../.env.ci run.mjs poll
         env:
@@ -87,23 +108,24 @@ jobs:
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
 
-      - name: Fetch fundamentals
-        run: cd pipeline && node --env-file=../.env.ci run.mjs fetch-fundamentals
-        env:
-          KITE_SCREENER_URL: ${{ secrets.KITE_SCREENER_URL }}
-
+      # ─── Daily/reference lane: slug discovery is slower and network-chatty ─
       - name: Resolve Tijori slugs
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '7 6 * * 0' }}
         run: cd pipeline && node --env-file=../.env.ci run.mjs resolve-tijori-slugs 50
         continue-on-error: true
 
+      # ─── Concall lane: post-market, late catch, weekend, manual full ─
       - name: Poll + enrich concalls
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '37 10 * * 1-5' || github.event.schedule == '7,37 11 * * 1-5' || github.event.schedule == '30 16 * * 1-5' || github.event.schedule == '7 6 * * 0' || github.event.schedule == '17 3,5,7,9,11,13,15 * * 6,0' }}
         run: cd pipeline && node --env-file=../.env.ci run.mjs concalls 50
         env:
           TIJORI_CONCALLS_API_KEY: ${{ secrets.TIJORI_CONCALLS_API_KEY }}
           TIJORI_CONCALLS_BASE_URL: ${{ secrets.TIJORI_CONCALLS_BASE_URL }}
         continue-on-error: true
 
+      # ─── Macro calendar lane: daily/weekend/manual full ────────────
       - name: Poll macro calendar
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '7 6 * * 0' }}
         run: cd pipeline && node --env-file=../.env.ci run.mjs poll-macro-calendar
         env:
           INDIA_DATAHUB_API_KEY: ${{ secrets.INDIA_DATAHUB_API_KEY }}
@@ -112,13 +134,14 @@ jobs:
 
       # ─── Regulatory circulars (NSE/BSE/SEBI) + RBI ingest ──────────
       # Read-only ingest into the shared DB (circulars_raw / rbi_raw). No secrets — public RSS.
-      # Both are idempotent (dedup), so polling on every run is harmless; enrichment→publish is
-      # a later wiring step. continue-on-error so a feed hiccup never blocks the deploy.
+      # Runs on daily, post-market/late/weekend, and manual full profiles.
       - name: Poll exchange circulars (NSE/BSE/SEBI)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '37 10 * * 1-5' || github.event.schedule == '7,37 11 * * 1-5' || github.event.schedule == '30 16 * * 1-5' || github.event.schedule == '7 6 * * 0' || github.event.schedule == '17 3,5,7,9,11,13,15 * * 6,0' }}
         run: cd pipeline && node circulars_poller.mjs
         continue-on-error: true
 
       - name: Poll RBI (RSS — idempotent)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '37 10 * * 1-5' || github.event.schedule == '7,37 11 * * 1-5' || github.event.schedule == '30 16 * * 1-5' || github.event.schedule == '7 6 * * 0' || github.event.schedule == '17 3,5,7,9,11,13,15 * * 6,0' }}
         run: cd pipeline && node rbi_poller.mjs
         continue-on-error: true
 
@@ -126,10 +149,12 @@ jobs:
       # RBI enricher below summarises them into /economy. pdfplumber is pure-pip (no apt);
       # skip-existing makes re-runs cheap (only fetches a new Bulletin's PDFs).
       - name: Setup Python (PDF extract)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '7 6 * * 0' }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Ingest RBI Bulletin articles (PDF → text)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '7 6 * * 0' }}
         run: |
           pip install --quiet pdfplumber
           cd pipeline && python3 pdf_extract.py bulletin --limit 4
@@ -138,6 +163,7 @@ jobs:
       # Enrich + persist the new sources into circulars_enriched / rbi_enriched (section-routed).
       # Held-for-review items are stored with validation_ok=0; the site shows only ok=1.
       - name: Enrich + persist circulars (Gemini)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '37 10 * * 1-5' || github.event.schedule == '7,37 11 * * 1-5' || github.event.schedule == '30 16 * * 1-5' || github.event.schedule == '7 6 * * 0' || github.event.schedule == '17 3,5,7,9,11,13,15 * * 6,0' }}
         run: cd pipeline && node --env-file=../.env.ci circulars_enricher.mjs run 30
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -145,9 +171,8 @@ jobs:
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
         continue-on-error: true
 
-      # RBI enrich uses DeepSeek — needs DEEPSEEK_API_KEY added as a repo secret.
-      # Until then this step no-ops gracefully (continue-on-error).
       - name: Enrich + persist RBI (DeepSeek)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '37 10 * * 1-5' || github.event.schedule == '7,37 11 * * 1-5' || github.event.schedule == '30 16 * * 1-5' || github.event.schedule == '7 6 * * 0' || github.event.schedule == '17 3,5,7,9,11,13,15 * * 6,0' }}
         run: cd pipeline && node --env-file=../.env.ci rbi_enricher.mjs run 30
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
@@ -156,6 +181,7 @@ jobs:
       # AlphaStreet concall transcripts → DeepSeek summaries (poll + enrich in one). Idempotent:
       # only new transcripts enrich, so frequent runs are cheap. Needs DEEPSEEK_API_KEY.
       - name: Concall notes from AlphaStreet (DeepSeek)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '37 10 * * 1-5' || github.event.schedule == '7,37 11 * * 1-5' || github.event.schedule == '30 16 * * 1-5' || github.event.schedule == '7 6 * * 0' || github.event.schedule == '17 3,5,7,9,11,13,15 * * 6,0' }}
         run: cd pipeline && node --env-file=../.env.ci alphastreet.mjs run 12
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
@@ -164,6 +190,7 @@ jobs:
       # Macro data-release engine: India Data Hub actuals (CPI/IIP/GST/trade/FX…) → /economy notes.
       # Idempotent (only new releases enrich). Needs IDH + DeepSeek keys.
       - name: Macro data-release notes (IDH → DeepSeek)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '30 16 * * 1-5' || github.event.schedule == '7 6 * * 0' }}
         run: cd pipeline && node --env-file=../.env.ci macro_release.mjs run 15
         env:
           INDIA_DATAHUB_API_KEY: ${{ secrets.INDIA_DATAHUB_API_KEY }}
@@ -174,27 +201,36 @@ jobs:
       # Index moves + per-stock weekly history for the briefing market strip and
       # event sparklines. Must run before briefing generation (snapshot freshness).
       - name: Setup Python (market data)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '15 3 * * 1-5' || github.event.schedule == '30 11 * * 1-5' }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Fetch market data (yfinance)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '15 3 * * 1-5' || github.event.schedule == '30 11 * * 1-5' }}
         run: |
           pip install --quiet yfinance
           cd pipeline && python3 market_yf.py --hours 36
         continue-on-error: true
 
-      - name: Generate briefings
-        run: |
-          cd pipeline
-          node --env-file=../.env.ci run.mjs briefing-close || true
-          node --env-file=../.env.ci run.mjs briefing-open  || true
+      - name: Generate The Open briefing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '15 3 * * 1-5' }}
+        run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-open
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+
+      - name: Generate The Close briefing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '30 11 * * 1-5' }}
+        run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-close
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
 
       - name: Generate radar
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' || github.event.schedule == '30 16 * * 1-5' || github.event.schedule == '7 6 * * 0' }}
         run: cd pipeline && node --env-file=../.env.ci run.mjs generate-radar
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -204,7 +240,7 @@ jobs:
 
       # ─── Tijori SDK ingest (once daily / manual): Alerts + financial box ───
       - name: Restore + persist Tijori widget cache
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 1 * * *' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' }}
         uses: actions/cache@v4
         with:
           path: data/tijori-cache
@@ -213,27 +249,29 @@ jobs:
             tijori-cache-
 
       - name: Set up Python (Tijori SDK)
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 1 * * *' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install Tijori SDK
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 1 * * *' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' }}
         run: pip install "git+https://x-access-token:${TIJORI_SDK_TOKEN}@github.com/bebhuvan/tijori-codex.git"
         env:
           TIJORI_SDK_TOKEN: ${{ secrets.TIJORI_SDK_TOKEN }}
         continue-on-error: true
 
       - name: Refresh Tijori market signals (Alerts)
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 1 * * *' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' }}
         run: |
           tijori-scraper market-ingest --data-dir data/tijori-market
           python pipeline/market_signals.py --data-dir data/tijori-market --db data/filings.db
+        env:
+          TIJORI_COOKIE: ${{ secrets.TIJORI_COOKIE }}
         continue-on-error: true
 
       - name: Refresh Tijori financial widgets to D1
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 1 * * *' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile == 'full' || github.event.schedule == '17 1 * * *' }}
         run: |
           python pipeline/tijori_widgets.py --db data/filings.db --data-dir data/tijori-cache
           node pipeline/sync-widgets-to-d1.mjs
@@ -325,11 +363,21 @@ jobs:
           workingDirectory: site
           command: deploy
 
+      - name: Install pipeline deps for Telegram notifier
+        if: success() && !inputs.skip_pipeline
+        run: cd pipeline && npm ci
+
       - name: Notify Telegram
         if: success() && !inputs.skip_pipeline
-        continue-on-error: true
         run: cd pipeline && node --env-file=../.env.ci notify_telegram.mjs
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SITE_URL: https://tipsheet.markets
+
+      - name: Save post-notification DB cache
+        uses: actions/cache/save@v4
+        if: always() && !inputs.skip_pipeline
+        with:
+          path: data/filings.db
+          key: filings-db-${{ github.run_number }}-post-notify
