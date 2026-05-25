@@ -269,7 +269,6 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
 
       <div class="dateline">
         <span><strong>{filing.symbol}</strong></span>
-        {filing.scripcode && <span>BSE {filing.scripcode}</span>}
         <span>{dateOf(filing.created_on)} · {timeOf(filing.created_on)}</span>
         {(sources.bse_announcements || sources.nse_announcements) && (
           <span class="source-links">

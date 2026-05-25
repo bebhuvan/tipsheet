@@ -33,7 +33,7 @@ export async function GET({ params }) {
     tier: tierFor(f.score),
     sector: f.sector || '',
     ticker: f.symbol || '',
-    exchange: f.scripcode ? `BSE ${f.scripcode}` : '',
+    exchange: '',
   }));
   try { fs.mkdirSync(OG_CACHE, { recursive: true }); fs.writeFileSync(cacheFile, png); } catch { /* cache is best-effort */ }
   return new Response(png, { headers: HEADERS });

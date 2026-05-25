@@ -91,7 +91,6 @@ const schema = {
 
           <div class="lead-meta">
             <span class="ticker">{lead.symbol}</span>
-            {lead.scripcode && <span>BSE {lead.scripcode}</span>}
             <span>{timeOf(lead.created_on)}</span>
             <a class="read inline" href={lead.canonical_url}>Read the filing</a>
           </div>
