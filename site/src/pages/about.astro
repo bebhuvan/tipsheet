@@ -4,54 +4,70 @@ import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 ---
 <Base
-  title="About Tipsheet — why it exists, and who built it"
-  description="Why Tipsheet exists, who's behind it, and how the most important filings from India's listed companies become short, readable news. Made by Bhuvan."
+  title="About Tipsheet"
+  description="Tipsheet turns important Indian exchange filings into short, source-linked notes for readers who follow listed companies."
 >
   <Masthead />
   <main>
     <article class="prose-page">
       <header>
         <div class="kicker"><span>About</span></div>
-        <h1 class="page-title">Why I built this.</h1>
+        <h1 class="page-title">Important filings, without the noise.</h1>
       </header>
 
       <hr class="rule" />
 
       <p>
-        I'll start with the part that bothers me. Financial news in India is, for the most part, bad. Not bad in the ordinary way most things are slightly bad — bad in a way that's almost a feat. Routine, formulaic stories that should take an afternoon to get right come out padded, garbled, or simply wrong. After enough years of reading it, you stop being irritated and start being a little impressed. It begins to look like performance art.
+        Tipsheet is a small publication for people who follow Indian listed companies.
+        It watches exchange filings, earnings-call material, regulatory releases, and
+        market data, then turns the important items into short notes you can read fast.
       </p>
       <p>
-        I care about this more than is probably healthy. I love old-fashioned journalism — the patient, unglamorous kind — and I think good reporting does something real for the place it covers. So watching it done badly, again and again, has always nagged at me. I wanted to be a journalist once. Better sense prevailed.
-      </p>
-      <p>
-        Instead I've spent years tinkering with small ways to put better information in front of people. <a href="https://smallweb.blog/" target="_blank" rel="noopener">smallweb.blog</a>, my most recent site. <a href="https://www.rabbitholes.garden/" target="_blank" rel="noopener">rabbitholes.garden</a>, where I keep a link blog of things worth your time. A few other things still half-finished. It's the same itch every time.
-      </p>
-      <p>
-        I work in finance, so financial journalism is the corner of all this that depresses me most, and the urge to do something about it never quite went away. So I started small, and specific.
-      </p>
-      <p>
-        Some very good colleagues of mine have been living inside AI for a while, and they built a pipeline that reads every exchange filing from Indian companies and surfaces the handful that genuinely matter. They handed me the feed. I did the obvious thing with it: pointed another language model at each important filing and had it write the thing up properly — short, plain, readable. That's the whole origin of Tipsheet.
-      </p>
-      <p>
-        So here's what you get. Short pieces on the most consequential news from India's listed companies. Not all of it — I'm not republishing every filing from every company. Only the ones that clear a real bar for importance make it here. Think of them as alerts worth your attention.
-      </p>
-      <p>
-        If you'll allow me a moment of arrogance: I think these are already better than what most of the field puts out. And in the same honest breath — they're still just alerts. I have bigger plans for where this goes. This is simply where it starts.
+        The point is simple: a reader should know what happened, why it matters, and
+        where the original source is. No padded rewrite. No mystery sourcing. No stock
+        tips dressed up as news.
       </p>
 
-      <h2>A few things this isn't</h2>
+      <h2>Why it exists</h2>
+      <p>
+        Indian companies file a lot of useful information. Most of it is routine. Some
+        of it is material: a large order, a weak result, a pledge release, a rating
+        action, a regulatory hit, a management contradiction, a capital raise, a related
+        party transaction.
+      </p>
+      <p>
+        Those items often get missed, arrive late, or get buried under generic market
+        copy. Tipsheet is built to catch them early and write them plainly.
+      </p>
+
+      <h2>How it works</h2>
+      <p>
+        The site uses software to monitor primary sources and rank what looks important.
+        Language models help draft the first version of each note. The system is built
+        around source links, validation rules, and a bias toward short copy.
+      </p>
+      <p>
+        That does not make it magic. It makes it a workflow. The standard is whether the
+        note is accurate, useful, and traceable to the source. The full mechanics are on
+        the <a href="/methodology/">methodology</a> page.
+      </p>
+
+      <h2>What this is not</h2>
       <ul>
-        <li>It won't tell you what to buy or sell. No tips, no targets, no "calls."</li>
-        <li>It carries no ads, no sponsorships, no advertorials.</li>
-        <li>It doesn't rewrite anyone else's reporting. Every story comes from the company's own filing, and links back to it so you can check me.</li>
+        <li>It is not investment advice.</li>
+        <li>It does not tell you what to buy or sell.</li>
+        <li>It does not run ads, paid placements, or sponsored stories.</li>
+        <li>It does not rewrite other publications. Notes are based on primary sources.</li>
       </ul>
-      <p>
-        If you want the mechanics — what gets published, where the facts come from, and how the AI is kept honest — it's all in the <a href="/methodology/">methodology</a>.
-      </p>
 
-      <h2 id="founder">Who's behind it</h2>
+      <h2>What to expect</h2>
       <p>
-        Just me — Bhuvan. I built it, I run it, and I'll answer for it. You can find me on my <a href="https://bebhuvan.com/" target="_blank" rel="noopener">personal site</a>, <a href="https://bhuvan.substack.com/" target="_blank" rel="noopener">Substack</a>, <a href="https://twitter.com/bebhuvan" target="_blank" rel="noopener">Twitter</a>, and <a href="https://www.linkedin.com/in/bebhuvan/" target="_blank" rel="noopener">LinkedIn</a>.
+        Most pieces are brief because most filings only deserve a brief. When the source
+        is thin, the note should be thin too. If there is no clear point, it should not
+        be published.
+      </p>
+      <p>
+        The ambition is not to be loud. It is to be early, specific, and easy to check.
       </p>
 
       <h2>Start reading</h2>
@@ -61,9 +77,19 @@ import SiteFooter from '../components/SiteFooter.astro';
         <li><a href="/markets/">Markets</a> — a live read on Indian indices and the macro backdrop.</li>
       </ul>
 
+      <h2 id="team">Who's behind it</h2>
+      <p>
+        Tipsheet is built and run by Bhuvan. You can find me on my
+        <a href="https://bebhuvan.com/" target="_blank" rel="noopener">personal site</a>,
+        <a href="https://bhuvan.substack.com/" target="_blank" rel="noopener">Substack</a>,
+        <a href="https://twitter.com/bebhuvan" target="_blank" rel="noopener">Twitter</a>,
+        and <a href="https://www.linkedin.com/in/bebhuvan/" target="_blank" rel="noopener">LinkedIn</a>.
+      </p>
+
       <h2>Get in touch</h2>
       <p>
-        Questions, tips, or something I got wrong? The <a href="/contact/">contact</a> page is the place. I take mistakes seriously — there's an <a href="/editorial-standards/">editorial standards</a> page and a <a href="/corrections/">corrections policy</a> to hold me to.
+        Questions, tips, or something wrong? Use the <a href="/contact/">contact</a>
+        page. The standards are public, and so is the <a href="/corrections/">corrections policy</a>.
       </p>
     </article>
   </main>
