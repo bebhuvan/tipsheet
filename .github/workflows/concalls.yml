@@ -22,6 +22,9 @@ on:
 env:
   NODE_VERSION: '22'
 
+permissions:
+  contents: write
+
 concurrency:
   group: tipsheet-db-${{ github.ref }}
   cancel-in-progress: false
@@ -37,21 +40,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Restore DB cache
-        uses: actions/cache/restore@v4
-        id: db-cache
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
-          restore-keys: |
-            filings-db-
-
-      - name: Download seed DB from release
-        if: steps.db-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p data
-          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
-          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+      - name: Restore latest DB
+        run: bash .github/scripts/restore-db.sh
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -82,12 +72,12 @@ jobs:
       - name: Show stats
         run: cd pipeline && node --env-file=../.env.ci run.mjs stats
 
-      - name: Save DB cache
-        uses: actions/cache/save@v4
+      - name: Publish latest DB
         if: always()
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
+        run: bash .github/scripts/publish-db.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
 
       - name: Restore + persist OG image cache
         if: ${{ !inputs.skip_deploy }}

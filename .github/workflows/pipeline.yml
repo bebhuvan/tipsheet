@@ -31,6 +31,9 @@ on:
 env:
   NODE_VERSION: '22'
 
+permissions:
+  contents: write
+
 concurrency:
   group: tipsheet-db-${{ github.ref }}
   cancel-in-progress: false
@@ -47,21 +50,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Restore DB cache
-        uses: actions/cache/restore@v4
-        id: db-cache
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
-          restore-keys: |
-            filings-db-
-
-      - name: Download seed DB from release
-        if: steps.db-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p data
-          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
-          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+      - name: Restore latest DB
+        run: bash .github/scripts/restore-db.sh
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -94,19 +84,19 @@ jobs:
       - name: Show stats
         run: cd pipeline && node --env-file=../.env.ci run.mjs stats
 
-      - name: Save DB cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
-
       - name: Upload DB artifact
         uses: actions/upload-artifact@v4
         with:
           name: filings-db
           path: data/filings.db
           retention-days: 7
+
+      - name: Publish latest DB
+        if: always()
+        run: bash .github/scripts/publish-db.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
 
   build-deploy:
     needs: pipeline
@@ -127,22 +117,9 @@ jobs:
           name: filings-db
           path: data/
 
-      - name: Restore DB from cache
+      - name: Restore latest DB
         if: ${{ inputs.skip_pipeline }}
-        uses: actions/cache/restore@v4
-        id: build-cache
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
-          restore-keys: |
-            filings-db-
-
-      - name: Download seed DB from release
-        if: ${{ inputs.skip_pipeline && steps.build-cache.outputs.cache-hit != 'true' }}
-        run: |
-          mkdir -p data
-          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
-          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+        run: bash .github/scripts/restore-db.sh
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -182,9 +159,9 @@ jobs:
           TELEGRAM_SCOPE: all
           SITE_URL: https://tipsheet.markets
 
-      - name: Save post-notification DB cache
-        uses: actions/cache/save@v4
+      - name: Publish post-notification DB
         if: always() && !inputs.skip_pipeline
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}-post-notify
+        run: bash .github/scripts/publish-db.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}

@@ -3,7 +3,7 @@ name: Backfill FAQs (one-off)
 # Manual-only. Regenerates ONLY the faqs column on existing articles (4–6 sharper
 # Q&As via the enrichment model), then rebuilds + deploys. Never touches the
 # headline / dek / body / slug, so published URLs and analysis are unchanged.
-# Operates on the canonical CI database (the rolling filings-db-* cache).
+# Operates on the canonical CI database published as the filings-db-latest release asset.
 on:
   workflow_dispatch:
     inputs:
@@ -14,6 +14,9 @@ on:
 
 env:
   NODE_VERSION: '22'
+
+permissions:
+  contents: write
 
 jobs:
   backfill:
@@ -26,22 +29,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Pull the live DB (most recent pipeline cache; release seed on miss).
-      - name: Restore DB cache
-        uses: actions/cache/restore@v4
-        id: db-cache
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
-          restore-keys: |
-            filings-db-
-
-      - name: Download seed DB from release (cache miss)
-        if: steps.db-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p data
-          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
-          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+      - name: Restore latest DB
+        run: bash .github/scripts/restore-db.sh
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -58,12 +47,12 @@ jobs:
         run: cd pipeline && node --env-file=../.env.ci backfill_faqs.mjs --limit "$LIMIT" --concurrency 5
 
       # Persist the backfilled DB so future pipeline runs build from it.
-      - name: Save DB cache
-        uses: actions/cache/save@v4
+      - name: Publish latest DB
         if: always()
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
+        run: bash .github/scripts/publish-db.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
 
       # Headlines are unchanged, so the OG cache fully hits (no re-render).
       - name: Restore + persist OG image cache

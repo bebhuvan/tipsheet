@@ -20,9 +20,16 @@ on:
         description: 'Skip Cloudflare Workers deploy'
         type: boolean
         default: false
+      date:
+        description: 'Briefing date in IST, YYYY-MM-DD. Leave blank for today.'
+        type: string
+        default: ''
 
 env:
   NODE_VERSION: '22'
+
+permissions:
+  contents: write
 
 concurrency:
   group: tipsheet-db-${{ github.ref }}
@@ -39,21 +46,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Restore DB cache
-        uses: actions/cache/restore@v4
-        id: db-cache
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
-          restore-keys: |
-            filings-db-
-
-      - name: Download seed DB from release
-        if: steps.db-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p data
-          gh release download --pattern 'filings.db.gz' -R "$REPO" || true
-          if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
+      - name: Restore latest DB
+        run: bash .github/scripts/restore-db.sh
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -80,29 +74,31 @@ jobs:
 
       - name: Generate The Open briefing
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.briefing == 'all' || inputs.briefing == 'open') || github.event.schedule == '15 3 * * 1-5' }}
-        run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-open
+        run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-open "$BRIEFING_DATE"
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          BRIEFING_DATE: ${{ github.event.inputs.date || '' }}
 
       - name: Generate The Close briefing
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.briefing == 'all' || inputs.briefing == 'close') || github.event.schedule == '30 11 * * 1-5' }}
-        run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-close
+        run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-close "$BRIEFING_DATE"
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          BRIEFING_DATE: ${{ github.event.inputs.date || '' }}
 
       - name: Show stats
         run: cd pipeline && node --env-file=../.env.ci run.mjs stats
 
-      - name: Save DB cache
-        uses: actions/cache/save@v4
+      - name: Publish latest DB
         if: always()
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}
+        run: bash .github/scripts/publish-db.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
 
       - name: Restore + persist OG image cache
         if: ${{ !inputs.skip_deploy }}
@@ -139,9 +135,9 @@ jobs:
           TELEGRAM_SCOPE: briefings
           SITE_URL: https://tipsheet.markets
 
-      - name: Save post-notification DB cache
-        uses: actions/cache/save@v4
+      - name: Publish post-notification DB
         if: always()
-        with:
-          path: data/filings.db
-          key: filings-db-${{ github.run_id }}-post-notify
+        run: bash .github/scripts/publish-db.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}

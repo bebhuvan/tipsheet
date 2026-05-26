@@ -441,8 +441,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     else if (cmd === 'enrich-concalls')       { await enrichConcallsBatch(n || 50); }
     else if (cmd === 'concalls')              { await pollConcalls(n || 100); await enrichConcallsBatch(n || 50); }
     else if (cmd === 'poll-macro-calendar')   { await pollMacroCalendar(); }
-    else if (cmd === 'briefing-open')         { await generateBriefing('open'); }
-    else if (cmd === 'briefing-close')        { await generateBriefing('close'); }
+    else if (cmd === 'briefing-open')         { await generateBriefing('open', process.argv[3] || null); }
+    else if (cmd === 'briefing-close')        { await generateBriefing('close', process.argv[3] || null); }
     else if (cmd === 'stats')                 { showStats(); }
     else {
       console.error(`Unknown command: ${cmd}`);

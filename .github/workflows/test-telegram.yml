@@ -9,22 +9,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Restore DB from cache
-        uses: actions/cache/restore@v4
-        with:
-          path: data/filings.db
-          key: filings-db-
-          restore-keys: |
-            filings-db-
-      - name: Get seed DB if cache missed
-        run: |
-          mkdir -p data
-          if [ ! -f data/filings.db ]; then
-            gh release download --pattern 'filings.db.gz' -R ${{ github.repository }} || true
-            if [ -f filings.db.gz ]; then gunzip -f filings.db.gz && mv -f filings.db data/filings.db; fi
-          fi
+      - name: Restore latest DB
+        run: bash .github/scripts/restore-db.sh
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
       - name: Install pipeline deps
         run: cd pipeline && npm ci
       - name: Send one test message
