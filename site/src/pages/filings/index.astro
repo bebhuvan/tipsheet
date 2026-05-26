@@ -2,11 +2,11 @@
 import Base from '../../layouts/Base.astro';
 import Masthead from '../../components/Masthead.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
-import { listFilings, filingEyebrow } from '../../lib/queries.mjs';
+import { listFilings, filingEyebrow, MARKET_CAP_TIERS } from '../../lib/queries.mjs';
 
 // Page 1 — redirects pagination users to /filings/page/2/, /page/3/, etc.
 const PER_PAGE = 25;
-const all = listFilings({ limit: 10000 });
+const all = listFilings({ limit: 50000 });
 const totalPages = Math.max(1, Math.ceil(all.length / PER_PAGE));
 const items = all.slice(0, PER_PAGE);
 
@@ -39,6 +39,14 @@ const categories = ['Earnings','Concalls','Order Wins','M&A','Credit','Regulator
         <a href="/filings/" class="active">All</a>
         {categories.map(c => (
           <a href={`/filings/category/${c.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}/`}>{c}</a>
+        ))}
+      </div>
+
+      <div class="archive-filters compact">
+        <span class="label">Filter by size:</span>
+        <a href="/filings/" class="active">All caps</a>
+        {MARKET_CAP_TIERS.map(t => (
+          <a href={`/filings/market-cap/${t.slug}/`}>{t.label}</a>
         ))}
       </div>
 

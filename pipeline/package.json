@@ -19,6 +19,7 @@
     "macro": "node --env-file=../.env run.mjs poll-macro-calendar",
     "briefing:open": "node --env-file=../.env run.mjs briefing-open",
     "briefing:close": "node --env-file=../.env run.mjs briefing-close",
+    "telegram": "node --env-file=../.env notify_telegram.mjs",
     "stats": "node --env-file=../.env run.mjs stats",
     "loop": "node --env-file=../.env loop.mjs"
   },

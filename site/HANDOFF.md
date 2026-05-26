@@ -19,8 +19,8 @@ The publication was rebranded **Filings → Stories → Tipsheet**. Tier names r
 | `ARTICLE_TYPE` / plural | *Story* / *Stories* (kept deliberately distinct from brand) |
 | `EDITORIAL_BYLINE` | *Tipsheet Editorial* |
 | Editorial tiers | **Alert** (score ≥ 9) / **Lead** (7–8) / **Brief** (5–6) |
-| Numeric scores | **Never displayed** — tier names only, banded by colour |
-| Site (placeholder) | `https://stories.example` — **needs replacement before deploy** (see `astro.config.mjs`) |
+| Numeric scores | Shown on archive rows; tier names are used on article/search surfaces |
+| Site | `https://tipsheet.markets` (see `astro.config.mjs`) |
 
 All brand text flows from `src/lib/brand.mjs`. Tier mapping is in `src/lib/queries.mjs` (`tierFor`) and mirrored client-side in `src/pages/index.astro` (`tierLabel`) and `src/pages/search.astro` (`tierName`).
 
@@ -60,7 +60,7 @@ site/
 │       ├── index.astro            # home: hero (lead + companions + rail) → midtier → briefs → wire
 │       ├── [id].astro             # filing/story page; gutter (tier + fund-block + timeline) + body
 │       ├── search.astro           # client-side filter against /search-index.json
-│       ├── search-index.json.js   # flat index of filings + companies + sectors
+│       ├── search-index.json.js   # flat index of filings + companies + sectors + cap labels
 │       ├── og/[id].png.js         # per-article 1200×630 PNG
 │       ├── og/brand.png.js        # fallback brand OG
 │       ├── apple-touch-icon.png.js, icon-192.png.js, icon-512.png.js
@@ -200,7 +200,7 @@ SiteFooter
 ## Search
 
 - `/search/` page with client-side filter (DOM-safe, no innerHTML)
-- `/search-index.json` — 280 KB raw, ~50 KB gzipped (filings + companies + sectors)
+- `/search-index.json` — filings + companies + sectors, with market-cap labels in the searchable haystack
 - Masthead utility cluster: "Search ⌘K" link
 - Global `⌘K`/`Ctrl+K` shortcut in `Base.astro` — navigates to `/search/` from anywhere (ignored inside inputs and on the search page itself)
 - Index trimmed: `d` (dek) used only for matching (in `q`); `ti` (tier name) computed client-side from `sc`
@@ -215,7 +215,7 @@ npm install
 npm run build       # ~2 min — generates 949 HTML pages + 492 OG PNGs + 3 icon PNGs
 ```
 
-Output: `dist/` (22 MB total — mostly HTML, ~52 KB main CSS, ~280 KB search index, ~20 MB OG PNGs)
+Output: `dist/` (size depends on article count; mostly HTML, CSS, search index, and generated OG PNGs)
 
 Static preview (the previous session ran one on port 8765):
 ```bash
@@ -223,7 +223,7 @@ python3 -m http.server 8765 --directory dist
 ```
 
 ### Before deploy
-1. **Replace the placeholder domain** in `astro.config.mjs` (currently `https://stories.example`). All canonical URLs, sitemaps, schemas, og URLs derive from it. Suggested: `https://tipsheet.in`.
+1. Confirm `astro.config.mjs` has the production domain. All canonical URLs, sitemaps, schemas, og URLs derive from it.
 2. Set `Cache-Control: public, max-age=31536000, immutable` at the edge for `/fonts/*.woff2`, `/og/*.png`, `/favicon.svg`, `/icon-*.png`, `/apple-touch-icon.png`.
 3. Set short cache (or no-cache) for HTML.
 4. Submit `/sitemap-news.xml` to Google Search Console under News.
@@ -234,7 +234,7 @@ python3 -m http.server 8765 --directory dist
 ## What's pending / known issues
 
 ### Domain & deploy hygiene
-- **`astro.config.mjs` site URL is still `https://stories.example`** — must be replaced before deploy. RSS feed canonicals, sitemap loc URLs, OG image URLs, and schema URLs all derive from this.
+- **Market-data source is still the biggest production hygiene item.** Do not treat the temporary yfinance-backed market strip as licensed production market data.
 - The `Editorial byline slug` URL is still `/authors/filings-editorial/` (intentional — URL kept for SEO continuity through the rebrand). The displayed byline is "Tipsheet Editorial." If you ever change the slug, add a 301 redirect.
 - Site nav label says "Latest" but the URL is `/filings/`. SEO durable, label tells the reader what it is. Fine.
 
@@ -248,7 +248,7 @@ python3 -m http.server 8765 --directory dist
 
 ### Performance
 - **Markets page is 200 KB** (132 inline SVG sparklines). Could lazy-render below-the-fold with IntersectionObserver. Not on the critical path — most arriving traffic lands on article pages.
-- **Search index is 280 KB raw / ~50 KB gzipped.** Acceptable for `/search/` only. Could be split by type and lazy-loaded if pressure ever arises.
+- **Search index grows with article count.** It is acceptable for `/search/` only. Split by month/type or move to D1 FTS if payload size becomes painful.
 - **Build time is ~2 min** because of 492 OG PNG renders. Acceptable for daily rebuild. Could parallelize the resvg renders if it becomes a problem.
 
 ### Design / dust

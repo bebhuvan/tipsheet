@@ -91,6 +91,30 @@ export function marketCapLabel(marketCap) {
   return 'Micro cap';
 }
 
+export const MARKET_CAP_TIERS = [
+  { slug: 'mega-cap', label: 'Mega cap', min: 100000, max: null, dek: 'India’s largest listed companies by market value.' },
+  { slug: 'large-cap', label: 'Large cap', min: 20000, max: 100000, dek: 'Large listed companies below the mega-cap tier.' },
+  { slug: 'mid-cap', label: 'Mid cap', min: 5000, max: 20000, dek: 'Mid-sized listed companies where liquidity and governance vary more widely.' },
+  { slug: 'small-cap', label: 'Small cap', min: 1000, max: 5000, dek: 'Smaller listed companies where filings can be more company-specific and less broadly relevant.' },
+  { slug: 'micro-cap', label: 'Micro cap', min: 0, max: 1000, dek: 'The smallest listed companies in the coverage universe.' },
+];
+
+export function marketCapTierBySlug(slug) {
+  return MARKET_CAP_TIERS.find(t => t.slug === slug) || null;
+}
+
+function marketCapClauseForTier(tier) {
+  if (!tier) return null;
+  const lowerOp = tier.min === 0 ? '>' : '>=';
+  const clauses = ['f.market_cap IS NOT NULL', `f.market_cap ${lowerOp} ?`];
+  const params = [tier.min];
+  if (tier.max != null) {
+    clauses.push('f.market_cap < ?');
+    params.push(tier.max);
+  }
+  return { sql: `r.symbol IN (SELECT f.symbol FROM fundamentals f WHERE ${clauses.join(' AND ')})`, params };
+}
+
 export function filingEyebrow(filing, { category = true, sector = true, cap = true } = {}) {
   if (!filing) return '';
   const parts = [];
@@ -161,10 +185,16 @@ const ALL_COLS = `
 `;
 
 /** All publishable filings ordered newest first, optionally filtered. */
-export function listFilings({ limit = 100, scoreMin = 5, category = null } = {}) {
+export function listFilings({ limit = 100, scoreMin = 5, category = null, marketCap = null } = {}) {
   const where = ['r.score >= ?', 'e.validation_ok = 1'];
   const params = [scoreMin];
   if (category) { where.push('e.canonical_category = ?'); params.push(category); }
+  const tier = typeof marketCap === 'string' ? marketCapTierBySlug(marketCap) : marketCap;
+  const capClause = marketCapClauseForTier(tier);
+  if (capClause) {
+    where.push(capClause.sql);
+    params.push(...capClause.params);
+  }
   const sql = `
     SELECT ${ALL_COLS}
     FROM filings_raw r

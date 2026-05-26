@@ -8,6 +8,7 @@
 // Optional:
 //   SITE_URL             defaults to https://tipsheet.markets
 //   NOTIFY_SCORE_MIN     minimum score to push (default 5)
+//   TELEGRAM_DELIVERY_MODE digest | individual (default digest)
 import { openDb } from './db.mjs';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -16,6 +17,16 @@ const SITE = (process.env.SITE_URL || 'https://tipsheet.markets').replace(/\/+$/
 const SCORE_MIN = Number(process.env.NOTIFY_SCORE_MIN || 5);
 const MAX_PER_RUN = 15;
 const BACKLOG_KEEP_LATEST = 20;
+const DELIVERY_MODE = (process.env.TELEGRAM_DELIVERY_MODE || 'digest').toLowerCase();
+
+const DEFAULT_LLM_BASE = process.env.DEEPSEEK_API_KEY
+  ? 'https://api.deepseek.com'
+  : 'https://generativelanguage.googleapis.com/v1beta/openai';
+const LLM = {
+  baseUrl: process.env.TELEGRAM_LLM_BASE_URL || process.env.LLM_BASE_URL || DEFAULT_LLM_BASE,
+  apiKey: process.env.TELEGRAM_LLM_API_KEY || process.env.LLM_API_KEY || process.env.GOOGLE_API_KEY || process.env.DEEPSEEK_API_KEY,
+  model: process.env.TELEGRAM_LLM_MODEL || process.env.LLM_MODEL || (process.env.DEEPSEEK_API_KEY ? 'deepseek-v4-flash' : 'gemini-3.1-flash-lite'),
+};
 
 if (!TOKEN || !CHAT) {
   console.log('[telegram] TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set — skipping');
@@ -29,6 +40,7 @@ function buildSlug(symbol, headline, recordId) {
 }
 const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const tierFor = (s) => (s >= 9 ? '🔴 Alert' : s >= 7 ? '🟠 Lead' : '⚪️ Brief');
+const plainTierFor = (s) => (s >= 9 ? 'Alert' : s >= 7 ? 'Lead' : 'Brief');
 
 async function send(html) {
   const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
@@ -85,6 +97,107 @@ function buildBriefingMessage(b, events) {
   }
   msg += `\n<a href="${escapeHtml(url)}">Read the full digest →</a>`;
   return msg;
+}
+
+function articleUrl(r) {
+  return `${SITE}/${buildSlug(r.symbol, r.headline, r.record_id)}/`;
+}
+
+function buildFallbackDigest(rows) {
+  const alerts = rows.filter(r => r.score >= 9).length;
+  const leads = rows.filter(r => r.score >= 7 && r.score < 9).length;
+  let msg = `🧾 <b>Tipsheet digest</b> · ${rows.length} new ${rows.length === 1 ? 'note' : 'notes'}\n`;
+  msg += `${alerts} alerts · ${leads} leads · score ≥ ${SCORE_MIN}\n\n`;
+  for (const r of rows.slice(0, 8)) {
+    const cat = r.canonical_category && r.canonical_category !== 'Other' ? ` · ${escapeHtml(r.canonical_category)}` : '';
+    msg += `${tierFor(r.score)} · <b>${escapeHtml(r.symbol)}</b>${cat}\n`;
+    msg += `${escapeHtml(r.headline)}\n`;
+    if (r.dek) msg += `<i>${escapeHtml(r.dek)}</i>\n`;
+    msg += `<a href="${escapeHtml(articleUrl(r))}">Read →</a>\n\n`;
+  }
+  if (rows.length > 8) msg += `…and ${rows.length - 8} more on Tipsheet.\n\n`;
+  msg += `<a href="${SITE}/filings/">Open the full archive →</a>`;
+  return msg.slice(0, 3900);
+}
+
+async function buildAiDigest(rows) {
+  if (!LLM.apiKey) return null;
+  const compact = rows.slice(0, MAX_PER_RUN).map(r => ({
+    symbol: r.symbol,
+    company: r.company,
+    score: r.score,
+    tier: plainTierFor(r.score),
+    category: r.canonical_category,
+    headline: r.headline,
+    dek: r.dek,
+    number: r.the_number_value ? `${r.the_number_value} ${r.the_number_label || ''}`.trim() : null,
+    url: articleUrl(r),
+  }));
+
+  const messages = [
+    {
+      role: 'system',
+      content: [
+        'You write one concise Telegram digest for Tipsheet, an Indian-equities filings publication.',
+        'Goal: reduce alert spam while making the refresh period actionable.',
+        'Write in plain, direct English. No hype. No invented facts. Do not mention market reaction unless source says it.',
+        'Return JSON only: {"headline":"string","take":"string","items":[{"symbol":"string","line":"string","url":"string"}]}',
+        'headline <= 70 chars. take <= 180 chars. items 4-8, ordered by reader importance. line <= 150 chars.',
+      ].join(' '),
+    },
+    {
+      role: 'user',
+      content: `New filings since the last refresh:\n${JSON.stringify(compact)}`,
+    },
+  ];
+
+  try {
+    const r = await fetch(`${LLM.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${LLM.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: LLM.model,
+        messages,
+        response_format: { type: 'json_object' },
+        temperature: 0.6,
+        max_tokens: 900,
+      }),
+    });
+    if (!r.ok) return null;
+    const body = await r.json();
+    const content = body.choices?.[0]?.message?.content || '';
+    const start = content.indexOf('{');
+    const end = content.lastIndexOf('}');
+    if (start === -1 || end <= start) return null;
+    const parsed = JSON.parse(content.slice(start, end + 1));
+    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    if (!items.length) return null;
+
+    let msg = `🧾 <b>${escapeHtml(parsed.headline || 'Tipsheet digest')}</b>\n`;
+    if (parsed.take) msg += `${escapeHtml(parsed.take)}\n`;
+    msg += `\n`;
+    for (const item of items.slice(0, 8)) {
+      const row = rows.find(r => r.symbol === item.symbol) || null;
+      const url = item.url || (row ? articleUrl(row) : `${SITE}/filings/`);
+      msg += `• <b>${escapeHtml(item.symbol || row?.symbol || '')}</b> — ${escapeHtml(item.line || row?.headline || '')}\n`;
+      msg += `<a href="${escapeHtml(url)}">Read →</a>\n`;
+    }
+    msg += `\n<a href="${SITE}/filings/">All new notes →</a>`;
+    return msg.slice(0, 3900);
+  } catch {
+    return null;
+  }
+}
+
+async function notifyArticleDigest(db, rows, TEST) {
+  const text = await buildAiDigest(rows) || buildFallbackDigest(rows);
+  await send(TEST ? `🧪 <i>Test digest</i>\n\n${text}` : text);
+  if (!TEST) {
+    const mark = db.prepare('UPDATE filings_enriched SET notified_at = ? WHERE record_id = ?');
+    const now = Date.now();
+    for (const r of rows) mark.run(now, r.record_id);
+  }
+  console.log(`[telegram] digest sent for ${rows.length} article(s)${LLM.apiKey ? ' (AI attempted)' : ' (fallback)'}`);
 }
 
 // Push newly-published briefings (The Open / The Close). Idempotent via
@@ -196,6 +309,14 @@ async function main() {
       `).all(SCORE_MIN, MAX_PER_RUN);
 
   if (!rows.length) { console.log('[telegram] nothing new to notify'); return; }
+
+  if (DELIVERY_MODE === 'digest') {
+    await notifyArticleDigest(db, rows, TEST);
+    return;
+  }
+  if (DELIVERY_MODE !== 'individual') {
+    throw new Error(`Invalid TELEGRAM_DELIVERY_MODE "${DELIVERY_MODE}". Use digest or individual.`);
+  }
 
   const mark = db.prepare('UPDATE filings_enriched SET notified_at = ? WHERE record_id = ?');
   let sent = 0;

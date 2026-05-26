@@ -27,6 +27,8 @@ export function openDb(path = process.env.DB_PATH || DEFAULT_DB) {
   migrateAddColumn(_db, 'filings_enriched', 'tone_score', 'INTEGER');
   migrateAddColumn(_db, 'filings_enriched', 'tone_confidence', 'TEXT');
   migrateAddColumn(_db, 'filings_enriched', 'tone_reason', 'TEXT');
+  migrateAddColumn(_db, 'filings_enriched', 'notified_at', 'INTEGER');
+  migrateAddColumn(_db, 'briefings', 'notified_at', 'INTEGER');
   migrateAddColumn(_db, 'fundamentals', 'tijori_slug', 'TEXT');
   return _db;
 }

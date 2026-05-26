@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes, filingEyebrow } from '../lib/queries.mjs';
+import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes, filingEyebrow, MARKET_CAP_TIERS } from '../lib/queries.mjs';
 import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
 
 const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalToday, totalPublished, hiScore, hiScoreToday } = getHomepageBundle();
@@ -282,7 +282,15 @@ const schema = {
     <section class="wire-section">
       <div class="wire-head">
         <h2><em>The Wire</em></h2>
-        <span class="meta">{wireSummary}</span>
+        <div class="wire-tools">
+          <span class="meta">{wireSummary}</span>
+          <nav class="cap-browse" aria-label="Browse filings by market cap">
+            <span>By size</span>
+            {MARKET_CAP_TIERS.filter(t => t.slug !== 'mega-cap').map(t => (
+              <a href={`/filings/market-cap/${t.slug}/`}>{t.label.replace(' cap', '')}</a>
+            ))}
+          </nav>
+        </div>
       </div>
       <div class="wire-list">
         {wire.map(f => (
@@ -298,7 +306,9 @@ const schema = {
           </a>
         ))}
       </div>
-      <div class="wire-more"><a href="/filings/">See all filings →</a></div>
+      <div class="wire-more">
+        <a href="/filings/">See all filings →</a>
+      </div>
     </section>
   </main>
 

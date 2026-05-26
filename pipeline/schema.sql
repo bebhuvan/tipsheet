@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS filings_enriched (
   model_used             TEXT,
   prompt_version         TEXT,
   enriched_at            INTEGER NOT NULL,
+  notified_at            INTEGER,
   validation_ok          INTEGER NOT NULL,
   validation_issues      TEXT,
   FOREIGN KEY (record_id) REFERENCES filings_raw(record_id)
@@ -105,6 +106,7 @@ CREATE TABLE IF NOT EXISTS briefings (
   sections        TEXT,                         -- JSON array of { label, body, items }
   input_summary   TEXT,                         -- JSON snapshot of what was fed to the LLM (audit trail)
   generated_at    INTEGER NOT NULL,
+  notified_at      INTEGER,
   model_used      TEXT,
   prompt_version  TEXT,
   validation_ok   INTEGER NOT NULL,
