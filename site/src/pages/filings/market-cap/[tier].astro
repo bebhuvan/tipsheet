@@ -1,0 +1,81 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Masthead from '../../../components/Masthead.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { listFilings, filingEyebrow, MARKET_CAP_TIERS, marketCapTierBySlug } from '../../../lib/queries.mjs';
+
+export async function getStaticPaths() {
+  return MARKET_CAP_TIERS.map(t => ({ params: { tier: t.slug } }));
+}
+
+const { tier } = Astro.params;
+const meta = marketCapTierBySlug(tier);
+if (!meta) return Astro.redirect('/404');
+
+const categories = ['Earnings','Concalls','Order Wins','M&A','Credit','Regulatory'];
+const items = listFilings({ marketCap: meta, limit: 50000 });
+
+function timeOf(iso) {
+  const m = String(iso || '').match(/(\d{2}):(\d{2})/);
+  if (!m) return '';
+  let h = +m[1];
+  const ap = h < 12 ? 'AM' : 'PM';
+  h = h % 12 || 12;
+  return `${h}:${m[2]} ${ap} IST`;
+}
+function dateOf(iso) {
+  const d = new Date(String(iso).replace(' ', 'T'));
+  if (Number.isNaN(d.valueOf())) return iso;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]}`;
+}
+---
+<Base
+  title={`${meta.label} notes archive`}
+  description={`${items.length} published notes from ${meta.label.toLowerCase()} companies. ${meta.dek}`}
+>
+  <Masthead activeNav="filings" />
+
+  <main>
+    <article class="archive-page">
+      <header class="archive-header">
+        <div class="kicker"><a href="/filings/">Archive</a> <span class="sep">/</span> <span>{meta.label}</span></div>
+        <h1 class="page-title">{meta.label}</h1>
+        <p class="page-dek">{items.length} published. {meta.dek}</p>
+      </header>
+
+      <div class="archive-filters">
+        <span class="label">Filter by category:</span>
+        <a href="/filings/">All</a>
+        {categories.map(c => (
+          <a href={`/filings/category/${c.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}/`}>{c}</a>
+        ))}
+      </div>
+
+      <div class="archive-filters compact">
+        <span class="label">Filter by size:</span>
+        <a href="/filings/">All caps</a>
+        {MARKET_CAP_TIERS.map(t => (
+          <a href={`/filings/market-cap/${t.slug}/`} class={t.slug === tier ? 'active' : ''}>{t.label}</a>
+        ))}
+      </div>
+
+      <div class="archive-list">
+        {items.length === 0 && <p style="font-style: italic; color: var(--text-muted); padding: 24px 0;">No notes in this market-cap tier yet.</p>}
+        {items.map(f => (
+          <a href={f.canonical_url} class="archive-row">
+            <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
+            <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
+            <div class="archive-body">
+              <div class="kicker">{filingEyebrow(f)}</div>
+              <h3>{f.headline}</h3>
+            </div>
+            <span class="archive-ticker">{f.symbol}</span>
+          </a>
+        ))}
+      </div>
+    </article>
+  </main>
+
+  <SiteFooter />
+</Base>

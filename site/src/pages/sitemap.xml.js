@@ -1,7 +1,7 @@
 // Standard XML sitemap — every public URL.
 // Built statically at build-time.
 
-import { listFilings, distinctSymbolsWithFilings, distinctSectorsWithFilings, sectorSlug } from '../lib/queries.mjs';
+import { listFilings, distinctSymbolsWithFilings, distinctSectorsWithFilings, sectorSlug, MARKET_CAP_TIERS } from '../lib/queries.mjs';
 
 export async function GET({ site }) {
   const siteUrl = site?.toString().replace(/\/$/, '') || 'https://tipsheet.markets';
@@ -22,9 +22,12 @@ export async function GET({ site }) {
   for (const cat of ['earnings','concalls','order-wins','m-a','credit','regulatory']) {
     urls.push({ loc: `${siteUrl}/filings/category/${cat}/`, changefreq: 'daily', priority: '0.6' });
   }
+  for (const tier of MARKET_CAP_TIERS) {
+    urls.push({ loc: `${siteUrl}/filings/market-cap/${tier.slug}/`, changefreq: 'daily', priority: '0.6' });
+  }
   for (const f of filings) {
     urls.push({
-      loc: `${siteUrl}${f.canonical_url}/`,
+      loc: `${siteUrl}${f.canonical_url}`,
       lastmod: String(f.created_on).replace(' ', 'T') + '+05:30',
       changefreq: 'monthly',
       priority: '0.7',

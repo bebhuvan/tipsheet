@@ -11,10 +11,10 @@
 # Requires: Node ≥22, .env file in project root.
 
 .PHONY: poll enrich both fundamentals slugs radar concalls-poll concalls-enrich \
-        concalls macro briefing-open briefing-close stats widgets widgets-cache-only \
+        concalls macro briefing-open briefing-close telegram stats widgets widgets-cache-only \
         pipeline dev build preview check install help
 
-ENV  = --env-file=.env
+ENV  = --env-file=../.env
 PIPE = cd pipeline && node $(ENV) run.mjs
 
 # ─── Pipeline ────────────────────────────────────────────────────────
@@ -59,6 +59,9 @@ briefing-open: market-yf
 
 briefing-close: market-yf
 	$(PIPE) briefing-close
+
+telegram:
+	cd pipeline && node $(ENV) notify_telegram.mjs
 
 stats:
 	$(PIPE) stats
@@ -135,6 +138,7 @@ help:
 	@echo "  make market-yf [H=36] Fetch index moves + stock weekly history (yfinance)"
 	@echo "  make briefing-open    Generate The Open briefing"
 	@echo "  make briefing-close   Generate The Close briefing"
+	@echo "  make telegram         Send Telegram briefing/article digest"
 	@echo "  make stats            Show DB statistics"
 	@echo "  make widgets [N=80]   Refresh Tijori SDK widgets (Python)"
 	@echo "  make pipeline         Full pipeline cycle"

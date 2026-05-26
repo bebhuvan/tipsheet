@@ -148,20 +148,31 @@ The static-first model works up to ~5,000 filings. Beyond that we'd burn through
 
 The boundary lives in two places: `getStaticPaths()` in `site/src/pages/filings/[id].astro`, and the cache headers on the SSR fallback. Both are config changes, not refactors.
 
+At 10,000 articles, the recommended operating model is hybrid:
+
+- prerender the latest 30-60 days of article pages plus all high-value landing pages;
+- keep `/filings/`, category pages, market-cap pages, company pages, sector pages, briefings and feeds static or edge-cached;
+- render old long-tail article pages from D1 on first request and cache them for a year;
+- split `/search-index.json` into monthly shards or move to D1 FTS if the gzipped index becomes too large;
+- keep sitemaps complete, but use sitemap indexes if a single XML file approaches protocol limits.
+
 ## Archive + pagination + filters
 
 `/filings/` — paginated archive, 25 per page, sorted by date desc.
 `/filings/page/2/`, `/filings/page/3/` — Astro's `paginate()` generates these.
-`/filings/category/[name]/` — pre-built per-category pages (6 categories × pages each).
-`/filings/sector/[name]/` — pre-built per-sector pages once we have a normalized sector taxonomy.
+`/filings/category/[name]/` — pre-built per-category pages.
+`/filings/market-cap/[tier]/` — pre-built market-cap pages for mega, large, mid, small and micro caps.
+`/sector/[slug]/` — pre-built per-sector pages from the fundamentals taxonomy.
 
-URL filters via query params (`?score=8`) would require SSR — defer until needed.
+Market-cap tiers are a reader-relevance filter, not just metadata. Current coverage skews heavily toward micro and small caps, which is useful for discovery but noisy for readers who mainly care about liquid names. Static cap pages give those readers a clean route without requiring accounts or query-string SSR.
+
+URL filters via arbitrary query params (`?score=8&cap=large`) would require SSR or client-side filtering. Defer until the archive needs compound filters.
 
 ## Search
 
 Three options ranked by complexity:
 
-1. **Client-side JSON index** (today): build a `/search-index.json` at build time containing `{id, slug, headline, symbol, company, sector, category, score}` for every filing. At 30k filings × ~120 bytes/entry = 3.6MB raw / ~1MB gzipped. Loaded on first search interaction (not on page load). Search via simple substring + a small ranking function. Works offline. Limit: gets sluggish past ~20k entries.
+1. **Client-side JSON index** (today): build a `/search-index.json` at build time containing `{id, slug, headline, symbol, company, sector, category, score, cap}` for every filing. Loaded on first search interaction (not on page load). Search via simple substring + a small ranking function. Works offline. Limit: gets sluggish past ~20k entries.
 
 2. **Pre-built static search shards** (~5k+ filings): split the index by month, load only the shard the user is searching against. Or use a small client-side library like `FlexSearch` for proper ranked search.
 
@@ -189,11 +200,27 @@ Baked into the Astro build:
 - Google News–compatible sitemap at `/sitemap-news.xml`
 - Public read-only JSON API at `/api/filings.json` and `/api/filing/[id].json`
 
+## Telegram Distribution
+
+Telegram should behave like a refresh digest, not a firehose. `pipeline/notify_telegram.mjs` now defaults to `TELEGRAM_DELIVERY_MODE=digest`, which consolidates newly published notes into one message per run. If LLM credentials are present it asks the model for an actionable digest; if not, it falls back to a deterministic grouped digest. `TELEGRAM_DELIVERY_MODE=individual` keeps the old one-message-per-article behavior for tests or exceptional high-urgency channels.
+
+Briefings are notified first, then article digests. Both are idempotent via `notified_at`, so retries do not spam the channel.
+
+## Briefing Retention
+
+The `briefings` table uses `(type, date)` as its primary key. That means:
+
+- re-running `briefing-open 2026-05-26` rewrites that one Open briefing;
+- re-running `briefing-close 2026-05-26` rewrites that one Close briefing;
+- older dates are retained and listed at `/briefings/`;
+- generated prompt version and model are stored for audit.
+
+The briefing prompt deliberately asks for 6-10 high-signal events rather than every article. It also tells the model to balance reader relevance by market cap: micro-cap events can lead when they are material, forensic, or broadly instructive, but a cluster of micro-cap filings should not bury broader large/mid-cap developments.
+
 ## What's intentionally NOT built yet
 
-- Licensed market-data integration. The old Yahoo/yfinance path has been removed; do not reintroduce it for production.
+- Licensed market-data integration. `Makefile` still has a temporary `market-yf` target for briefing market strips and sparklines. Treat it as non-production scaffolding; replace it before relying on market data publicly.
 - Email/WhatsApp alerts (post-launch feature)
-- Search (post-launch — small `Fuse.js` index over headlines)
 - User accounts / watchlists (post-launch)
 - Cloudflare deployment (config skeleton ready; live deploy is a separate decision)
 

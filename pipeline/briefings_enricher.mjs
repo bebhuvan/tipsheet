@@ -17,7 +17,7 @@ import { PHRASE_PATTERNS, STRUCTURAL_RULES } from './banned-patterns.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PATH = resolve(__dirname, 'prompts/briefings_system.txt');
 const USER_PATH   = resolve(__dirname, 'prompts/briefings_user.txt');
-export const BRIEFING_PROMPT_VERSION = 'briefing.v3';
+export const BRIEFING_PROMPT_VERSION = 'briefing.v4';
 
 const CFG = {
   baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
@@ -110,9 +110,19 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 24 } = {
 function renderTopFilings(rows) {
   if (!rows.length) return '(none)';
   const fmt = (value, suffix = '') => value == null ? 'n/a' : `${value}${suffix}`;
+  const capTier = (marketCap) => {
+    const v = Number(marketCap);
+    if (!Number.isFinite(v) || v <= 0) return null;
+    if (v >= 100000) return 'mega cap';
+    if (v >= 20000) return 'large cap';
+    if (v >= 5000) return 'mid cap';
+    if (v >= 1000) return 'small cap';
+    return 'micro cap';
+  };
   return rows.map(r => {
     const financial = [
       r.sector ? `sector ${r.sector}` : null,
+      capTier(r.market_cap) ? `size ${capTier(r.market_cap)}` : null,
       r.market_cap != null ? `market cap ₹${Number(r.market_cap).toLocaleString('en-IN')} cr` : null,
       r.pe != null ? `P/E ${r.pe}x` : null,
       r.roe != null ? `ROE ${r.roe}%` : null,
@@ -224,7 +234,7 @@ function buildFeedbackMessage(validation) {
     lines.push('');
     lines.push('Event problems:');
     for (const e of validation.eventIssues) lines.push(`  - ${e}`);
-    lines.push('  Each event needs a real filing_id from top_filings and 2-3 sentences of prose. Aim for 8-12 events.');
+    lines.push('  Each event needs a real filing_id from top_filings and 2-3 sentences of prose. Aim for 6-10 events.');
   }
   if (validation.banned?.length) {
     lines.push('');
@@ -266,7 +276,7 @@ function validate(parsed, inputs) {
   const eventIssues = [];
   if (!events || events.length === 0) {
     issues.push('events_empty');
-    eventIssues.push('No events array. Produce 8-12 events, each tied to a filing_id.');
+    eventIssues.push('No events array. Produce 6-10 events, each tied to a filing_id.');
   } else {
     const validIds = new Set(inputs.top_filings.map(f => Number(f.record_id)));
     let badId = 0, thin = 0;

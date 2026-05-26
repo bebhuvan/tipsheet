@@ -14,7 +14,7 @@ We do NOT aggregate other publications' content. Our advantage is reading primar
 
 - **Pipeline**: Node 22, SQLite (`better-sqlite3`), DeepSeek native API for enrichment (system prompt is KV-cached → 50× cheaper input on hits)
 - **Site**: Astro 5 static-mode (492 base pages → ~930 with all section pages), `better-sqlite3` for read-only queries at build time
-- **Data sources**: Tijori B2B feed (filing rationales) + Tijori Kite Screener (fundamentals for 5,500+ companies) + Tijori SDK/widget cache for richer company financials. The Yahoo Finance path was removed because it is not a production-safe source.
+- **Data sources**: Tijori B2B feed (filing rationales) + Tijori Kite Screener (fundamentals for 5,500+ companies) + Tijori SDK/widget cache for richer company financials. Yahoo/yfinance is not production-safe; `market-yf` remains only as temporary scaffolding for briefing market strips until a permitted market-data source replaces it.
 - **Production target**: Cloudflare Workers + D1 + Queues + Cron Triggers (schema is D1-compatible; deploy is a separate decision)
 - **Editorial provider**: DeepSeek `deepseek-v4-flash` (native, ~$0.0014/filing). Tested against Qwen, GLM, Gemini 3.1 Flash Lite, Gemma 4 31B, DeepSeek Pro — Flash won decisively on quality + reliability + cost.
 
@@ -70,7 +70,8 @@ News experiment/
 │           │   ├── index.astro              archive p1 (25/page)
 │           │   ├── page/[page].astro        archive pagination
 │           │   ├── category/[name].astro    6 category-filtered archives
-│           │   └── [id].astro               491+ Filing Note pages (each with NewsArticle JSON-LD)
+│           │   ├── market-cap/[tier].astro  5 market-cap archives
+│           │   └── [id].astro               1,004+ Filing Note pages (each with NewsArticle JSON-LD)
 │           ├── company/[symbol].astro       250+ per-company pages (timeline + fundamentals)
 │           └── sector/[slug].astro          120+ per-sector pages (anchor companies + activity)
 │       └── public/
@@ -84,8 +85,8 @@ News experiment/
 
 ### Pipeline
 
-- 500 raw filings ingested from Tijori (one historical pull)
-- **491 enriched Filing Notes** in the DB, validation_ok=1 (98% pass rate)
+- 1,425 raw filings ingested from Tijori
+- **1,004 enriched Filing Notes** in the DB, validation_ok=1
 - 5,594 companies with fundamentals from Kite Screener
 - 78 instruments × 30 days = ~2,000 market-history data points (sparkline source)
 - Feedback-retry on validation failure pushes pass rate from 73% (first attempt) → 98% (after retry with explicit "you used these banned phrases" feedback)
@@ -102,14 +103,15 @@ News experiment/
 
 ### Site — built and live (local preview)
 
-Total: **932 prerendered HTML pages, builds in ~10s.** Zero JS shipped for content pages.
+Total: **1,841 prerendered pages, builds in ~16s locally.** Zero JS shipped for content pages.
 
 | URL pattern | Count | Notes |
 |---|---|---|
 | `/` | 1 | Lead + 2 secondaries + 6 by-section briefs + Wire (20 items) + right rail (markets + score distribution) + Browse band |
 | `/filings/` | 1 + N | Archive paginated 25/page |
 | `/filings/category/[name]/` | 6 | Earnings, Concalls, Order Wins, M&A, Credit, Regulatory |
-| `/filings/[id]/` | 491 | Each Filing Note with NewsArticle JSON-LD, fundamentals sidebar, story-so-far, primary-source links |
+| `/filings/[id]/` | 1,004+ | Each Filing Note with NewsArticle JSON-LD, fundamentals sidebar, story-so-far, primary-source links |
+| `/filings/market-cap/[tier]/` | 5 | Mega, large, mid, small and micro-cap archive filters |
 | `/company/[symbol]/` | ~250 | Per-company: fundamentals + timeline grouped by month + sector link + BSE/NSE source links + Corporation schema |
 | `/sector/[slug]/` | ~120 | Per-sector: anchor companies (top 16 by mcap) + recent activity |
 | `/companies/` | 1 | Alphabetical A-Z index, anchor jumps |
@@ -145,14 +147,13 @@ All sparklines are server-rendered SVG. Zero JS. ~50 LOC per chart.
 - Primary-source links on every filing: dateline ("Verify on BSE · NSE") + dedicated "Primary source" block at bottom of article body
 - No clickbait, no ads, no paywall. Editorial discipline = SEO advantage post-Helpful-Content-Update.
 
-## What's intentionally NOT built
+## What's intentionally NOT built / still not production-grade
 
-- **Licensed market-data refresh** — the old Yahoo path has been removed. Market tables can still render cached rows, but fresh index/FX/commodity data needs a licensed or explicitly permitted source.
-- **The Open / The Close briefings** — designed in detail (see ARCHITECTURE.md and earlier conversation), data schema sketched, NOT generated. This is the biggest reader-habit feature waiting.
-- **Search** — architecture planned (client-side JSON index for now → split shards at ~5k → D1 FTS5 endpoint at ~50k). Nothing shipped yet.
+- **Licensed market-data refresh** — still needed. `market-yf` is temporary scaffolding only; do not treat it as production market data.
+- **Briefings depth and cadence** — The Open / The Close schema, prompt, pages and archive exist. The next work is editorial quality, regular scheduling and richer input selection.
+- **Search scale** — `/search/` and `/search-index.json` exist. The next threshold is sharding or D1 FTS when the index becomes too large.
 - **Calendar aggregator** — concalls from our DB + macro events (hand-curated YAML) + (later) NSE corporate actions. Not built.
 - **Indian G-Sec yields** — need CCIL, RBI, NSE, or another permitted source.
-- **RSS / JSON Feed endpoints** — referenced in `llms.txt` but not implemented yet.
 - **Cloudflare Workers deploy** — `worker/` directory has README skeleton, no actual deploy yet.
 - **Per-instrument deep-dive pages** (e.g. `/markets/index/[symbol]/`) — would be the home for interactive TradingView Lightweight Charts.
 
@@ -182,10 +183,10 @@ All four currently set. Treat each as confidential:
 
 1. **Prompt iteration was the leverage point.** First-pass pass rate was 40%. The fixes that mattered, in order: (a) bumping `max_tokens` to 2500, (b) per-call AbortController timeout, (c) splitting prompts into separate system + user messages so DeepSeek's KV cache hits, (d) adding banned-phrase validator with 40+ patterns, (e) feedback-retry that sends validation issues back to the model — that one move took us from 73% → 98%.
 2. **The Tijori feed has no source URLs and no sector field.** Both should be requested upstream. Until then we derive BSE/NSE company-page links from `scripcode`+`symbol`, and sector comes from Kite Screener via Tijori (`/b2b/v1/in/api/kite-screener/fundamental/`).
-3. **Market-data refresh is intentionally disabled.** Do not reintroduce Yahoo/yfinance. Pick a licensed or explicitly permitted provider before refreshing markets or company price charts.
+3. **Market-data refresh is not production-grade.** Do not rely on Yahoo/yfinance for public production. Pick a licensed or explicitly permitted provider before refreshing markets or company price charts.
 4. **Local security hook trips on `child_process` patterns.** Workarounds in this codebase: read SQL from `schema.sql` and run it via the bracket-notation form `db['exec']`, and avoid the `RegExp.prototype.exec(...)` form in favour of `String.prototype.match(...)`. Both are functionally identical; only the hook is bothered.
 5. **Astro `getStaticPaths()` runs in isolated scope** — top-level consts outside the function don't see in. Define inside `getStaticPaths` or pass via `props`.
-6. **The build is currently 932 pages in ~10s.** At ~5,000 pages it'll cross the threshold where we should switch from full static to hybrid SSR (filing pages from last 30d stay static; older filings SSR-on-demand with year-long edge cache). Already documented in ARCHITECTURE.md.
+6. **At 10,000 articles, switch to hybrid.** Keep recent article pages and discovery pages static; serve old long-tail article pages from D1/Workers with long edge cache. Already documented in ARCHITECTURE.md.
 7. **DeepSeek V4 Flash uses reasoning by default.** The `reasoning_content` field is separate from `content`; our parser reads `content` and ignores reasoning, which is what we want. DeepSeek V4 Pro is ~3× the cost AND much slower (67% timeout rate at 90s) — Flash beats it on every dimension for our task.
 
 ## Commands to know
@@ -203,7 +204,7 @@ node --env-file=../.env loop.mjs                    # continuous loop
 # Site
 cd site
 npm run dev        # http://localhost:4321
-npm run build      # 932 pages in ~10s
+npm run build      # 1,841 pages in ~16s locally
 npm run preview    # serve dist/
 ```
 
@@ -212,9 +213,9 @@ npm run preview    # serve dist/
 Pick one or split into parallel passes:
 
 1. **Licensed market-data source** — replace the removed Yahoo path before building per-company charts or refreshing markets.
-2. **The Open / The Close briefings** — twice-daily editorial digest. Designed in conversation (see "Briefing format sketch" in ARCHITECTURE.md). New schema, new LLM prompt, new pages, cron schedule. ~4-6 hours.
-3. **Search** — client-side JSON index over headlines + tickers + companies. ~2 hours. Improves browseability dramatically.
-4. **RSS / JSON Feed** — already referenced in `llms.txt`; needs implementation. ~1 hour.
+2. **Briefing quality** — improve input selection, market-cap balance, recurring follow-through and schedule discipline.
+3. **Search scale** — shard the JSON index or move to D1 FTS when payload size warrants it.
+4. **Telegram productization** — digest-first mode now exists; next step is scheduled 30-minute refresh windows and optional separate channels/thresholds.
 5. **Cloudflare deploy** — port pipeline to Workers + Cron + Queue + D1. ~half a day.
 6. **Indian G-Sec yields** — CCIL or RBI source integration to complete the yield-curve picture. Research-heavy; likely 2-3 hours.
 7. **The article-label rename pass through ALL UI copy** — currently the Story/Alert/Update tiering appears on Filing Note kickers + Company-page row kickers + Smart Money rows. Other surfaces (homepage Wire kickers, briefs, archive rows, etc.) still show only category names. Pure CSS/template edit.

@@ -2,6 +2,8 @@
 
 This directory holds the Cloudflare Workers configuration for production deployment. **Not deployed yet.** The local pipeline + static Astro build is the MVP. This is the deploy target once the editorial product is validated.
 
+The separate `worker/telegram-notifier/` worker is still a thin article-push skeleton. The richer implementation currently lives in `pipeline/notify_telegram.mjs`, which sends briefing notifications and digest-first article updates with idempotent `notified_at` tracking. If Telegram moves fully to Workers, port that behavior rather than the older one-message-per-article skeleton.
+
 ## What goes here when we deploy
 
 ```
@@ -62,6 +64,6 @@ D1 binding name: `DB`. Queue binding: `FILINGS_QUEUE`. R2 bucket for OG images: 
 We haven't validated the editorial product yet. Running the local pipeline + static site for a few weeks lets us:
 - Iterate on the prompt without redeploying workers
 - See real reader behaviour on the dev preview before committing to infrastructure
-- Adjust the design under real data load (not the 491-filing snapshot)
+- Adjust the design under real data load (now 1,000+ enriched filings and growing)
 
 The code is structured so the swap is small: storage handle (SQLite → D1) and scheduler (loop.mjs → Cron Trigger). Logic modules (`poller.mjs`, `enricher.mjs`, `normalize.mjs`, `prompts/`) port verbatim.

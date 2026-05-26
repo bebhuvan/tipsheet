@@ -4,7 +4,7 @@ import Masthead from '../../components/Masthead.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import { listBriefings } from '../../lib/queries.mjs';
 
-const briefings = listBriefings(60);
+const briefings = listBriefings(730);
 
 function dateOf(ymd) {
   const d = new Date(ymd + 'T00:00:00');
@@ -22,9 +22,9 @@ function dateOf(ymd) {
     <article class="prose-page">
       <header>
         <div class="kicker"><span>Briefings</span></div>
-        <h1 class="page-title">Twice a day.</h1>
+        <h1 class="page-title">Twice a day. Kept for reference.</h1>
         <p class="page-dek">
-          The Open runs before the market opens at 9:15 AM IST — three things to watch today, plus what landed on the wires overnight. The Close runs after the bell — what actually moved and why. Both end on a verdict.
+          The Open runs before the market opens at 9:15 AM IST — three things to watch today, plus what landed on the wires overnight. The Close runs after the bell — what actually moved and why. Older editions stay here as the market diary.
         </p>
       </header>
 

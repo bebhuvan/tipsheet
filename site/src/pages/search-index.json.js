@@ -4,7 +4,7 @@ import { listFilings, listAllCompanies, listAllSectors, sectorSlug } from '../li
 // Kept compact: short field names, only what's needed to display a result row.
 // `q` is the lowercased haystack; `s` is a short label for the result type.
 export async function GET() {
-  const filings = listFilings({ limit: 1000 });
+  const filings = listFilings({ limit: 50000 });
   const companies = listAllCompanies();
   const sectors = listAllSectors();
 
@@ -24,7 +24,7 @@ export async function GET() {
       cat: f.canonical_category || '',
       sc: f.score,
       t: f.created_on || '',
-      q: [f.headline, f.dek, f.symbol, f.company, f.sector, f.canonical_category]
+      q: [f.headline, f.dek, f.symbol, f.company, f.sector, f.canonical_category, f.market_cap_label]
          .filter(Boolean).join(' ').toLowerCase(),
     });
   }
