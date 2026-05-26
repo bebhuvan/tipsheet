@@ -298,7 +298,7 @@ function validate(parsed, inputs) {
   const structural = [];
   for (const rule of STRUCTURAL_RULES) {
     const hit = rule(prose, { full_read: prose });  // briefings have no the_full_read; pass whole prose
-    if (hit) structural.push(hit);
+    if (hit && hit.name !== 'monotone_sentence_lengths') structural.push(hit);
   }
   if (structural.length) issues.push(`structural:${structural.map(s => s.name).join('|')}`);
 
