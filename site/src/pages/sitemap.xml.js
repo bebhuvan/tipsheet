@@ -3,6 +3,19 @@
 
 import { listFilings, distinctSymbolsWithFilings, distinctSectorsWithFilings, sectorSlug, MARKET_CAP_TIERS } from '../lib/queries.mjs';
 
+function escapeXml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function absoluteUrl(path, siteUrl) {
+  return new URL(path, siteUrl).toString();
+}
+
 export async function GET({ site }) {
   const siteUrl = site?.toString().replace(/\/$/, '') || 'https://tipsheet.markets';
   const filings = listFilings({ limit: 50000 });
@@ -27,7 +40,7 @@ export async function GET({ site }) {
   }
   for (const f of filings) {
     urls.push({
-      loc: `${siteUrl}${f.canonical_url}`,
+      loc: absoluteUrl(f.canonical_url, siteUrl),
       lastmod: String(f.created_on).replace(' ', 'T') + '+05:30',
       changefreq: 'monthly',
       priority: '0.7',
@@ -35,7 +48,7 @@ export async function GET({ site }) {
   }
   for (const s of symbols) {
     urls.push({
-      loc: `${siteUrl}/company/${String(s.symbol).toLowerCase()}/`,
+      loc: absoluteUrl(`/company/${encodeURIComponent(String(s.symbol).toLowerCase())}/`, siteUrl),
       changefreq: 'daily',
       priority: '0.6',
     });
@@ -51,9 +64,9 @@ export async function GET({ site }) {
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map(u => `  <url>
-    <loc>${u.loc}</loc>${u.lastmod ? `\n    <lastmod>${u.lastmod}</lastmod>` : ''}
-    <changefreq>${u.changefreq}</changefreq>
-    <priority>${u.priority}</priority>
+    <loc>${escapeXml(u.loc)}</loc>${u.lastmod ? `\n    <lastmod>${escapeXml(u.lastmod)}</lastmod>` : ''}
+    <changefreq>${escapeXml(u.changefreq)}</changefreq>
+    <priority>${escapeXml(u.priority)}</priority>
   </url>`).join('\n')}
 </urlset>`;
 
