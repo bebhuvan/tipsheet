@@ -35,6 +35,11 @@ const CACHE_RULES = [
 ];
 
 const DEFAULT_PAGE_MAX_AGE = 300;
+const IST_OFFSET_MIN = 330;
+const BRIEFING_SCHEDULES = [
+  { type: 'open', dueHour: 8, dueMinute: 45, graceEnv: 'BRIEFING_OPEN_GRACE_MIN' },
+  { type: 'close', dueHour: 17, dueMinute: 0, graceEnv: 'BRIEFING_CLOSE_GRACE_MIN' },
+];
 
 function applySecurityHeaders(headers) {
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
@@ -88,6 +93,55 @@ function recordIdFromPath(pathname) {
   return match ? match[1] : null;
 }
 
+function istNowParts(now = new Date()) {
+  const ist = new Date(now.getTime() + IST_OFFSET_MIN * 60000);
+  const date = ist.toISOString().slice(0, 10);
+  return {
+    date,
+    day: ist.getUTCDay(),
+    minutes: ist.getUTCHours() * 60 + ist.getUTCMinutes(),
+  };
+}
+
+function istDateTimeUtcMs(dateYmd, hour, minute) {
+  const [year, month, day] = dateYmd.split('-').map(Number);
+  return Date.UTC(year, month - 1, day, hour, minute) - IST_OFFSET_MIN * 60000;
+}
+
+function githubHeaders(token) {
+  return {
+    'Accept': 'application/vnd.github+json',
+    'Authorization': `Bearer ${token}`,
+    'User-Agent': 'tipsheet-cloudflare-watchdog',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+}
+
+async function listWorkflowRuns({ repo, workflow, branch, token, perPage = 5 }) {
+  const headers = githubHeaders(token);
+  const runsUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(workflow)}/runs?branch=${encodeURIComponent(branch)}&per_page=${perPage}`;
+  const runsResponse = await fetch(runsUrl, { headers });
+  if (!runsResponse.ok) {
+    return { ok: false, status: runsResponse.status, runs: [] };
+  }
+  const runsBody = await runsResponse.json();
+  return {
+    ok: true,
+    status: runsResponse.status,
+    runs: Array.isArray(runsBody.workflow_runs) ? runsBody.workflow_runs : [],
+  };
+}
+
+async function dispatchWorkflow({ repo, workflow, branch, token, inputs }) {
+  const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`;
+  const dispatchResponse = await fetch(dispatchUrl, {
+    method: 'POST',
+    headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: branch, inputs }),
+  });
+  return { ok: dispatchResponse.ok, status: dispatchResponse.status };
+}
+
 async function maybeRedirectArticleSlug(url, env) {
   const recordId = recordIdFromPath(url.pathname);
   if (!recordId) return null;
@@ -122,17 +176,9 @@ async function maybeDispatchGitHubWatchdog(env) {
   const maxStaleMin = Number(env.WATCHDOG_MAX_STALE_MIN || 45);
   if (!token || !repo || !maxStaleMin) return { skipped: 'missing-config' };
 
-  const headers = {
-    'Accept': 'application/vnd.github+json',
-    'Authorization': `Bearer ${token}`,
-    'User-Agent': 'tipsheet-cloudflare-watchdog',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-  const runsUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(workflow)}/runs?branch=${encodeURIComponent(branch)}&per_page=5`;
-  const runsResponse = await fetch(runsUrl, { headers });
-  if (!runsResponse.ok) return { skipped: 'runs-api-failed', status: runsResponse.status };
-  const runsBody = await runsResponse.json();
-  const runs = Array.isArray(runsBody.workflow_runs) ? runsBody.workflow_runs : [];
+  const listed = await listWorkflowRuns({ repo, workflow, branch, token });
+  if (!listed.ok) return { skipped: 'runs-api-failed', status: listed.status };
+  const runs = listed.runs;
   if (runs.some(run => run.status === 'queued' || run.status === 'in_progress')) {
     return { skipped: 'run-active' };
   }
@@ -142,24 +188,104 @@ async function maybeDispatchGitHubWatchdog(env) {
   const ageMin = latestAt ? (Date.now() - latestAt) / 60000 : Infinity;
   if (ageMin < maxStaleMin) return { skipped: 'fresh', ageMin: Math.round(ageMin) };
 
-  const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`;
-  const dispatchResponse = await fetch(dispatchUrl, {
-    method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ref: branch,
-      inputs: {
-        skip_pipeline: 'false',
-        skip_deploy: 'false',
-        enrich_limit: '50',
-      },
-    }),
+  const dispatch = await dispatchWorkflow({
+    repo,
+    workflow,
+    branch,
+    token,
+    inputs: {
+      skip_pipeline: 'false',
+      skip_deploy: 'false',
+      enrich_limit: '50',
+    },
   });
   return {
-    dispatched: dispatchResponse.ok,
-    status: dispatchResponse.status,
+    dispatched: dispatch.ok,
+    status: dispatch.status,
     ageMin: Number.isFinite(ageMin) ? Math.round(ageMin) : null,
   };
+}
+
+async function briefingPageExists(env, type, date) {
+  const site = String(env.SITE_URL || 'https://tipsheet.markets').replace(/\/+$/, '');
+  const url = `${site}/briefings/the-${type}/${date}/`;
+  const response = await fetch(url, {
+    cf: { cacheTtl: 0, cacheEverything: false },
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  return { exists: response.status === 200, status: response.status, url };
+}
+
+async function maybeDispatchBriefingWatchdog(env) {
+  const token = env.GITHUB_ACTIONS_TOKEN || env.GITHUB_TOKEN;
+  const repo = env.GITHUB_REPOSITORY;
+  const workflow = env.BRIEFINGS_WORKFLOW || 'briefings.yml';
+  const branch = env.WATCHDOG_BRANCH || 'main';
+  if (!token || !repo) return { skipped: 'missing-config' };
+
+  const now = istNowParts();
+  if (now.day === 0 || now.day === 6) {
+    return { skipped: 'weekend', date: now.date };
+  }
+
+  const due = BRIEFING_SCHEDULES
+    .filter(item => {
+      const graceMin = Number(env[item.graceEnv] || 15);
+      const dueMinuteOfDay = item.dueHour * 60 + item.dueMinute + graceMin;
+      return now.minutes >= dueMinuteOfDay;
+    })
+    .sort((a, b) => (b.dueHour * 60 + b.dueMinute) - (a.dueHour * 60 + a.dueMinute));
+  if (!due.length) return { skipped: 'before-window', date: now.date };
+
+  const listed = await listWorkflowRuns({ repo, workflow, branch, token, perPage: 10 });
+  if (!listed.ok) return { skipped: 'runs-api-failed', status: listed.status };
+  if (listed.runs.some(run => run.status === 'queued' || run.status === 'in_progress')) {
+    return { skipped: 'run-active', date: now.date };
+  }
+
+  const results = [];
+  for (const item of due) {
+    const dueAt = istDateTimeUtcMs(now.date, item.dueHour, item.dueMinute);
+    const recentSuccess = listed.runs.find(run => (
+      run.conclusion === 'success' &&
+      run.created_at &&
+      Date.parse(run.created_at) >= dueAt
+    ));
+    if (recentSuccess) {
+      results.push({ type: item.type, skipped: 'recent-success', run: recentSuccess.id });
+      continue;
+    }
+
+    const page = await briefingPageExists(env, item.type, now.date);
+    if (page.exists) {
+      results.push({ type: item.type, skipped: 'published', url: page.url });
+      continue;
+    }
+
+    const dispatch = await dispatchWorkflow({
+      repo,
+      workflow,
+      branch,
+      token,
+      inputs: {
+        briefing: item.type,
+        date: now.date,
+        skip_deploy: 'false',
+      },
+    });
+    results.push({
+      type: item.type,
+      dispatched: dispatch.ok,
+      status: dispatch.status,
+      pageStatus: page.status,
+      url: page.url,
+    });
+
+    // One dispatch at a time keeps the shared DB/deploy workflow serialized.
+    if (dispatch.ok) break;
+  }
+
+  return { date: now.date, results };
 }
 
 async function handleWidgetApi(pathname, env) {
@@ -195,8 +321,11 @@ async function handleWidgetApi(pathname, env) {
 export default {
   async scheduled(_controller, env, ctx) {
     ctx.waitUntil(
-      maybeDispatchGitHubWatchdog(env).then(result => {
-        console.log('[watchdog]', JSON.stringify(result));
+      Promise.all([
+        maybeDispatchGitHubWatchdog(env),
+        maybeDispatchBriefingWatchdog(env),
+      ]).then(([pipeline, briefings]) => {
+        console.log('[watchdog]', JSON.stringify({ pipeline, briefings }));
       }).catch(error => {
         console.error('[watchdog] failed:', error?.message || error);
       }),

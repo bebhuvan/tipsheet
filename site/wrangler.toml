@@ -8,11 +8,14 @@ assets = { directory = "./dist", binding = "ASSETS", run_worker_first = true }
 SITE_URL = "https://tipsheet.markets"
 GITHUB_REPOSITORY = "bebhuvan/tipsheet"
 WATCHDOG_WORKFLOW = "pipeline.yml"
+BRIEFINGS_WORKFLOW = "briefings.yml"
 WATCHDOG_BRANCH = "main"
 WATCHDOG_MAX_STALE_MIN = "45"
+BRIEFING_OPEN_GRACE_MIN = "15"
+BRIEFING_CLOSE_GRACE_MIN = "15"
 
 [triggers]
-crons = ["*/30 * * * *"]
+crons = ["*/15 * * * *"]
 
 [[d1_databases]]
 binding = "tipsheet_db"

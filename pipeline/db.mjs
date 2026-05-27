@@ -279,12 +279,23 @@ export function insertEnrichedConcall(db, row) {
 // ─── briefings (The Open / The Close) ───────────────────────────────
 
 const _upsertBriefing = (db) => db.prepare(`
-  INSERT OR REPLACE INTO briefings
+  INSERT INTO briefings
     (type, date, headline, dek, the_take, sections, input_summary,
      generated_at, model_used, prompt_version, validation_ok, validation_issues)
   VALUES
     (@type, @date, @headline, @dek, @the_take, @sections, @input_summary,
      @generated_at, @model_used, @prompt_version, @validation_ok, @validation_issues)
+  ON CONFLICT(type, date) DO UPDATE SET
+    headline = excluded.headline,
+    dek = excluded.dek,
+    the_take = excluded.the_take,
+    sections = excluded.sections,
+    input_summary = excluded.input_summary,
+    generated_at = excluded.generated_at,
+    model_used = excluded.model_used,
+    prompt_version = excluded.prompt_version,
+    validation_ok = excluded.validation_ok,
+    validation_issues = excluded.validation_issues
 `);
 export function upsertBriefing(db, row) {
   return _upsertBriefing(db).run({ generated_at: Date.now(), ...row });
