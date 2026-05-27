@@ -18,6 +18,7 @@ const SCORE_MIN = Number(process.env.NOTIFY_SCORE_MIN || 5);
 const MAX_PER_RUN = 15;
 const BACKLOG_KEEP_LATEST = 20;
 const DELIVERY_MODE = (process.env.TELEGRAM_DELIVERY_MODE || 'digest').toLowerCase();
+const REQUIRE_LIVE_URL = process.env.TELEGRAM_REQUIRE_LIVE_URL !== '0';
 
 const DEFAULT_LLM_BASE = process.env.DEEPSEEK_API_KEY
   ? 'https://api.deepseek.com'
@@ -52,6 +53,20 @@ async function send(html) {
     // Surface the API error text but never the token.
     const detail = await r.text().catch(() => '');
     throw new Error(`Telegram API ${r.status}: ${detail.slice(0, 200)}`);
+  }
+}
+
+async function urlIsLive(url) {
+  if (!REQUIRE_LIVE_URL) return true;
+  try {
+    const r = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000),
+    });
+    return r.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -96,6 +111,19 @@ function buildBriefingMessage(b, events) {
 
 function articleUrl(r) {
   return `${SITE}/${r.slug || buildArticleSlug(r.symbol, r.headline, r.record_id)}/`;
+}
+
+async function filterLiveArticleRows(rows, TEST) {
+  if (TEST || !REQUIRE_LIVE_URL) return rows;
+  const checked = await Promise.all(rows.map(async (row) => {
+    const url = articleUrl(row);
+    return { row, url, live: await urlIsLive(url) };
+  }));
+  const skipped = checked.filter(item => !item.live);
+  for (const item of skipped) {
+    console.warn(`[telegram] skip ${item.row.record_id}: URL not live after deploy: ${item.url}`);
+  }
+  return checked.filter(item => item.live).map(item => item.row);
 }
 
 function buildFallbackDigest(rows) {
@@ -185,6 +213,11 @@ async function buildAiDigest(rows) {
 }
 
 async function notifyArticleDigest(db, rows, TEST) {
+  rows = await filterLiveArticleRows(rows, TEST);
+  if (!rows.length) {
+    console.log('[telegram] no live article URLs to notify; rows left un-notified');
+    return;
+  }
   const text = await buildAiDigest(rows) || buildFallbackDigest(rows);
   await send(TEST ? `🧪 <i>Test digest</i>\n\n${text}` : text);
   if (!TEST) {
@@ -230,6 +263,11 @@ async function notifyBriefings(db, TEST) {
     const events = resolveBriefingEvents(db, b.sections);
     try {
       const text = buildBriefingMessage(b, events);
+      const url = `${SITE}/briefings/the-${b.type}/${b.date}/`;
+      if (!TEST && !(await urlIsLive(url))) {
+        console.warn(`[telegram] briefing skip ${b.type}:${b.date}: URL not live after deploy: ${url}`);
+        continue;
+      }
       await send(TEST ? `🧪 <i>Test digest</i>\n\n${text}` : text);
       if (!TEST) mark.run(Date.now(), b.type, b.date);
       sent++;
@@ -315,7 +353,12 @@ async function main() {
 
   const mark = db.prepare('UPDATE filings_enriched SET notified_at = ? WHERE record_id = ?');
   let sent = 0;
-  for (const r of rows) {
+  const liveRows = await filterLiveArticleRows(rows, TEST);
+  if (!liveRows.length) {
+    console.log('[telegram] no live article URLs to notify; rows left un-notified');
+    return;
+  }
+  for (const r of liveRows) {
     const url = articleUrl(r);
     const cat = r.canonical_category && r.canonical_category !== 'Other' ? ` · ${escapeHtml(r.canonical_category)}` : '';
     const number = r.the_number_value ? `\n<b>${escapeHtml(r.the_number_value)}</b>${r.the_number_label ? ' ' + escapeHtml(r.the_number_label) : ''}` : '';
