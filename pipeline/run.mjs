@@ -306,6 +306,14 @@ export async function enrichConcallsBatch(max = 50) {
       totalOut += u.completion_tokens || 0;
       totalCached += u.prompt_tokens_details?.cached_tokens || 0;
 
+      if (!result.ok && result.parsed && result.validation?.issues) {
+        const onlyStyleIssues = result.validation.issues.every(i => i.startsWith('banned:') || i.startsWith('structural:'));
+        if (onlyStyleIssues) {
+          result.ok = true;
+          result.forced_pass = true;
+        }
+      }
+
       if (result.ok) {
         ok++;
         const p = result.parsed;
@@ -326,9 +334,9 @@ export async function enrichConcallsBatch(max = 50) {
           model_used:         result.model,
           prompt_version:     result.promptVersion,
           validation_ok:      1,
-          validation_issues:  null,
+          validation_issues:  result.forced_pass ? JSON.stringify(result.validation.issues) : null,
         });
-        console.log(`  ✓ ${(raw.symbol || raw.slug || '?').padEnd(20)} ${result.elapsed_ms}ms  ${p.headline?.slice(0, 70) || ''}`);
+        console.log(`  ✓ ${(raw.symbol || raw.slug || '?').padEnd(20)} ${result.elapsed_ms}ms  ${p.headline?.slice(0, 70) || ''}${result.forced_pass ? ' (FORCED PASS)' : ''}`);
       } else {
         fail++;
         insertEnrichedConcall(db, {

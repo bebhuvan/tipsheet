@@ -61,7 +61,6 @@ jobs:
           TIJORI_CONCALLS_API_KEY: ${{ secrets.TIJORI_CONCALLS_API_KEY }}
           TIJORI_CONCALLS_BASE_URL: ${{ secrets.TIJORI_CONCALLS_BASE_URL }}
           LIMIT: ${{ inputs.limit || '50' }}
-        continue-on-error: true
 
       - name: Concall notes from AlphaStreet
         run: cd pipeline && node --env-file=../.env.ci alphastreet.mjs run 12

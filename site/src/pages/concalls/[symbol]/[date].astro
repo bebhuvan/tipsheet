@@ -96,7 +96,7 @@ const schema = {
         {concall.isin && <span class="mono">ISIN {concall.isin}</span>}
         <span>{dateOf(concall.event_time)}</span>
         <span>
-          Powered by <a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener" class="inline">Tijori Concall Monitor</a>
+          Analysis source: <a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener" class="inline">Tijori Concall Monitor</a>
         </span>
       </div>
 
@@ -127,9 +127,9 @@ const schema = {
           )}
 
           <div class="primary-block">
-            <h3>Primary source</h3>
+            <h3>Analysis source</h3>
             <ul class="primary-list">
-              <li><a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener">Full analysis on Tijori Concall Monitor</a></li>
+              <li><a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener">Tijori Concall Monitor</a></li>
             </ul>
           </div>
 
@@ -219,8 +219,8 @@ const schema = {
 
           <div class="primary-source">
             <span class="label">Source</span>
-            <a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener">Tijori Concall Monitor (full analysis)</a>
-            <span class="note">Our brief is derived from the Tijori Concall Monitor analysis. Read the full analysis on Tijori for the complete picture.</span>
+            <a href={concall.tijori_concall_monitor_url} target="_blank" rel="noopener">Tijori Concall Monitor analysis</a>
+            <span class="note">This brief is derived from Tijori's call-monitor analysis, not the exchange transcript source of record. Verify material claims against the company's call materials where available.</span>
           </div>
         </div>
       </div>

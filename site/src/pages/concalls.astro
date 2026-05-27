@@ -18,7 +18,7 @@ function dateOf(iso) {
 ---
 <Base
   title="Concalls — editorial coverage of Indian earnings calls"
-  description="Tipsheet Concall Notes — short editorial briefs on Indian earnings calls. Where management has flip-flopped versus prior calls, we lead with the contradiction. Powered by Tijori Concall Monitor."
+  description="Tipsheet Concall Notes — short editorial briefs on Indian earnings calls, using transcript notes and third-party call-monitor analysis with clear attribution."
 >
   <Masthead activeNav="concalls" />
   <main>
@@ -27,8 +27,7 @@ function dateOf(iso) {
         <div class="kicker"><span>Concalls</span></div>
         <h1 class="page-title">Concall Notes.</h1>
         <p class="page-dek">
-          Short editorial briefs on Indian earnings calls. When management's guidance contradicts what they said last quarter, we lead with the contradiction — that is the news.
-          Underlying transcripts and analysis are produced by <a href="https://www.tijoristack.ai/concall-monitor" class="inline" target="_blank" rel="noopener">Tijori Concall Monitor</a>; we summarise and add editorial framing.
+          Short editorial briefs on Indian earnings calls. Transcript notes are written from call transcripts; call-monitor notes use <a href="https://www.tijoristack.ai/concall-monitor" class="inline" target="_blank" rel="noopener">Tijori Concall Monitor</a> analysis, credited clearly.
         </p>
       </header>
 
@@ -39,7 +38,7 @@ function dateOf(iso) {
       {withFlag.length > 0 && (
         <section class="concall-section">
           <h2 class="section-title">Where management changed its story</h2>
-          <p class="section-dek">Calls where this quarter's guidance contradicts a prior call. Source: Tijori Concall Monitor's consistency check, summarised editorially.</p>
+          <p class="section-dek">Calls where this quarter's guidance appears to contradict a prior call. Source: Tijori Concall Monitor's consistency check, summarised editorially.</p>
           <ol class="concall-list">
             {withFlag.map(c => (
               <li>
@@ -67,7 +66,7 @@ function dateOf(iso) {
 
       {withoutFlag.length > 0 && (
         <section class="concall-section">
-          <h2 class="section-title">Recent Concall Notes</h2>
+          <h2 class="section-title">Call-monitor notes</h2>
           <ol class="concall-list">
             {withoutFlag.map(c => (
               <li>

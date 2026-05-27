@@ -252,7 +252,7 @@ export function concallStats(db) {
 const _listUnenrichedConcalls = (db, limit) => db.prepare(`
   SELECT r.* FROM concalls_raw r
   LEFT JOIN concalls_enriched e ON e.isin = r.isin AND e.event_time = r.event_time
-  WHERE e.isin IS NULL
+  WHERE (e.isin IS NULL OR e.validation_ok = 0)
     AND r.status = 'recorded'
     AND r.ai_summary IS NOT NULL AND r.ai_summary != ''
   ORDER BY r.event_time DESC
