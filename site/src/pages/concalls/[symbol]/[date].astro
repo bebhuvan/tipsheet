@@ -78,7 +78,7 @@ const schema = {
         <span style="color: var(--accent); font-weight: 500;">Concall Note</span>
         <span class="sep">/</span>
         <span>{concall.sector}</span>
-        {concall.symbol && (
+        {concall.symbol && fund && (
           <>
             <span class="sep">/</span>
             <a href={`/company/${String(concall.symbol).toLowerCase()}/`} class="inline">{concall.symbol}</a>

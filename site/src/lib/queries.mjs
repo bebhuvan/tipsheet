@@ -177,7 +177,8 @@ export function recordIdFromSlug(slug) {
 const ALL_COLS = `
   r.record_id, r.symbol, r.scripcode, r.company, r.score, r.sentiment,
   r.event_type, r.event_category_raw, r.event_category_canonical AS canonical_category,
-  e.sector, r.created_on,
+  COALESCE((SELECT f.sector FROM fundamentals f WHERE f.symbol = r.symbol LIMIT 1), e.sector) AS sector,
+  r.created_on,
   (SELECT f.market_cap FROM fundamentals f WHERE f.symbol = r.symbol LIMIT 1) AS market_cap,
   e.headline, e.dek, e.the_number_value, e.the_number_label,
   e.whats_new, e.why_it_matters, e.what_were_watching, e.faqs, e.the_full_read,
@@ -487,7 +488,13 @@ export function distinctSymbolsWithFilings() {
     FROM filings_raw r
     JOIN filings_enriched e ON e.record_id = r.record_id
     WHERE e.validation_ok = 1 AND r.symbol IS NOT NULL
-    ORDER BY r.symbol
+    UNION
+    SELECT DISTINCT c.symbol, COALESCE(c.company_name, c.symbol) AS company
+    FROM concalls_raw c
+    JOIN concalls_enriched e ON e.isin = c.isin AND e.event_time = c.event_time
+    JOIN fundamentals f ON f.symbol = c.symbol
+    WHERE e.validation_ok = 1 AND c.symbol IS NOT NULL
+    ORDER BY symbol
   `).all();
 }
 
@@ -523,18 +530,20 @@ export function listAllSectors() {
   `).all();
 }
 
-/** Distinct sectors (from fundamentals) with at least one filing among the symbols in that sector. */
+/** Distinct sectors that should have landing pages. Prefer fundamentals, but include article sectors as fallback. */
 export function distinctSectorsWithFilings() {
+  return sectorRows().sort((a, b) => String(a.sector).localeCompare(String(b.sector)));
+}
+
+function sectorRows() {
   return db().prepare(`
-    SELECT DISTINCT f.sector
-    FROM fundamentals f
-    INNER JOIN (
-      SELECT DISTINCT r.symbol FROM filings_raw r
-      JOIN filings_enriched e ON e.record_id = r.record_id
-      WHERE e.validation_ok = 1
-    ) filed ON filed.symbol = f.symbol
-    WHERE f.sector IS NOT NULL
-    ORDER BY f.sector
+    SELECT DISTINCT sector
+    FROM fundamentals
+    WHERE sector IS NOT NULL AND sector != ''
+    UNION
+    SELECT DISTINCT e.sector
+    FROM filings_enriched e
+    WHERE e.validation_ok = 1 AND e.sector IS NOT NULL AND e.sector != ''
   `).all();
 }
 
@@ -545,11 +554,11 @@ export function filingsForSector(sector, limit = 50) {
     SELECT ${ALL_COLS}
     FROM filings_raw r
     JOIN filings_enriched e ON e.record_id = r.record_id
-    INNER JOIN fundamentals f ON f.symbol = r.symbol
-    WHERE f.sector = ? AND e.validation_ok = 1
+    LEFT JOIN fundamentals f ON f.symbol = r.symbol
+    WHERE (f.sector = ? OR e.sector = ?) AND e.validation_ok = 1
     ORDER BY r.created_on DESC
     LIMIT ?
-  `).all(sector, limit).map(shapeFiling);
+  `).all(sector, sector, limit).map(shapeFiling);
 }
 
 /** Companies in a sector (anchor list for sector page). */
@@ -559,6 +568,12 @@ export function companiesInSector(sector, limit = 50) {
     SELECT f.symbol, f.market_cap, f.pe, f.roe, f.low_52w, f.high_52w
     FROM fundamentals f
     WHERE f.sector = ? AND f.market_cap IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM filings_raw r
+        JOIN filings_enriched e ON e.record_id = r.record_id
+        WHERE e.validation_ok = 1 AND r.symbol = f.symbol
+      )
     ORDER BY f.market_cap DESC
     LIMIT ?
   `).all(sector, limit);
@@ -571,7 +586,7 @@ export function sectorSlug(sector) {
 
 /** Resolve a sector slug back to its canonical name. */
 export function sectorBySlug(slug) {
-  const all = db().prepare('SELECT DISTINCT sector FROM fundamentals WHERE sector IS NOT NULL').all();
+  const all = sectorRows();
   return all.find(r => sectorSlug(r.sector) === slug)?.sector || null;
 }
 
@@ -922,6 +937,25 @@ export function listAllForStaticPaths(limit = 20000) {
   `).all(limit).map(row => ({ id: row.slug || buildSlug(row.symbol, row.headline, row.record_id), record_id: row.record_id }));
 }
 
+/** Canonical article paths keyed by immutable record_id, for Worker-side old-slug redirects. */
+export function articleRedirectMap(limit = 50000) {
+  const rows = db().prepare(`
+    SELECT r.record_id, r.symbol, e.headline, ${hasColumn('filings_enriched', 'slug') ? 'e.slug' : 'NULL AS slug'}
+    FROM filings_raw r
+    JOIN filings_enriched e ON e.record_id = r.record_id
+    WHERE e.validation_ok = 1
+    ORDER BY r.created_on DESC
+    LIMIT ?
+  `).all(limit);
+
+  const map = {};
+  for (const row of rows) {
+    const slug = row.slug || buildSlug(row.symbol, row.headline, row.record_id);
+    if (row.record_id && slug) map[String(row.record_id)] = `/${slug}/`;
+  }
+  return map;
+}
+
 export function listSourceHealth() {
   if (!hasTable('source_health')) return [];
   return db().prepare(`
@@ -1066,19 +1100,20 @@ function dedupeNotes(notes) {
 /** Regulation feed: all published circulars + RBI regulation notes, deduped, newest first. */
 export function listRegulation({ limit = 200 } = {}) {
   const out = [];
+  const sourceLimit = Math.max(Number(limit) * 10, 200);
   if (hasTable('circulars_enriched')) {
     const pdfTablesCol = hasColumn('circulars_raw', 'pdf_tables') ? 'cr.pdf_tables' : "'[]' AS pdf_tables";
     out.push(...db().prepare(`
       SELECT ce.*, cr.source, cr.pub_date, cr.stocks, cr.pdf_url, ${pdfTablesCol}
       FROM circulars_enriched ce JOIN circulars_raw cr ON cr.circular_id = ce.circular_id
       WHERE ce.validation_ok = 1 ORDER BY ce.enriched_at DESC LIMIT ?
-    `).all(limit).map(shapeCircularNote));
+    `).all(sourceLimit).map(shapeCircularNote));
   }
   if (hasTable('rbi_enriched')) {
     out.push(...db().prepare(`
       SELECT re.*, rr.pub_date FROM rbi_enriched re JOIN rbi_raw rr ON rr.link = re.link
       WHERE re.validation_ok = 1 AND re.section = 'regulation' ORDER BY re.enriched_at DESC LIMIT ?
-    `).all(limit).map(shapeRbiNote));
+    `).all(sourceLimit).map(shapeRbiNote));
   }
   return dedupeNotes(out).sort((a, b) => b.ts - a.ts).slice(0, limit);
 }

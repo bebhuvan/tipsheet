@@ -6,9 +6,13 @@ assets = { directory = "./dist", binding = "ASSETS", run_worker_first = true }
 
 [vars]
 SITE_URL = "https://tipsheet.markets"
+GITHUB_REPOSITORY = "bebhuvan/tipsheet"
 WATCHDOG_WORKFLOW = "pipeline.yml"
 WATCHDOG_BRANCH = "main"
 WATCHDOG_MAX_STALE_MIN = "45"
+
+[triggers]
+crons = ["*/30 * * * *"]
 
 [[d1_databases]]
 binding = "tipsheet_db"

@@ -120,6 +120,10 @@ jobs:
         if: ${{ !inputs.skip_deploy }}
         run: cd site && npm run build
 
+      - name: Check internal links
+        if: ${{ !inputs.skip_deploy }}
+        run: cd site && npm run check:links
+
       - name: Deploy to Cloudflare Workers
         if: ${{ !inputs.skip_deploy }}
         uses: cloudflare/wrangler-action@v3

@@ -31,6 +31,7 @@ const CACHE_RULES = [
   { pattern: /^\/feed\.json$/,    maxAge: 1800 },
   { pattern: /^\/sitemap\.xml$/,  maxAge: 3600 },
   { pattern: /^\/sitemap-news\.xml$/, maxAge: 1800 },
+  { pattern: /^\/article-redirects\.json$/, maxAge: 300 },
 ];
 
 const DEFAULT_PAGE_MAX_AGE = 300;
@@ -79,6 +80,38 @@ function redirectPath(url, pathname, status = 301) {
   const target = new URL(url);
   target.pathname = pathname;
   return Response.redirect(target.toString(), status);
+}
+
+function recordIdFromPath(pathname) {
+  const clean = String(pathname || '').replace(/\/+$/, '');
+  const match = clean.match(/-(\d+)$/);
+  return match ? match[1] : null;
+}
+
+async function maybeRedirectArticleSlug(url, env) {
+  const recordId = recordIdFromPath(url.pathname);
+  if (!recordId) return null;
+
+  const redirectsUrl = new URL('/article-redirects.json', url);
+  const response = await env.ASSETS.fetch(new Request(redirectsUrl.toString()));
+  if (!response.ok) return null;
+
+  let redirects = null;
+  try {
+    redirects = await response.json();
+  } catch {
+    return null;
+  }
+
+  const targetPath = redirects?.[recordId];
+  if (!targetPath) return null;
+
+  const currentPath = url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`;
+  if (currentPath === targetPath) return null;
+
+  const target = new URL(url);
+  target.pathname = targetPath;
+  return Response.redirect(target.toString(), 301);
 }
 
 async function maybeDispatchGitHubWatchdog(env) {
@@ -199,6 +232,9 @@ export default {
     const response = await env.ASSETS.fetch(request);
 
     if (response.status === 404 && url.pathname !== '/') {
+      const articleRedirect = await maybeRedirectArticleSlug(url, env);
+      if (articleRedirect) return articleRedirect;
+
       const headers = new Headers({
         'Cache-Control': 'public, max-age=60',
         'Content-Type': 'text/html; charset=utf-8',

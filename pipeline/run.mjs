@@ -149,6 +149,105 @@ export async function enrichBatch(max = 50) {
   return { ok, fail, totalIn, totalOut };
 }
 
+export async function enrichIds(ids = []) {
+  const normalized = ids
+    .flatMap(id => String(id || '').split(','))
+    .map(id => Number(id.trim()))
+    .filter(Number.isInteger);
+  const unique = [...new Set(normalized)];
+  if (!unique.length) {
+    console.log('[enrich-ids] no valid record ids supplied');
+    return { ok: 0, fail: 0 };
+  }
+
+  const db = openDb();
+  const placeholders = unique.map(() => '?').join(',');
+  const pending = db.prepare(`
+    SELECT r.*
+    FROM filings_raw r
+    WHERE r.record_id IN (${placeholders})
+    ORDER BY r.created_on DESC
+  `).all(...unique);
+  const found = new Set(pending.map(row => Number(row.record_id)));
+  const missing = unique.filter(id => !found.has(id));
+  if (missing.length) console.log(`[enrich-ids] missing raw rows: ${missing.join(',')}`);
+  console.log(`[enrich-ids] ${pending.length} filings selected`);
+
+  let ok = 0, fail = 0, totalIn = 0, totalOut = 0;
+  for (const raw of pending) {
+    let result = await enrich(raw);
+    let retries = 0;
+
+    while (!result.ok && retries < 3) {
+      retries++;
+      await sleep(600);
+      if (result.parsed && result.validation?.issues?.length) {
+        result = await enrich(raw, result);
+      } else {
+        result = await enrich(raw);
+      }
+    }
+
+    if (!result.ok && result.parsed && result.validation?.issues) {
+      const onlyStyleIssues = result.validation.issues.every(i => i.startsWith('banned:') || i.startsWith('structural:'));
+      if (onlyStyleIssues) {
+        result.ok = true;
+        result.forced_pass = true;
+      }
+    }
+
+    const u = result.usage || {};
+    totalIn += u.prompt_tokens || 0;
+    totalOut += u.completion_tokens || 0;
+
+    if (result.ok) {
+      ok++;
+      const p = result.parsed;
+      insertEnriched(db, {
+        record_id:           raw.record_id,
+        headline:            p.headline,
+        dek:                 p.dek,
+        the_number_value:    p.the_number?.value || null,
+        the_number_label:    p.the_number?.label || null,
+        whats_new:           JSON.stringify(p.whats_new || []),
+        why_it_matters:      p.why_it_matters || null,
+        what_were_watching:  JSON.stringify(p.what_were_watching || []),
+        faqs:                JSON.stringify(p.faqs || []),
+        the_full_read:       p.the_full_read || null,
+        editorial_tone:      p.editorial_tone?.label || null,
+        tone_score:          Number.isFinite(Number(p.editorial_tone?.score)) ? Math.round(Number(p.editorial_tone.score)) : null,
+        tone_confidence:     p.editorial_tone?.confidence || null,
+        tone_reason:         p.editorial_tone?.reason || null,
+        canonical_category:  p.canonical_category || null,
+        sector:              p.sector || null,
+        key_entities:        JSON.stringify(p.key_entities || []),
+        model_used:          result.model,
+        prompt_version:      result.promptVersion,
+        validation_ok:       1,
+        validation_issues:   result.forced_pass ? JSON.stringify(result.validation.issues) : null,
+      });
+      console.log(`  ✓ ${String(raw.record_id).padEnd(8)} ${(raw.symbol || '?').padEnd(12)} ${result.elapsed_ms}ms  ${p.headline?.slice(0, 70) || ''}${result.forced_pass ? ' (FORCED PASS)' : ''}`);
+    } else {
+      fail++;
+      insertEnriched(db, {
+        record_id:           raw.record_id,
+        headline:            null, dek: null,
+        the_number_value:    null, the_number_label: null,
+        whats_new:           null, why_it_matters: null, what_were_watching: null, faqs: null, the_full_read: null,
+        editorial_tone:      null, tone_score: null, tone_confidence: null, tone_reason: null,
+        canonical_category:  null, sector: null, key_entities: null,
+        model_used:          '',
+        prompt_version:      PROMPT_VERSION,
+        validation_ok:       0,
+        validation_issues:   JSON.stringify([result.error || 'unknown', ...(result.validation?.issues || [])]),
+      });
+      console.log(`  ✗ ${String(raw.record_id).padEnd(8)} ${(raw.symbol || '?').padEnd(12)} ${result.elapsed_ms ?? '?'}ms  ${result.error}${result.validation?.issues ? ' | ' + result.validation.issues.slice(0, 3).join(';') : ''}`);
+    }
+  }
+  console.log(`[enrich-ids] ok=${ok} fail=${fail} tokens in=${totalIn} out=${totalOut}`);
+  return { ok, fail, totalIn, totalOut };
+}
+
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 export async function fetchFundamentalsAll() {
@@ -513,6 +612,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     if (cmd === 'poll')              { await poll(); }
     else if (cmd === 'enrich')       { await enrichBatch(n); }
+    else if (cmd === 'enrich-ids')   { await enrichIds(process.argv.slice(3)); }
     else if (cmd === 'both')         { await poll(); await enrichBatch(n); await resolveTijoriSlugs(50); await generateRadar(); }
     else if (cmd === 'fetch-fundamentals')    { await fetchFundamentalsAll(); }
     else if (cmd === 'resolve-tijori-slugs')   { await resolveTijoriSlugs(n || 100); }
@@ -526,7 +626,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     else if (cmd === 'stats')                 { showStats(); }
     else {
       console.error(`Unknown command: ${cmd}`);
-      console.error('Usage: node run.mjs [poll|enrich N|both N|fetch-fundamentals|resolve-tijori-slugs N|generate-radar N|poll-concalls N|enrich-concalls N|concalls N|stats]');
+      console.error('Usage: node run.mjs [poll|enrich N|enrich-ids ID[,ID...]|both N|fetch-fundamentals|resolve-tijori-slugs N|generate-radar N|poll-concalls N|enrich-concalls N|concalls N|stats]');
       process.exit(1);
     }
   } catch (e) {
