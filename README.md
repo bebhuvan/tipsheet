@@ -140,7 +140,7 @@ Market-cap tiers are derived from `fundamentals.market_cap` in crore:
 
 Pipeline runs update `source_health` in the SQLite/D1 schema. The site publishes a lightweight health document at `/api/health.json` with latest source status, article counts, and newest filing timestamps.
 
-The Cloudflare Worker also has a scheduled watchdog (`site/wrangler.toml`) that can dispatch `pipeline.yml` if the latest successful Fast News run is stale. Configure `GITHUB_REPOSITORY` and `GITHUB_ACTIONS_TOKEN` as Cloudflare secrets before relying on it.
+The Cloudflare Worker includes watchdog code that can dispatch `pipeline.yml` if the latest successful Fast News run is stale. The Worker cron is not registered in `site/wrangler.toml` right now because the current Cloudflare account is at the 5-cron trigger limit; enable a cron there only after freeing a trigger or moving to a plan with more cron capacity. Configure `GITHUB_REPOSITORY` and `GITHUB_ACTIONS_TOKEN` as Cloudflare secrets before relying on it.
 
 Article slugs are now immutable once first written to `filings_enriched.slug`. Future headline edits should not change published URLs.
 
