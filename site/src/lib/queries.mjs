@@ -234,8 +234,9 @@ export function priorFilingsForSymbol(symbol, excludeRecordId, limit = 5) {
 
 /** Homepage data bundle: lead + secondaries + midtier + briefs + wire. */
 export function getHomepageBundle() {
-  const todayYmd = currentIstYmd();
   const top = listFilings({ limit: 160 });
+  const latestPublishedAt = top[0]?.created_on || null;
+  const latestYmd = String(latestPublishedAt || '').match(/^(\d{4}-\d{2}-\d{2})/)?.[1] || currentIstYmd();
   const sorted = [...top].sort(compareHomepageOrder);
   const lead = sorted[0] || null;
   const secondaries = sorted.slice(1, 4);
@@ -280,15 +281,15 @@ export function getHomepageBundle() {
     FROM filings_raw r
     JOIN filings_enriched e ON e.record_id = r.record_id
     WHERE e.validation_ok = 1 AND substr(r.created_on, 1, 10) = ?
-  `).get(todayYmd).c;
+  `).get(latestYmd).c;
   const hiScoreToday = db().prepare(`
     SELECT COUNT(*) AS c
     FROM filings_raw r
     JOIN filings_enriched e ON e.record_id = r.record_id
     WHERE r.score >= 8 AND e.validation_ok = 1 AND substr(r.created_on, 1, 10) = ?
-  `).get(todayYmd).c;
+  `).get(latestYmd).c;
 
-  return { lead, secondaries, leadCompanions, midtier: midtierRest, briefs, wire, dist, totalToday, totalPublished, hiScore, hiScoreToday };
+  return { lead, secondaries, leadCompanions, midtier: midtierRest, briefs, wire, dist, totalToday, totalPublished, hiScore, hiScoreToday, latestPublishedAt, latestYmd };
 }
 
 function currentIstYmd(date = new Date()) {
