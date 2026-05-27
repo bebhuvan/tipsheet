@@ -81,6 +81,54 @@ function redirectPath(url, pathname, status = 301) {
   return Response.redirect(target.toString(), status);
 }
 
+async function maybeDispatchGitHubWatchdog(env) {
+  const token = env.GITHUB_ACTIONS_TOKEN || env.GITHUB_TOKEN;
+  const repo = env.GITHUB_REPOSITORY;
+  const workflow = env.WATCHDOG_WORKFLOW || 'pipeline.yml';
+  const branch = env.WATCHDOG_BRANCH || 'main';
+  const maxStaleMin = Number(env.WATCHDOG_MAX_STALE_MIN || 45);
+  if (!token || !repo || !maxStaleMin) return { skipped: 'missing-config' };
+
+  const headers = {
+    'Accept': 'application/vnd.github+json',
+    'Authorization': `Bearer ${token}`,
+    'User-Agent': 'tipsheet-cloudflare-watchdog',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const runsUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(workflow)}/runs?branch=${encodeURIComponent(branch)}&per_page=5`;
+  const runsResponse = await fetch(runsUrl, { headers });
+  if (!runsResponse.ok) return { skipped: 'runs-api-failed', status: runsResponse.status };
+  const runsBody = await runsResponse.json();
+  const runs = Array.isArray(runsBody.workflow_runs) ? runsBody.workflow_runs : [];
+  if (runs.some(run => run.status === 'queued' || run.status === 'in_progress')) {
+    return { skipped: 'run-active' };
+  }
+
+  const latestSuccess = runs.find(run => run.conclusion === 'success');
+  const latestAt = latestSuccess?.updated_at ? Date.parse(latestSuccess.updated_at) : 0;
+  const ageMin = latestAt ? (Date.now() - latestAt) / 60000 : Infinity;
+  if (ageMin < maxStaleMin) return { skipped: 'fresh', ageMin: Math.round(ageMin) };
+
+  const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`;
+  const dispatchResponse = await fetch(dispatchUrl, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ref: branch,
+      inputs: {
+        skip_pipeline: 'false',
+        skip_deploy: 'false',
+        enrich_limit: '50',
+      },
+    }),
+  });
+  return {
+    dispatched: dispatchResponse.ok,
+    status: dispatchResponse.status,
+    ageMin: Number.isFinite(ageMin) ? Math.round(ageMin) : null,
+  };
+}
+
 async function handleWidgetApi(pathname, env) {
   const match = pathname.match(/^\/api\/widget\/([a-zA-Z0-9_-]+)$/);
   if (!match) return null;
@@ -112,6 +160,16 @@ async function handleWidgetApi(pathname, env) {
 }
 
 export default {
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(
+      maybeDispatchGitHubWatchdog(env).then(result => {
+        console.log('[watchdog]', JSON.stringify(result));
+      }).catch(error => {
+        console.error('[watchdog] failed:', error?.message || error);
+      }),
+    );
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
 

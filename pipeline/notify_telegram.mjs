@@ -9,7 +9,7 @@
 //   SITE_URL             defaults to https://tipsheet.markets
 //   NOTIFY_SCORE_MIN     minimum score to push (default 5)
 //   TELEGRAM_DELIVERY_MODE digest | individual (default digest)
-import { openDb } from './db.mjs';
+import { buildArticleSlug, openDb } from './db.mjs';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT = process.env.TELEGRAM_CHAT_ID;
@@ -33,11 +33,6 @@ if (!TOKEN || !CHAT) {
   process.exit(0);
 }
 
-function buildSlug(symbol, headline, recordId) {
-  const sym = String(symbol || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const hd = String(headline || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return hd ? `${sym}-${hd}-${recordId}` : `${sym}-${recordId}`;
-}
 const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const tierFor = (s) => (s >= 9 ? '🔴 Alert' : s >= 7 ? '🟠 Lead' : '⚪️ Brief');
 const plainTierFor = (s) => (s >= 9 ? 'Alert' : s >= 7 ? 'Lead' : 'Brief');
@@ -100,7 +95,7 @@ function buildBriefingMessage(b, events) {
 }
 
 function articleUrl(r) {
-  return `${SITE}/${buildSlug(r.symbol, r.headline, r.record_id)}/`;
+  return `${SITE}/${r.slug || buildArticleSlug(r.symbol, r.headline, r.record_id)}/`;
 }
 
 function buildFallbackDigest(rows) {
@@ -291,7 +286,7 @@ async function main() {
   const rows = TEST
     ? db.prepare(`
         SELECT r.symbol, r.company, r.score, r.record_id,
-               e.headline, e.dek, e.the_number_value, e.the_number_label, e.canonical_category
+               e.headline, e.dek, e.the_number_value, e.the_number_label, e.canonical_category, e.slug
         FROM filings_enriched e
         JOIN filings_raw r ON r.record_id = e.record_id
         WHERE e.validation_ok = 1
@@ -300,7 +295,7 @@ async function main() {
       `).all()
     : db.prepare(`
         SELECT r.symbol, r.company, r.score, r.record_id,
-               e.headline, e.dek, e.the_number_value, e.the_number_label, e.canonical_category
+               e.headline, e.dek, e.the_number_value, e.the_number_label, e.canonical_category, e.slug
         FROM filings_enriched e
         JOIN filings_raw r ON r.record_id = e.record_id
         WHERE e.validation_ok = 1 AND e.notified_at IS NULL AND r.score >= ?
@@ -321,7 +316,7 @@ async function main() {
   const mark = db.prepare('UPDATE filings_enriched SET notified_at = ? WHERE record_id = ?');
   let sent = 0;
   for (const r of rows) {
-    const url = `${SITE}/${buildSlug(r.symbol, r.headline, r.record_id)}/`;
+    const url = articleUrl(r);
     const cat = r.canonical_category && r.canonical_category !== 'Other' ? ` · ${escapeHtml(r.canonical_category)}` : '';
     const number = r.the_number_value ? `\n<b>${escapeHtml(r.the_number_value)}</b>${r.the_number_label ? ' ' + escapeHtml(r.the_number_label) : ''}` : '';
     const text =

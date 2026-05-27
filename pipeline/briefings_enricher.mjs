@@ -17,13 +17,13 @@ import { PHRASE_PATTERNS, STRUCTURAL_RULES } from './banned-patterns.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PATH = resolve(__dirname, 'prompts/briefings_system.txt');
 const USER_PATH   = resolve(__dirname, 'prompts/briefings_user.txt');
-export const BRIEFING_PROMPT_VERSION = 'briefing.v4';
+export const BRIEFING_PROMPT_VERSION = 'briefing.v5';
 
 const CFG = {
   baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
   apiKey:      process.env.LLM_API_KEY  || process.env.GOOGLE_API_KEY,
   model:       process.env.LLM_MODEL    || 'gemini-3.1-flash-lite',
-  maxTokens:   Number(process.env.LLM_MAX_TOKENS_BRIEFING || 2000),
+  maxTokens:   Number(process.env.LLM_MAX_TOKENS_BRIEFING || 3600),
   temperature: Number(process.env.LLM_TEMPERATURE || 1.0),
   timeoutMs:   Number(process.env.LLM_TIMEOUT_MS || 45000),
 };
@@ -41,9 +41,9 @@ async function loadPrompts() {
  * @param db better-sqlite3 Database
  * @param type 'open' | 'close'
  * @param dateYmd YYYY-MM-DD (IST)
- * @param windowHours how far back to pull filings (default 24)
+ * @param windowHours how far back to pull filings (default 30)
  */
-export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 24 } = {}) {
+export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 30 } = {}) {
   // Top filings in the last N hours
   const cutoff = new Date(dateYmd + 'T00:00:00+05:30');
   cutoff.setHours(cutoff.getHours() - windowHours);
@@ -60,7 +60,7 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 24 } = {
     LEFT JOIN fundamentals f ON f.symbol = r.symbol
     WHERE e.validation_ok = 1 AND r.created_on >= ?
     ORDER BY r.score DESC, r.created_on DESC
-    LIMIT 14
+    LIMIT 32
   `).all(cutoffIso);
 
   // Recent mgmt-consistency flags (last 7 days)
@@ -74,6 +74,16 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 24 } = {
     WHERE e.validation_ok = 1 AND e.inconsistency_flag IS NOT NULL AND e.inconsistency_flag != ''
       AND c.event_time >= ?
     ORDER BY c.event_time DESC LIMIT 3
+  `).all(concallCutoffIso);
+
+  const recentConcalls = db.prepare(`
+    SELECT c.symbol, c.company_name, c.sector, c.event_time,
+           e.headline, e.dek, e.the_take, e.inconsistency_flag,
+           e.whats_new, e.key_quotes, e.the_brief
+    FROM concalls_raw c JOIN concalls_enriched e ON e.isin = c.isin AND e.event_time = c.event_time
+    WHERE e.validation_ok = 1 AND c.event_time >= ?
+    ORDER BY c.event_time DESC
+    LIMIT 8
   `).all(concallCutoffIso);
 
   // Macro events scheduled for today (India + high-impact global)
@@ -101,6 +111,7 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 24 } = {
   return {
     type, date: dateYmd, window_hours: windowHours,
     top_filings: topFilings,
+    recent_concall_notes: recentConcalls,
     mgmt_consistency_flags: mgmtFlags,
     macro_events_today: macroEvents,
     market_snapshot: marketRows,
@@ -130,7 +141,16 @@ function renderTopFilings(rows) {
       r.revenue_growth != null ? `revenue growth ${fmt(r.revenue_growth, '%')}` : null,
       r.pat_growth != null ? `PAT growth ${fmt(r.pat_growth, '%')}` : null,
     ].filter(Boolean).join(' · ');
-    return `[filing_id ${r.record_id}] ${r.symbol || '?'} · ${r.company || ''} · score ${r.score} · ${r.category}\n  Headline: ${r.headline}\n  Number: ${r.the_number_value || ''} (${r.the_number_label || ''})\n  Financial context: ${financial || 'n/a'}\n  Why: ${r.why_it_matters || ''}`;
+    return `[filing_id ${r.record_id}] ${r.symbol || '?'} · ${r.company || ''} · score ${r.score} · ${r.category}\n  Sector/cap: ${[r.sector, capTier(r.market_cap)].filter(Boolean).join(' · ') || 'n/a'}\n  Headline: ${r.headline}\n  Number: ${r.the_number_value || ''} (${r.the_number_label || ''})\n  Financial context: ${financial || 'n/a'}\n  Why: ${r.why_it_matters || ''}`;
+  }).join('\n\n');
+}
+function renderRecentConcallNotes(rows) {
+  if (!rows.length) return '(none)';
+  const parse = (s) => { try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+  return rows.map(r => {
+    const bullets = parse(r.whats_new).slice(0, 4).map(x => `    - ${x}`).join('\n');
+    const quotes = parse(r.key_quotes).slice(0, 2).map(q => `    - "${q.quote}" — ${q.attribution || 'management'}`).join('\n');
+    return `- ${r.company_name} (${r.symbol || '?'}) · ${String(r.event_time).slice(0,10)} · ${r.sector || 'n/a'}\n  Headline: ${r.headline || ''}\n  Dek: ${r.dek || ''}\n  Take: ${r.the_take || ''}\n  Consistency flag: ${r.inconsistency_flag || 'none'}\n  What's new:\n${bullets || '    - n/a'}\n  Quotes:\n${quotes || '    - n/a'}`;
   }).join('\n\n');
 }
 function renderMgmtFlags(rows) {
@@ -165,6 +185,7 @@ function buildUserMessage(template, inputs) {
     .replace('{window_hours}',  String(inputs.window_hours))
     .replace('{market_snapshot}',          renderMarketSnapshot(inputs.market_snapshot))
     .replace('{top_filings}',              renderTopFilings(inputs.top_filings))
+    .replace('{recent_concall_notes}',      renderRecentConcallNotes(inputs.recent_concall_notes || []))
     .replace('{mgmt_consistency_flags}',   renderMgmtFlags(inputs.mgmt_consistency_flags))
     .replace('{macro_events_today}',       renderMacroEvents(inputs.macro_events_today));
 }
@@ -271,6 +292,8 @@ function validate(parsed, inputs) {
 
   // Events: must reference real filing_ids and carry real prose.
   const events = Array.isArray(parsed?.events) ? parsed.events : null;
+  const dayMap = Array.isArray(parsed?.day_map) ? parsed.day_map : [];
+  const concalls = Array.isArray(parsed?.concalls) ? parsed.concalls : [];
   const mgmt = Array.isArray(parsed?.mgmt_flags) ? parsed.mgmt_flags : [];
   const calendar = Array.isArray(parsed?.calendar) ? parsed.calendar : [];
   const eventIssues = [];
@@ -286,15 +309,18 @@ function validate(parsed, inputs) {
     }
     if (badId)  { issues.push(`event_filing_id_unknown:${badId}`); eventIssues.push(`${badId} event(s) used a filing_id not in top_filings.`); }
     if (thin)   { issues.push(`event_prose_thin:${thin}`);          eventIssues.push(`${thin} event(s) under 2-3 sentences.`); }
-    const wantMin = Math.min(6, inputs.top_filings.length);
+    const wantMin = Math.min(inputs.top_filings.length >= 18 ? 10 : 8, inputs.top_filings.length);
     if (events.length < wantMin) { issues.push(`events_too_few:${events.length}`); eventIssues.push(`Only ${events.length} events; cover more of the day (${inputs.top_filings.length} filings available).`); }
   }
+  if (inputs.top_filings.length >= 6 && dayMap.length < 3) issues.push('day_map_too_thin');
 
   // Collect all prose into one blob for the banned/structural validators.
   const prose = [
     parsed?.headline, parsed?.dek, parsed?.the_take,
+    ...dayMap,
     ...(events || []).map(e => e?.prose),
     ...mgmt.map(m => m?.prose),
+    ...concalls.map(c => c?.prose),
     ...calendar,
   ].filter(Boolean).join(' ');
 

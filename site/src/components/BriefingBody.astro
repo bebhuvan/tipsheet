@@ -9,6 +9,8 @@ const {
   theTake = '',
   market = [],          // [{symbol, name, price, change_pct}]
   events = [],          // resolved by getBriefingEvents()
+  dayMap = [],          // sector/cap shape of the day
+  concalls = [],        // [{symbol,date,prose}]
   mgmtFlags = [],       // [{symbol, date, prose}]
   calendar = [],        // [string]
   eventsLabel = 'What moved',
@@ -44,6 +46,30 @@ function concallUrl(symbol, date) {
   if (!symbol || !date) return null;
   return `/concalls/${String(symbol).toLowerCase()}/${date}/`;
 }
+
+const capGroups = (() => {
+  const order = ['Mega cap', 'Large cap', 'Mid cap', 'Small cap', 'Micro cap'];
+  const map = new Map();
+  for (const ev of events) {
+    const key = ev.market_cap_label || 'Unclassified';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(ev);
+  }
+  return [...map.entries()].sort((a, b) => {
+    const ai = order.indexOf(a[0]); const bi = order.indexOf(b[0]);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+})();
+
+const sectorGroups = (() => {
+  const map = new Map();
+  for (const ev of events) {
+    const key = ev.sector || 'Other';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(ev);
+  }
+  return [...map.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 8);
+})();
 ---
 
 <div class={`bf bf-${theme === 'open' ? 'open' : 'close'}`}>
@@ -67,6 +93,35 @@ function concallUrl(symbol, date) {
       <span class="bf-take-label">The take</span>
       <p>{theTake}</p>
     </aside>
+  )}
+
+  {(dayMap.length > 0 || capGroups.length > 0 || sectorGroups.length > 0) && (
+    <section class="bf-map" aria-label="Market map">
+      <div class="bf-sec-head"><span class="bf-eyebrow">Market map</span></div>
+      {dayMap.length > 0 && (
+        <ul class="bf-map-lines">
+          {dayMap.map(line => <li>{line}</li>)}
+        </ul>
+      )}
+      <div class="bf-map-grid">
+        <div>
+          <span class="bf-map-label">By size</span>
+          <div class="bf-pills">
+            {capGroups.map(([label, rows]) => (
+              <span class="bf-pill"><b>{label}</b><em>{rows.length}</em></span>
+            ))}
+          </div>
+        </div>
+        <div>
+          <span class="bf-map-label">By sector</span>
+          <div class="bf-pills">
+            {sectorGroups.map(([label, rows]) => (
+              <span class="bf-pill"><b>{label}</b><em>{rows.length}</em></span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   )}
 
   {events.length > 0 && (
@@ -122,6 +177,22 @@ function concallUrl(symbol, date) {
             <p>{f.prose}</p>
             {concallUrl(f.symbol, f.date) && (
               <a href={concallUrl(f.symbol, f.date)}>{f.symbol} concall note <span aria-hidden="true">→</span></a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {concalls.length > 0 && (
+    <section class="bf-block" aria-label="Concall read-throughs">
+      <div class="bf-sec-head"><span class="bf-eyebrow">From the calls</span></div>
+      <ul class="bf-flags">
+        {concalls.map(c => (
+          <li>
+            <p>{c.prose}</p>
+            {concallUrl(c.symbol, c.date) && (
+              <a href={concallUrl(c.symbol, c.date)}>{c.symbol} concall note <span aria-hidden="true">→</span></a>
             )}
           </li>
         ))}
@@ -203,6 +274,66 @@ function concallUrl(symbol, date) {
     margin: 0 0 4px; padding-bottom: 12px;
     border-bottom: 1.5px solid var(--text);
   }
+
+  .bf-map {
+    margin-top: 32px;
+  }
+  .bf-map-lines {
+    list-style: none;
+    padding: 0;
+    margin: 14px 0 18px;
+    display: grid;
+    gap: 9px;
+  }
+  .bf-map-lines li {
+    position: relative;
+    padding-left: 18px;
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.42;
+    color: var(--text);
+  }
+  .bf-map-lines li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.72em;
+    width: 8px;
+    border-top: 1px solid var(--bf-accent);
+  }
+  .bf-map-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+  }
+  .bf-map-label {
+    display: block;
+    margin-bottom: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .bf-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .bf-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 5px 8px;
+    border: 1px solid var(--hairline);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text);
+  }
+  .bf-pill b { font-weight: 500; }
+  .bf-pill em { font-style: normal; color: var(--bf-accent); }
   .bf-eyebrow {
     font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
     text-transform: uppercase; color: var(--bf-accent); font-weight: 500;

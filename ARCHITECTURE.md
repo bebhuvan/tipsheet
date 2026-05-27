@@ -94,7 +94,11 @@ The Tijori URL **is itself a secret** (B2B endpoint, no auth, knowledge of the U
 
 **Local dev**: `pipeline/loop.mjs` — long-running Node process; polls every 2 min, enriches new filings, sleeps, repeats. Idempotent (running twice is harmless).
 
-**Production (Cloudflare Workers)**:
+**Current production**: GitHub Actions restore the latest SQLite DB from the `filings-db-latest` release asset, run source-specific pipeline jobs, publish the DB back, build the Astro site, and deploy to Cloudflare Workers.
+
+The Cloudflare Worker includes a scheduled watchdog. If configured with `GITHUB_REPOSITORY` and `GITHUB_ACTIONS_TOKEN`, it checks the latest `pipeline.yml` run every 30 minutes and dispatches a catch-up run if Fast News is stale. Source runs write their status to `source_health`; the public health snapshot is `/api/health.json`.
+
+**Target production (Cloudflare Workers)**:
 - Cron Trigger → Poller Worker (every 2 min during market hours, every 15 min off-hours)
 - Poller pushes new record_ids to a **Cloudflare Queue**
 - Enricher Worker consumes the queue (concurrency = 8, retries built-in)
@@ -198,7 +202,10 @@ Baked into the Astro build:
 - `/robots.txt` permissive to citation bots (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`, `OAI-SearchBot`)
 - `/feed.xml` (RSS) + `/feed.json` (JSON Feed)
 - Google News–compatible sitemap at `/sitemap-news.xml`
+- `/sitemap.xml` as a sitemap index, with child sitemaps under `/sitemaps/`
 - Public read-only JSON API at `/api/filings.json` and `/api/filing/[id].json`
+
+Article URLs are immutable after first publication. `filings_enriched.slug` is generated once and reused for all links; the headline can be edited without changing the canonical URL.
 
 ## Telegram Distribution
 
@@ -215,7 +222,7 @@ The `briefings` table uses `(type, date)` as its primary key. That means:
 - older dates are retained and listed at `/briefings/`;
 - generated prompt version and model are stored for audit.
 
-The briefing prompt deliberately asks for 6-10 high-signal events rather than every article. It also tells the model to balance reader relevance by market cap: micro-cap events can lead when they are material, forensic, or broadly instructive, but a cluster of micro-cap filings should not bury broader large/mid-cap developments.
+The briefing prompt deliberately asks for 10-14 high-signal events on busy days rather than every article. It also tells the model to balance reader relevance by market cap: micro-cap events can lead when they are material, forensic, or broadly instructive, but a cluster of micro-cap filings should not bury broader large/mid-cap developments. The rendered briefing adds a sector and market-cap map plus recent Concall Note read-throughs so the digest has more shape than a headline list.
 
 ## What's intentionally NOT built yet
 

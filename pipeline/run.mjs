@@ -7,7 +7,7 @@
 // Run with: node --env-file=../.env run.mjs <command>
 
 import { fetchLatestFeed, flattenItem } from './poller.mjs';
-import { openDb, insertRaw, hasRecord, insertEnriched, listUnenriched, stats, upsertFundamentals, fundamentalCount, insertConcalls, concallStats, listUnenrichedConcalls, insertEnrichedConcall, insertMacroEvents, macroCalendarStats, upsertBriefing, listCompaniesNeedingTijoriSlug, setTijoriSlug, listRadarSourceRows, listRecentConcallFlags, upsertRadarItems, deactivateStaleRadarItems, listExistingRadarItems } from './db.mjs';
+import { openDb, insertRaw, hasRecord, insertEnriched, listUnenriched, stats, upsertFundamentals, fundamentalCount, insertConcalls, concallStats, listUnenrichedConcalls, insertEnrichedConcall, insertMacroEvents, macroCalendarStats, upsertBriefing, listCompaniesNeedingTijoriSlug, setTijoriSlug, listRadarSourceRows, listRecentConcallFlags, upsertRadarItems, deactivateStaleRadarItems, listExistingRadarItems, updateSourceHealth } from './db.mjs';
 import { enrich, PROMPT_VERSION } from './enricher.mjs';
 import { enrichConcall, CONCALL_PROMPT_VERSION } from './concalls_enricher.mjs';
 import { fetchFundamentals, flattenFundamental, resolveTijoriCompanySlug } from './fundamentals.mjs';
@@ -22,6 +22,7 @@ const SCORE_MIN = Number(process.env.SCORE_MIN || 5);
 const PARALLEL  = Number(process.env.PARALLEL  || 4);
 
 export async function poll() {
+  const startedAt = Date.now();
   console.log('[poll] fetching tijori feed...');
   const items = await fetchLatestFeed();
   console.log(`[poll] received ${items.length} items`);
@@ -39,14 +40,26 @@ export async function poll() {
     inserted++;
   }
   console.log(`[poll] inserted=${inserted}  skipped(invalid)=${skipped_invalid}  skipped(dup)=${skipped_dup}`);
+  updateSourceHealth(db, 'filings', {
+    status: 'success',
+    startedAt,
+    inserted,
+    items: items.length,
+    latestSourceTime: items.map(item => flattenItem(item)?.created_on).filter(Boolean).sort().at(-1) || null,
+    meta: { skipped_invalid, skipped_dup },
+  });
   return { inserted, skipped_invalid, skipped_dup };
 }
 
 export async function enrichBatch(max = 50) {
+  const startedAt = Date.now();
   const db = openDb();
   const pending = listUnenriched(db, SCORE_MIN, max);
   console.log(`[enrich] ${pending.length} filings pending (score >= ${SCORE_MIN})`);
-  if (pending.length === 0) return;
+  if (pending.length === 0) {
+    updateSourceHealth(db, 'filings_enrichment', { status: 'success', startedAt, enriched: 0, items: 0 });
+    return { ok: 0, fail: 0 };
+  }
 
   let ok = 0, fail = 0, totalIn = 0, totalOut = 0;
 
@@ -126,11 +139,20 @@ export async function enrichBatch(max = 50) {
     }));
   }
   console.log(`[enrich] ok=${ok}  fail=${fail}  tokens in=${totalIn} out=${totalOut}`);
+  updateSourceHealth(db, 'filings_enrichment', {
+    status: fail ? 'partial' : 'success',
+    startedAt,
+    enriched: ok,
+    items: pending.length,
+    meta: { fail, totalIn, totalOut },
+  });
+  return { ok, fail, totalIn, totalOut };
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 export async function fetchFundamentalsAll() {
+  const startedAt = Date.now();
   console.log('[fundamentals] fetching from Kite Screener...');
   const t0 = Date.now();
   const raw = await fetchFundamentals();
@@ -139,6 +161,7 @@ export async function fetchFundamentalsAll() {
   const db = openDb();
   const n = upsertFundamentals(db, rows);
   console.log(`[fundamentals] upserted ${n} rows; total in DB: ${fundamentalCount(db)}`);
+  updateSourceHealth(db, 'fundamentals', { status: 'success', startedAt, inserted: n, items: rows.length });
   return { count: n };
 }
 
@@ -164,6 +187,7 @@ export async function resolveTijoriSlugs(max = 100) {
 }
 
 export async function generateRadar({ days = 30, limit = 80, enrich = process.env.RADAR_ENRICH !== '0' } = {}) {
+  const startedAt = Date.now();
   const db = openDb();
   const sourceRows = listRadarSourceRows(db, days);
   const concallFlags = listRecentConcallFlags(db, Math.max(days, 45));
@@ -222,6 +246,13 @@ export async function generateRadar({ days = 30, limit = 80, enrich = process.en
   for (const item of items.slice(0, 10)) {
     console.log(`  ${String(Math.round(item.radar_score)).padStart(3)} ${item.symbol.padEnd(12)} ${item.trigger_type.padEnd(16)} ${item.title}`);
   }
+  updateSourceHealth(db, 'radar', {
+    status: 'success',
+    startedAt,
+    inserted: n,
+    items: items.length,
+    meta: { sourceRows: sourceRows.length, stale, llmCalls, llmCached, llmFailed, llmEscaped },
+  });
   return { active: n, stale, llmCalls, llmCached, llmFailed, llmEscaped };
 }
 
@@ -247,10 +278,14 @@ function showStats() {
 }
 
 export async function enrichConcallsBatch(max = 50) {
+  const startedAt = Date.now();
   const db = openDb();
   const pending = listUnenrichedConcalls(db, max);
   console.log(`[concalls-enrich] ${pending.length} concalls pending`);
-  if (pending.length === 0) return { ok: 0, fail: 0 };
+  if (pending.length === 0) {
+    updateSourceHealth(db, 'concalls_enrichment', { status: 'success', startedAt, enriched: 0, items: 0 });
+    return { ok: 0, fail: 0 };
+  }
 
   let ok = 0, fail = 0, totalIn = 0, totalOut = 0, totalCached = 0;
 
@@ -282,6 +317,9 @@ export async function enrichConcallsBatch(max = 50) {
           the_take:           p.the_take,
           inconsistency_flag: p.inconsistency_flag,
           whats_new:          JSON.stringify(p.whats_new || []),
+          themes:             JSON.stringify(p.themes || []),
+          guidance_watch:      JSON.stringify(p.guidance_watch || []),
+          risk_flags:          JSON.stringify(p.risk_flags || []),
           key_quotes:         JSON.stringify(p.key_quotes || []),
           the_brief:          p.the_brief,
           canonical_category: p.canonical_category || 'Concalls',
@@ -296,7 +334,7 @@ export async function enrichConcallsBatch(max = 50) {
         insertEnrichedConcall(db, {
           isin: raw.isin, event_time: raw.event_time,
           headline: null, dek: null, the_take: null, inconsistency_flag: null,
-          whats_new: null, key_quotes: null, the_brief: null,
+          whats_new: null, themes: null, guidance_watch: null, risk_flags: null, key_quotes: null, the_brief: null,
           canonical_category: 'Concalls',
           model_used: '', prompt_version: CONCALL_PROMPT_VERSION,
           validation_ok: 0,
@@ -307,6 +345,13 @@ export async function enrichConcallsBatch(max = 50) {
     }));
   }
   console.log(`[concalls-enrich] ok=${ok}  fail=${fail}  tokens in=${totalIn} (cached ${totalCached}) out=${totalOut}`);
+  updateSourceHealth(db, 'concalls_enrichment', {
+    status: fail ? 'partial' : 'success',
+    startedAt,
+    enriched: ok,
+    items: pending.length,
+    meta: { fail, totalIn, totalOut, totalCached },
+  });
   return { ok, fail };
 }
 
@@ -316,6 +361,7 @@ export async function enrichConcallsBatch(max = 50) {
  * filled in after release; we replace).
  */
 export async function pollMacroCalendar({ from_date = null, to_date = null, max_pages = 5 } = {}) {
+  const startedAt = Date.now();
   const today = new Date();
   const fmt = (d) => d.toISOString().slice(0, 10);
   from_date = from_date || fmt(today);
@@ -344,6 +390,14 @@ export async function pollMacroCalendar({ from_date = null, to_date = null, max_
     if (rows.length === 0) break;
   }
   console.log(`[macro-cal] done: pages=${pageN} seen=${totalSeen} inserted=${totalInserted} invalid=${totalInvalid}`);
+  updateSourceHealth(db, 'macro_calendar', {
+    status: 'success',
+    startedAt,
+    inserted: totalInserted,
+    items: totalSeen,
+    latestSourceTime: to_date,
+    meta: { from_date, to_date, invalid: totalInvalid, pages: pageN },
+  });
   return { seen: totalSeen, inserted: totalInserted };
 }
 
@@ -352,6 +406,7 @@ export async function pollMacroCalendar({ from_date = null, to_date = null, max_
  * Idempotent: re-running upserts in place.
  */
 export async function generateBriefing(type, dateYmd = null) {
+  const startedAt = Date.now();
   if (!['open', 'close'].includes(type)) throw new Error("type must be 'open' or 'close'");
   if (!dateYmd) {
     const now = new Date();
@@ -364,6 +419,7 @@ export async function generateBriefing(type, dateYmd = null) {
   console.log(`[briefing] inputs: filings=${inputs.top_filings.length} mgmt_flags=${inputs.mgmt_consistency_flags.length} macro=${inputs.macro_events_today.length} market=${inputs.market_snapshot.length}`);
   if (inputs.top_filings.length === 0 && inputs.macro_events_today.length === 0) {
     console.log('[briefing] nothing to brief — skipping');
+    updateSourceHealth(db, `briefing_${type}`, { status: 'success', startedAt, items: 0, latestSourceTime: dateYmd, meta: { skipped: true } });
     return { skipped: true };
   }
   const t0 = Date.now();
@@ -389,7 +445,7 @@ export async function generateBriefing(type, dateYmd = null) {
     headline:        p.headline,
     dek:             p.dek,
     the_take:        p.the_take,
-    sections:        JSON.stringify({ events: p.events || [], mgmt_flags: p.mgmt_flags || [], calendar: p.calendar || [] }),
+    sections:        JSON.stringify({ events: p.events || [], day_map: p.day_map || [], concalls: p.concalls || [], mgmt_flags: p.mgmt_flags || [], calendar: p.calendar || [] }),
     input_summary:   JSON.stringify({
       filings_count: inputs.top_filings.length,
       mgmt_flags_count: inputs.mgmt_consistency_flags.length,
@@ -402,10 +458,19 @@ export async function generateBriefing(type, dateYmd = null) {
     validation_issues: result.ok ? null : JSON.stringify(result.validation?.issues || []),
   });
   console.log(`[briefing] ✓ stored: ${p.headline}`);
+  updateSourceHealth(db, `briefing_${type}`, {
+    status: result.ok ? 'success' : 'partial',
+    startedAt,
+    inserted: 1,
+    items: inputs.top_filings.length,
+    latestSourceTime: dateYmd,
+    meta: { macro_count: inputs.macro_events_today.length, mgmt_flags_count: inputs.mgmt_consistency_flags.length },
+  });
   return result;
 }
 
 export async function pollConcalls(maxItems = 100, opts = {}) {
+  const startedAt = Date.now();
   console.log(`[concalls] polling Tijori Concall Monitor (budget=${maxItems})...`);
   const db = openDb();
   let totalSeen = 0, totalInserted = 0, totalMapped = 0, totalUnmapped = 0, totalInvalid = 0, pageN = 0;
@@ -421,6 +486,13 @@ export async function pollConcalls(maxItems = 100, opts = {}) {
     console.log(`  page ${pageN}: seen=${page.items.length} new=${r.inserted} mapped=${r.mapped} unmapped=${r.unmapped} invalid=${page.invalid_count}`);
   }
   console.log(`[concalls] done: pages=${pageN} seen=${totalSeen} new=${totalInserted} mapped=${totalMapped} unmapped=${totalUnmapped} invalid=${totalInvalid}`);
+  updateSourceHealth(db, 'concalls', {
+    status: 'success',
+    startedAt,
+    inserted: totalInserted,
+    items: totalSeen,
+    meta: { mapped: totalMapped, unmapped: totalUnmapped, invalid: totalInvalid, pages: pageN },
+  });
   return { seen: totalSeen, inserted: totalInserted };
 }
 
@@ -450,6 +522,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       process.exit(1);
     }
   } catch (e) {
+    try {
+      updateSourceHealth(openDb(), `command_${cmd}`, { status: 'failure', error: e?.message || e });
+    } catch { /* best-effort health marker */ }
     console.error('FATAL:', e);
     process.exit(1);
   }

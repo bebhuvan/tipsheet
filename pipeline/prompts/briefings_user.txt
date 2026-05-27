@@ -8,6 +8,9 @@ LATEST MARKET SNAPSHOT (context only — do not restate index levels in prose):
 TOP FILINGS FROM THE LAST {window_hours}h (highest score first). Build your events from these; reference each by its filing_id:
 {top_filings}
 
+RECENT CONCALL NOTES (use only if they add guidance, tone, contradiction or sector read-through):
+{recent_concall_notes}
+
 CONCALL MANAGEMENT-CONSISTENCY FLAGS (recent flip-flops worth surfacing as mgmt_flags):
 {mgmt_consistency_flags}
 

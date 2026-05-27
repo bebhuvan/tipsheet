@@ -28,8 +28,14 @@ export function openDb(path = process.env.DB_PATH || DEFAULT_DB) {
   migrateAddColumn(_db, 'filings_enriched', 'tone_confidence', 'TEXT');
   migrateAddColumn(_db, 'filings_enriched', 'tone_reason', 'TEXT');
   migrateAddColumn(_db, 'filings_enriched', 'notified_at', 'INTEGER');
+  migrateAddColumn(_db, 'filings_enriched', 'slug', 'TEXT');
   migrateAddColumn(_db, 'briefings', 'notified_at', 'INTEGER');
   migrateAddColumn(_db, 'fundamentals', 'tijori_slug', 'TEXT');
+  migrateAddColumn(_db, 'concalls_enriched', 'themes', 'TEXT');
+  migrateAddColumn(_db, 'concalls_enriched', 'guidance_watch', 'TEXT');
+  migrateAddColumn(_db, 'concalls_enriched', 'risk_flags', 'TEXT');
+  _db['exec']('CREATE UNIQUE INDEX IF NOT EXISTS idx_enriched_slug ON filings_enriched(slug) WHERE slug IS NOT NULL');
+  backfillArticleSlugs(_db);
   return _db;
 }
 
@@ -38,6 +44,27 @@ function migrateAddColumn(db, table, column, type) {
   if (!cols.includes(column)) {
     db['exec'](`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
+}
+
+export function buildArticleSlug(symbol, headline, recordId) {
+  const sym = String(symbol || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const hd = String(headline || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return hd ? `${sym}-${hd}-${recordId}` : `${sym}-${recordId}`;
+}
+
+function backfillArticleSlugs(db) {
+  const rows = db.prepare(`
+    SELECT e.record_id, r.symbol, e.headline
+    FROM filings_enriched e
+    JOIN filings_raw r ON r.record_id = e.record_id
+    WHERE e.validation_ok = 1 AND (e.slug IS NULL OR e.slug = '')
+  `).all();
+  if (!rows.length) return;
+  const stmt = db.prepare('UPDATE filings_enriched SET slug = ? WHERE record_id = ? AND (slug IS NULL OR slug = ?)');
+  const tx = db.transaction((items) => {
+    for (const r of items) stmt.run(buildArticleSlug(r.symbol, r.headline, r.record_id), r.record_id, '');
+  });
+  tx(rows);
 }
 
 // ─── queries ────────────────────────────────────────────────────────
@@ -63,21 +90,82 @@ export function insertRaw(db, row) {
 }
 
 const _insertEnriched = (db) => db.prepare(`
-  INSERT OR REPLACE INTO filings_enriched
+  INSERT INTO filings_enriched
     (record_id, headline, dek, the_number_value, the_number_label,
      whats_new, why_it_matters, what_were_watching, faqs, the_full_read,
      editorial_tone, tone_score, tone_confidence, tone_reason,
-     canonical_category, sector, key_entities, model_used, prompt_version,
+     canonical_category, sector, key_entities, slug, model_used, prompt_version,
      enriched_at, validation_ok, validation_issues)
   VALUES
     (@record_id, @headline, @dek, @the_number_value, @the_number_label,
      @whats_new, @why_it_matters, @what_were_watching, @faqs, @the_full_read,
      @editorial_tone, @tone_score, @tone_confidence, @tone_reason,
-     @canonical_category, @sector, @key_entities, @model_used, @prompt_version,
+     @canonical_category, @sector, @key_entities, @slug, @model_used, @prompt_version,
      @enriched_at, @validation_ok, @validation_issues)
+  ON CONFLICT(record_id) DO UPDATE SET
+    headline=excluded.headline,
+    dek=excluded.dek,
+    the_number_value=excluded.the_number_value,
+    the_number_label=excluded.the_number_label,
+    whats_new=excluded.whats_new,
+    why_it_matters=excluded.why_it_matters,
+    what_were_watching=excluded.what_were_watching,
+    faqs=excluded.faqs,
+    the_full_read=excluded.the_full_read,
+    editorial_tone=excluded.editorial_tone,
+    tone_score=excluded.tone_score,
+    tone_confidence=excluded.tone_confidence,
+    tone_reason=excluded.tone_reason,
+    canonical_category=excluded.canonical_category,
+    sector=excluded.sector,
+    key_entities=excluded.key_entities,
+    slug=COALESCE(filings_enriched.slug, excluded.slug),
+    model_used=excluded.model_used,
+    prompt_version=excluded.prompt_version,
+    enriched_at=excluded.enriched_at,
+    validation_ok=excluded.validation_ok,
+    validation_issues=excluded.validation_issues
 `);
 export function insertEnriched(db, row) {
-  return _insertEnriched(db).run({ enriched_at: Date.now(), ...row });
+  const raw = row.symbol ? row : db.prepare('SELECT symbol FROM filings_raw WHERE record_id = ?').get(row.record_id);
+  const slug = row.validation_ok ? buildArticleSlug(raw?.symbol, row.headline, row.record_id) : null;
+  return _insertEnriched(db).run({ enriched_at: Date.now(), slug, ...row });
+}
+
+const _upsertSourceHealth = (db) => db.prepare(`
+  INSERT INTO source_health
+    (source, status, started_at, completed_at, last_success_at,
+     inserted_count, enriched_count, item_count, latest_source_time, error, meta_json)
+  VALUES
+    (@source, @status, @started_at, @completed_at, @last_success_at,
+     @inserted_count, @enriched_count, @item_count, @latest_source_time, @error, @meta_json)
+  ON CONFLICT(source) DO UPDATE SET
+    status=excluded.status,
+    started_at=excluded.started_at,
+    completed_at=excluded.completed_at,
+    last_success_at=COALESCE(excluded.last_success_at, source_health.last_success_at),
+    inserted_count=excluded.inserted_count,
+    enriched_count=excluded.enriched_count,
+    item_count=excluded.item_count,
+    latest_source_time=COALESCE(excluded.latest_source_time, source_health.latest_source_time),
+    error=excluded.error,
+    meta_json=excluded.meta_json
+`);
+
+export function updateSourceHealth(db, source, { status = 'success', startedAt = null, completedAt = Date.now(), inserted = null, enriched = null, items = null, latestSourceTime = null, error = null, meta = null } = {}) {
+  return _upsertSourceHealth(db).run({
+    source,
+    status,
+    started_at: startedAt,
+    completed_at: completedAt,
+    last_success_at: status === 'success' ? completedAt : null,
+    inserted_count: inserted,
+    enriched_count: enriched,
+    item_count: items,
+    latest_source_time: latestSourceTime,
+    error: error ? String(error).slice(0, 1000) : null,
+    meta_json: meta ? JSON.stringify(meta) : null,
+  });
 }
 
 export function listUnenriched(db, scoreMin = 5, limit = 200) {
@@ -177,11 +265,11 @@ export function listUnenrichedConcalls(db, limit = 50) {
 const _insertEnrichedConcall = (db) => db.prepare(`
   INSERT OR REPLACE INTO concalls_enriched
     (isin, event_time, headline, dek, the_take, inconsistency_flag,
-     whats_new, key_quotes, the_brief, canonical_category,
+     whats_new, themes, guidance_watch, risk_flags, key_quotes, the_brief, canonical_category,
      model_used, prompt_version, enriched_at, validation_ok, validation_issues)
   VALUES
     (@isin, @event_time, @headline, @dek, @the_take, @inconsistency_flag,
-     @whats_new, @key_quotes, @the_brief, @canonical_category,
+     @whats_new, @themes, @guidance_watch, @risk_flags, @key_quotes, @the_brief, @canonical_category,
      @model_used, @prompt_version, @enriched_at, @validation_ok, @validation_issues)
 `);
 export function insertEnrichedConcall(db, row) {

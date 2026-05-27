@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS filings_enriched (
   sector                 TEXT,
   faqs                   TEXT,
   key_entities           TEXT,
+  slug                   TEXT,
   model_used             TEXT,
   prompt_version         TEXT,
   enriched_at            INTEGER NOT NULL,
@@ -57,6 +58,23 @@ CREATE TABLE IF NOT EXISTS filings_enriched (
 CREATE INDEX IF NOT EXISTS idx_enriched_category ON filings_enriched(canonical_category);
 CREATE INDEX IF NOT EXISTS idx_enriched_sector   ON filings_enriched(sector);
 CREATE INDEX IF NOT EXISTS idx_enriched_ok       ON filings_enriched(validation_ok);
+-- Last known status of source/pipeline jobs. This powers freshness checks and
+-- an external watchdog without scraping GitHub Actions logs.
+CREATE TABLE IF NOT EXISTS source_health (
+  source              TEXT PRIMARY KEY,
+  status              TEXT NOT NULL,
+  started_at          INTEGER,
+  completed_at        INTEGER,
+  last_success_at     INTEGER,
+  inserted_count      INTEGER,
+  enriched_count      INTEGER,
+  item_count          INTEGER,
+  latest_source_time  TEXT,
+  error               TEXT,
+  meta_json           TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_source_health_status ON source_health(status);
+CREATE INDEX IF NOT EXISTS idx_source_health_success ON source_health(last_success_at DESC);
 
 -- Market snapshots — append-only history of every fetched quote.
 -- "Current" = MAX(fetched_at) per symbol. Never UPDATE; always INSERT.
@@ -179,8 +197,11 @@ CREATE TABLE IF NOT EXISTS concalls_enriched (
   the_take                TEXT,                  -- one-line editorial take
   inconsistency_flag      TEXT,                  -- the lede when mgmt-consistency surfaces a contradiction
   whats_new               TEXT,                  -- JSON array
+  themes                  TEXT,                  -- JSON array of {label, detail}
+  guidance_watch          TEXT,                  -- JSON array
+  risk_flags              TEXT,                  -- JSON array
   key_quotes              TEXT,                  -- JSON array of {quote, attribution}
-  the_brief               TEXT,                  -- 120-180 word editorial brief
+  the_brief               TEXT,                  -- 250-450 word editorial brief
   canonical_category      TEXT DEFAULT 'Concalls',
   model_used              TEXT,
   prompt_version          TEXT,

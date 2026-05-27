@@ -45,6 +45,7 @@ function hasColumn(table, col) {
 
 function shapeFiling(row) {
   if (!row) return null;
+  const slug = row.slug || buildSlug(row.symbol, row.headline, row.record_id);
   const marketCap = row.market_cap == null ? null : Number(row.market_cap);
   return {
     record_id:          row.record_id,
@@ -76,8 +77,8 @@ function shapeFiling(row) {
     tone_confidence:    row.tone_confidence,
     tone_reason:        row.tone_reason,
     key_entities:       parseJsonArray(row.key_entities),
-    slug:               buildSlug(row.symbol, row.headline, row.record_id),
-    canonical_url:      `/${buildSlug(row.symbol, row.headline, row.record_id)}/`,
+    slug,
+    canonical_url:      `/${slug}/`,
   };
 }
 
@@ -181,7 +182,7 @@ const ALL_COLS = `
   e.headline, e.dek, e.the_number_value, e.the_number_label,
   e.whats_new, e.why_it_matters, e.what_were_watching, e.faqs, e.the_full_read,
   e.editorial_tone, e.tone_score, e.tone_confidence, e.tone_reason,
-  e.key_entities
+  e.key_entities, ${hasColumn('filings_enriched', 'slug') ? 'e.slug' : 'NULL AS slug'}
 `;
 
 /** All publishable filings ordered newest first, optionally filtered. */
@@ -617,6 +618,8 @@ function shapeBriefing(row) {
   try { body = JSON.parse(row.sections || '{}'); } catch {}
   // Tolerate both the legacy array shape (v2 sections[]) and the v3 object shape.
   const events    = Array.isArray(body) ? [] : (Array.isArray(body.events) ? body.events : []);
+  const dayMap    = Array.isArray(body) ? [] : (Array.isArray(body.day_map) ? body.day_map : []);
+  const concalls  = Array.isArray(body) ? [] : (Array.isArray(body.concalls) ? body.concalls : []);
   const mgmtFlags = Array.isArray(body) ? [] : (Array.isArray(body.mgmt_flags) ? body.mgmt_flags : []);
   const calendar  = Array.isArray(body) ? [] : (Array.isArray(body.calendar) ? body.calendar : []);
   return {
@@ -625,7 +628,9 @@ function shapeBriefing(row) {
     headline:       row.headline,
     dek:            row.dek,
     the_take:       row.the_take,
+    day_map:        dayMap,
     events,
+    concalls,
     mgmt_flags:     mgmtFlags,
     calendar,
     legacy_sections: Array.isArray(body) ? body : null,  // old briefings still render
@@ -678,7 +683,8 @@ export function getBriefingEvents(events, { historyDays = 7 } = {}) {
     SELECT r.record_id, r.symbol, r.company, r.score,
            r.event_category_canonical AS category,
            e.headline, e.the_number_value, e.the_number_label,
-           f.market_cap, f.pe, f.roe, f.debt_to_equity, f.revenue_growth, f.pat_growth
+           ${hasColumn('filings_enriched', 'slug') ? 'e.slug' : 'NULL AS slug'},
+           f.sector, f.market_cap, f.pe, f.roe, f.debt_to_equity, f.revenue_growth, f.pat_growth
     FROM filings_raw r
     JOIN filings_enriched e ON e.record_id = r.record_id
     LEFT JOIN fundamentals f ON f.symbol = r.symbol
@@ -700,9 +706,11 @@ export function getBriefingEvents(events, { historyDays = 7 } = {}) {
       symbol:        row.symbol,
       company:       row.company,
       category:      row.category,
+      sector:        row.sector,
+      market_cap_label: marketCapLabel(row.market_cap),
       score:         row.score,
       prose:         String(ev?.prose || ''),
-      canonical_url: `/${buildSlug(row.symbol, row.headline, row.record_id)}/`,
+      canonical_url: `/${row.slug || buildSlug(row.symbol, row.headline, row.record_id)}/`,
       financials:    compactFinancials(row),
       history,                               // [{date, close}] chronological, for <Sparkline points>
       history_change: change,                // % over the window, for the chart caption
@@ -807,7 +815,11 @@ const CONCALL_COLS = `
   c.isin, c.event_time, c.symbol, c.company_name, c.sector, c.slug, c.status,
   c.recording_url, c.transcript_url, c.transcript_source, c.summary_highlight,
   e.headline, e.dek, e.the_take, e.inconsistency_flag,
-  e.whats_new, e.key_quotes, e.the_brief, e.canonical_category, e.model_used
+  e.whats_new,
+  ${hasColumn('concalls_enriched', 'themes') ? 'e.themes' : 'NULL AS themes'},
+  ${hasColumn('concalls_enriched', 'guidance_watch') ? 'e.guidance_watch' : 'NULL AS guidance_watch'},
+  ${hasColumn('concalls_enriched', 'risk_flags') ? 'e.risk_flags' : 'NULL AS risk_flags'},
+  e.key_quotes, e.the_brief, e.canonical_category, e.model_used
 `;
 
 function shapeConcall(row) {
@@ -831,6 +843,9 @@ function shapeConcall(row) {
     the_take:           row.the_take,
     inconsistency_flag: row.inconsistency_flag,
     whats_new:          parseJsonArray(row.whats_new),
+    themes:             parseJsonArray(row.themes),
+    guidance_watch:     parseJsonArray(row.guidance_watch),
+    risk_flags:         parseJsonArray(row.risk_flags),
     key_quotes:         parseJsonArray(row.key_quotes),
     the_brief:          row.the_brief,
     canonical_url:      `/concalls/${String(sym).toLowerCase()}/${datePart}/`,
@@ -897,13 +912,49 @@ export function priorConcallsForIsin(isin, excludeEventTime, limit = 4) {
 /** All filings for static-path generation. */
 export function listAllForStaticPaths(limit = 20000) {
   return db().prepare(`
-    SELECT r.record_id, r.symbol, e.headline
+    SELECT r.record_id, r.symbol, e.headline, ${hasColumn('filings_enriched', 'slug') ? 'e.slug' : 'NULL AS slug'}
     FROM filings_raw r
     JOIN filings_enriched e ON e.record_id = r.record_id
     WHERE e.validation_ok = 1
     ORDER BY r.created_on DESC
     LIMIT ?
-  `).all(limit).map(row => ({ id: buildSlug(row.symbol, row.headline, row.record_id), record_id: row.record_id }));
+  `).all(limit).map(row => ({ id: row.slug || buildSlug(row.symbol, row.headline, row.record_id), record_id: row.record_id }));
+}
+
+export function listSourceHealth() {
+  if (!hasTable('source_health')) return [];
+  return db().prepare(`
+    SELECT source, status, started_at, completed_at, last_success_at,
+           inserted_count, enriched_count, item_count, latest_source_time,
+           error, meta_json
+    FROM source_health
+    ORDER BY source
+  `).all().map(row => ({
+    ...row,
+    meta: parseJsonObject(row.meta_json),
+  }));
+}
+
+export function getFreshnessSummary() {
+  const health = listSourceHealth();
+  const latestFiling = db().prepare(`
+    SELECT MAX(r.created_on) AS created_on, MAX(e.enriched_at) AS enriched_at
+    FROM filings_raw r
+    LEFT JOIN filings_enriched e ON e.record_id = r.record_id AND e.validation_ok = 1
+  `).get();
+  const counts = db().prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM filings_raw) AS raw_filings,
+      (SELECT COUNT(*) FROM filings_enriched WHERE validation_ok = 1) AS enriched_filings,
+      (SELECT COUNT(*) FROM briefings WHERE validation_ok = 1) AS briefings
+  `).get();
+  return {
+    generated_at: new Date().toISOString(),
+    latest_filing_created_on: latestFiling?.created_on || null,
+    latest_enriched_at: latestFiling?.enriched_at || null,
+    counts,
+    sources: health,
+  };
 }
 
 // Market signals (Tijori dashboard cards) for /alerts/. Snapshot table; refreshed

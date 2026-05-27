@@ -1,7 +1,7 @@
-// Standard XML sitemap — every public URL.
-// Built statically at build-time.
+// Sitemap index. Child sitemaps keep each URL set safely below protocol limits
+// as the article archive grows.
 
-import { listFilings, distinctSymbolsWithFilings, distinctSectorsWithFilings, sectorSlug, MARKET_CAP_TIERS } from '../lib/queries.mjs';
+import { listFilings } from '../lib/queries.mjs';
 
 function escapeXml(value) {
   return String(value ?? '')
@@ -12,63 +12,25 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
-function absoluteUrl(path, siteUrl) {
-  return new URL(path, siteUrl).toString();
-}
-
 export async function GET({ site }) {
   const siteUrl = site?.toString().replace(/\/$/, '') || 'https://tipsheet.markets';
-  const filings = listFilings({ limit: 50000 });
-  const symbols = distinctSymbolsWithFilings();
-  const sectors = distinctSectorsWithFilings();
-
-  const urls = [
-    { loc: `${siteUrl}/`,             changefreq: 'hourly', priority: '1.0' },
-    { loc: `${siteUrl}/filings/`,      changefreq: 'hourly', priority: '0.9' },
-    { loc: `${siteUrl}/radar/`,        changefreq: 'hourly', priority: '0.8' },
-    { loc: `${siteUrl}/markets/`,      changefreq: 'hourly', priority: '0.8' },
-    { loc: `${siteUrl}/concalls/`,     changefreq: 'daily',  priority: '0.7' },
-    { loc: `${siteUrl}/orders/`,       changefreq: 'daily',  priority: '0.7' },
-    { loc: `${siteUrl}/smart-money/`,  changefreq: 'daily',  priority: '0.7' },
-    { loc: `${siteUrl}/methodology/`,  changefreq: 'monthly', priority: '0.4' },
+  const now = new Date().toISOString();
+  const filingPages = Math.max(1, Math.ceil(listFilings({ limit: 50000 }).length / 45000));
+  const sitemaps = [
+    '/sitemaps/static.xml',
+    ...Array.from({ length: filingPages }, (_, i) => `/sitemaps/filings-${i + 1}.xml`),
+    '/sitemaps/companies.xml',
+    '/sitemaps/sectors.xml',
+    '/sitemap-news.xml',
   ];
-  for (const cat of ['earnings','concalls','order-wins','m-a','credit','regulatory']) {
-    urls.push({ loc: `${siteUrl}/filings/category/${cat}/`, changefreq: 'daily', priority: '0.6' });
-  }
-  for (const tier of MARKET_CAP_TIERS) {
-    urls.push({ loc: `${siteUrl}/filings/market-cap/${tier.slug}/`, changefreq: 'daily', priority: '0.6' });
-  }
-  for (const f of filings) {
-    urls.push({
-      loc: absoluteUrl(f.canonical_url, siteUrl),
-      lastmod: String(f.created_on).replace(' ', 'T') + '+05:30',
-      changefreq: 'monthly',
-      priority: '0.7',
-    });
-  }
-  for (const s of symbols) {
-    urls.push({
-      loc: absoluteUrl(`/company/${encodeURIComponent(String(s.symbol).toLowerCase())}/`, siteUrl),
-      changefreq: 'daily',
-      priority: '0.6',
-    });
-  }
-  for (const s of sectors) {
-    urls.push({
-      loc: `${siteUrl}/sector/${sectorSlug(s.sector)}/`,
-      changefreq: 'daily',
-      priority: '0.5',
-    });
-  }
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map(u => `  <url>
-    <loc>${escapeXml(u.loc)}</loc>${u.lastmod ? `\n    <lastmod>${escapeXml(u.lastmod)}</lastmod>` : ''}
-    <changefreq>${escapeXml(u.changefreq)}</changefreq>
-    <priority>${escapeXml(u.priority)}</priority>
-  </url>`).join('\n')}
-</urlset>`;
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${sitemaps.map(path => `  <sitemap>
+    <loc>${escapeXml(new URL(path, siteUrl).toString())}</loc>
+    <lastmod>${escapeXml(now)}</lastmod>
+  </sitemap>`).join('\n')}
+</sitemapindex>`;
 
   return new Response(body, { headers: { 'Content-Type': 'application/xml' } });
 }

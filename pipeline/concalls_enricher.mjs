@@ -5,7 +5,7 @@
 //   • The ai_summary field is a JSON-stringified blob ~10-20KB; we extract relevant keys
 //     and truncate, so the LLM input stays bounded.
 //   • The management_consistency field is sent in full — it is the unique IP.
-//   • Same Gemini 3.1 Flash Lite config as filings (temperature 1.0, max_tokens 1500).
+//   • Same Gemini 3.1 Flash Lite config as filings (temperature 1.0, max_tokens 2600).
 //   • Implicit caching: system prompt is byte-identical across calls.
 
 import { readFile } from 'node:fs/promises';
@@ -16,13 +16,13 @@ import { PHRASE_PATTERNS, STRUCTURAL_RULES, FEEDBACK_SUBSTITUTIONS } from './ban
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PROMPT_PATH = resolve(__dirname, 'prompts/concalls_system.txt');
 const USER_PROMPT_PATH   = resolve(__dirname, 'prompts/concalls_user.txt');
-export const CONCALL_PROMPT_VERSION = 'concall-note.v1';
+export const CONCALL_PROMPT_VERSION = 'concall-note.v2';
 
 const CFG = {
   baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
   apiKey:      process.env.LLM_API_KEY  || process.env.GOOGLE_API_KEY,
   model:       process.env.LLM_MODEL    || 'gemini-3.1-flash-lite',
-  maxTokens:   Number(process.env.LLM_MAX_TOKENS || 1500),
+  maxTokens:   Number(process.env.LLM_MAX_TOKENS_CONCALL || process.env.LLM_MAX_TOKENS || 2600),
   temperature: Number(process.env.LLM_TEMPERATURE || 1.0),
   timeoutMs:   Number(process.env.LLM_TIMEOUT_MS || 30000),
 };
@@ -39,7 +39,7 @@ async function loadPrompts() {
  *   { "Management Consistency Check": [...], "Key Quote": [...], "Sentiment - Own Business": [...], ... }
  * It can be 10-20KB. We pull the high-signal keys and produce a compact text extract.
  */
-function extractFromAiSummary(rawJsonString, { maxChars = 4000 } = {}) {
+function extractFromAiSummary(rawJsonString, { maxChars = 9000 } = {}) {
   if (!rawJsonString || typeof rawJsonString !== 'string') return '';
   let obj;
   try { obj = JSON.parse(rawJsonString); } catch { return rawJsonString.slice(0, maxChars); }
@@ -50,13 +50,19 @@ function extractFromAiSummary(rawJsonString, { maxChars = 4000 } = {}) {
     'Sentiment - Own Business',
     'Sentiment - Sector and Competitive Backdrop',
     'Guidance',
+    'Future Outlook',
+    'Management Commentary',
+    'Demand',
     'Capex',
     'Order Book',
     'Margins',
+    'Working Capital',
+    'Debt',
     'Volume',
     'Pricing',
     'Strategy',
     'Risks',
+    'Q&A',
   ];
   const parts = [];
   for (const key of priorityKeys) {
@@ -219,16 +225,22 @@ function validate(parsed, raw) {
   else if (parsed.headline.length > 100) issues.push(`headline_too_long:${parsed.headline.length}`);
   if (typeof parsed?.dek !== 'string') issues.push('dek_missing');
   else if (parsed.dek.length > 240) issues.push(`dek_too_long:${parsed.dek.length}`);
-  if (!Array.isArray(parsed?.whats_new) || parsed.whats_new.length === 0) issues.push('whats_new_empty');
+  if (!Array.isArray(parsed?.whats_new) || parsed.whats_new.length < 3) issues.push('whats_new_thin');
+  if (!Array.isArray(parsed?.themes) || parsed.themes.length < 2) issues.push('themes_thin');
+  if (!Array.isArray(parsed?.guidance_watch)) issues.push('guidance_watch_missing');
+  if (!Array.isArray(parsed?.risk_flags)) issues.push('risk_flags_missing');
   if (typeof parsed?.the_brief !== 'string') issues.push('the_brief_missing');
-  else if (parsed.the_brief.length < 200) issues.push(`the_brief_thin:${parsed.the_brief.length}`);
-  else if (parsed.the_brief.length > 1400) issues.push(`the_brief_too_long:${parsed.the_brief.length}`);
+  else if (parsed.the_brief.length < 650) issues.push(`the_brief_thin:${parsed.the_brief.length}`);
+  else if (parsed.the_brief.length > 2600) issues.push(`the_brief_too_long:${parsed.the_brief.length}`);
   if (typeof parsed?.the_take !== 'string' || parsed.the_take.length < 20) issues.push('the_take_thin');
   if (!Array.isArray(parsed?.key_quotes)) issues.push('key_quotes_missing');
 
   const prose = [
     parsed?.headline, parsed?.dek, parsed?.inconsistency_flag,
     ...(parsed?.whats_new || []),
+    ...((parsed?.themes || []).map(t => `${t?.label || ''} ${t?.detail || ''}`)),
+    ...(parsed?.guidance_watch || []),
+    ...(parsed?.risk_flags || []),
     ...((parsed?.key_quotes || []).map(q => q?.quote || '')),
     parsed?.the_brief, parsed?.the_take,
   ].filter(Boolean).join(' ');
