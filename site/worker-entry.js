@@ -37,8 +37,8 @@ const CACHE_RULES = [
 const DEFAULT_PAGE_MAX_AGE = 300;
 const IST_OFFSET_MIN = 330;
 const BRIEFING_SCHEDULES = [
-  { type: 'open', dueHour: 8, dueMinute: 45, graceEnv: 'BRIEFING_OPEN_GRACE_MIN' },
-  { type: 'close', dueHour: 17, dueMinute: 0, graceEnv: 'BRIEFING_CLOSE_GRACE_MIN' },
+  { type: 'open', dueHour: 8, dueMinute: 0, graceEnv: 'BRIEFING_OPEN_GRACE_MIN' },
+  { type: 'close', dueHour: 16, dueMinute: 0, graceEnv: 'BRIEFING_CLOSE_GRACE_MIN' },
 ];
 
 function applySecurityHeaders(headers) {

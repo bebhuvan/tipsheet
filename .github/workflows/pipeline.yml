@@ -2,6 +2,8 @@ name: Fast News + Deploy
 
 on:
   schedule:
+    # Pre-open catch: 07:20 IST weekdays, ahead of The Open digest.
+    - cron: '50 1 * * 1-5'
     # Market hours: every ~30 min, 09:15-15:37 IST = UTC 03:45-10:07, weekdays.
     - cron: '45 3 * * 1-5'
     - cron: '15,45 4,5,6,7,8,9 * * 1-5'
