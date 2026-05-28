@@ -14,6 +14,9 @@ function rfc822(iso) {
   const d = new Date(String(iso).replace(' ', 'T'));
   return Number.isNaN(d.valueOf()) ? new Date().toUTCString() : d.toUTCString();
 }
+function briefingPublishedIso(b) {
+  return `${b.date}T${b.type === 'close' ? '16:00:00' : '08:00:00'}+05:30`;
+}
 
 export async function GET({ site }) {
   const filings = listFilings({ limit: 50 });
@@ -26,7 +29,7 @@ export async function GET({ site }) {
       title: `${b.label}: ${b.headline}`,
       url: new URL(b.canonical_url, siteUrl).toString(),
       guid: new URL(b.canonical_url, siteUrl).toString(),
-      pubDate: rfc822(b.date + 'T03:15:00+05:30'),
+      pubDate: rfc822(briefingPublishedIso(b)),
       description: b.dek,
       category: 'Briefings',
     });

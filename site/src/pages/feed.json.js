@@ -4,6 +4,10 @@
 import { listFilings, listBriefings } from '../lib/queries.mjs';
 import { BRAND_NAME, BRAND_TAGLINE, BRAND_DESCRIPTION, EDITORIAL_BYLINE, EDITORIAL_BYLINE_SLUG } from '../lib/brand.mjs';
 
+function briefingPublishedIso(b) {
+  return `${b.date}T${b.type === 'close' ? '16:00:00' : '08:00:00'}+05:30`;
+}
+
 export async function GET({ site }) {
   const filings = listFilings({ limit: 50 });
   const briefings = listBriefings(2);
@@ -17,7 +21,7 @@ export async function GET({ site }) {
       title: `${b.label}: ${b.headline}`,
       summary: b.dek,
       content_text: [b.dek, b.the_take].filter(Boolean).join('\n\n'),
-      date_published: new Date(b.date + 'T03:15:00+05:30').toISOString(),
+      date_published: new Date(briefingPublishedIso(b)).toISOString(),
       tags: ['Briefings', b.type],
       authors: [{ name: EDITORIAL_BYLINE, url: new URL(`/authors/${EDITORIAL_BYLINE_SLUG}/`, siteUrl).toString() }],
     });

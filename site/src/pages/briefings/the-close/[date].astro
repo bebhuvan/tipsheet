@@ -25,7 +25,7 @@ function dateOf(ymd) {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-const isoPublished = date + 'T10:30:00+05:30';  // ~16:00 IST in UTC
+const isoPublished = date + 'T16:00:00+05:30';
 const schema = {
   '@context': 'https://schema.org',
   '@type': 'NewsArticle',
@@ -75,7 +75,7 @@ const schema = {
 
       <footer class="briefing-foot">
         <a href="/briefings/" class="inline">← Older briefings</a>
-        <span>The Open runs before market open at 9:15 AM IST</span>
+        <span>The Open publishes at 8:00 AM IST</span>
       </footer>
     </article>
   </main>
