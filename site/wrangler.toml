@@ -11,11 +11,11 @@ WATCHDOG_WORKFLOW = "pipeline.yml"
 BRIEFINGS_WORKFLOW = "briefings.yml"
 WATCHDOG_BRANCH = "main"
 WATCHDOG_MAX_STALE_MIN = "45"
-BRIEFING_OPEN_GRACE_MIN = "15"
-BRIEFING_CLOSE_GRACE_MIN = "15"
+BRIEFING_OPEN_GRACE_MIN = "5"
+BRIEFING_CLOSE_GRACE_MIN = "5"
 
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/5 * * * *"]
 
 [[d1_databases]]
 binding = "tipsheet_db"

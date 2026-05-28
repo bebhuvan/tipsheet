@@ -142,6 +142,23 @@ async function dispatchWorkflow({ repo, workflow, branch, token, inputs }) {
   return { ok: dispatchResponse.ok, status: dispatchResponse.status };
 }
 
+async function latestPipelineDataSuccessMs(env) {
+  if (!env.tipsheet_db) return null;
+  try {
+    const row = await env.tipsheet_db
+      .prepare(`
+        SELECT MAX(last_success_at) AS last_success_at
+        FROM source_health
+        WHERE source IN ('filings', 'filings_enrichment')
+      `)
+      .first();
+    const value = Number(row?.last_success_at || 0);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 async function maybeRedirectArticleSlug(url, env) {
   const recordId = recordIdFromPath(url.pathname);
   if (!recordId) return null;
@@ -183,10 +200,12 @@ async function maybeDispatchGitHubWatchdog(env) {
     return { skipped: 'run-active' };
   }
 
+  const sourceHealthAt = await latestPipelineDataSuccessMs(env);
   const latestSuccess = runs.find(run => run.conclusion === 'success');
-  const latestAt = latestSuccess?.updated_at ? Date.parse(latestSuccess.updated_at) : 0;
+  const latestAt = sourceHealthAt || (latestSuccess?.updated_at ? Date.parse(latestSuccess.updated_at) : 0);
+  const freshness = sourceHealthAt ? 'source_health' : 'workflow_runs';
   const ageMin = latestAt ? (Date.now() - latestAt) / 60000 : Infinity;
-  if (ageMin < maxStaleMin) return { skipped: 'fresh', ageMin: Math.round(ageMin) };
+  if (ageMin < maxStaleMin) return { skipped: 'fresh', ageMin: Math.round(ageMin), freshness };
 
   const dispatch = await dispatchWorkflow({
     repo,
@@ -203,6 +222,7 @@ async function maybeDispatchGitHubWatchdog(env) {
     dispatched: dispatch.ok,
     status: dispatch.status,
     ageMin: Number.isFinite(ageMin) ? Math.round(ageMin) : null,
+    freshness,
   };
 }
 
