@@ -64,13 +64,15 @@ function dateOf(iso) {
         {items.length === 0 && <p style="font-style: italic; color: var(--text-muted); padding: 24px 0;">No notes in this market-cap tier yet.</p>}
         {items.map(f => (
           <a href={f.canonical_url} class="archive-row">
-            <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
-            <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
+            <span class="archive-row-meta">
+              <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
+              <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
+              <span class="archive-ticker">{f.symbol}</span>
+            </span>
             <div class="archive-body">
               <div class="kicker">{filingEyebrow(f)}</div>
               <h3>{f.headline}</h3>
             </div>
-            <span class="archive-ticker">{f.symbol}</span>
           </a>
         ))}
       </div>
