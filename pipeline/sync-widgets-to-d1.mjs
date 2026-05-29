@@ -2,7 +2,7 @@
 // Run after tijori_widgets.py refreshes the cache.
 // Requires: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID in env.
 
-import { openDb } from './db.mjs';
+import { openDb, withHealth } from './db.mjs';
 
 const D1_DATABASE_ID = '4645967f-e1aa-4291-b023-5509fcddb758';
 
@@ -81,7 +81,7 @@ async function main() {
   sqlite.close();
 }
 
-main().catch(e => {
+withHealth('tijori_widgets_sync', main).catch(e => {
   console.error('[widgets-sync] FAIL:', e.message);
   process.exit(1);
 });

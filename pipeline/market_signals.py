@@ -46,6 +46,37 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _record_health(db_path: str, source: str, status: str, items=None, error=None) -> None:
+    """Best-effort write to source_health so this stream is visible in
+    /api/health.json and to the watchdog. Never raises (a health-write failure
+    must not mask the real result)."""
+    import time
+    try:
+        now = int(time.time() * 1000)
+        h = sqlite3.connect(db_path)
+        h.execute(
+            """CREATE TABLE IF NOT EXISTS source_health (
+                 source TEXT PRIMARY KEY, status TEXT NOT NULL, started_at INTEGER,
+                 completed_at INTEGER, last_success_at INTEGER, inserted_count INTEGER,
+                 enriched_count INTEGER, item_count INTEGER, latest_source_time TEXT,
+                 error TEXT, meta_json TEXT)"""
+        )
+        h.execute(
+            """INSERT INTO source_health (source, status, completed_at, last_success_at, item_count, error)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(source) DO UPDATE SET
+                 status=excluded.status, completed_at=excluded.completed_at,
+                 last_success_at=COALESCE(excluded.last_success_at, source_health.last_success_at),
+                 item_count=excluded.item_count, error=excluded.error""",
+            (source, status, now, now if status == "success" else None, items,
+             (str(error)[:1000] if error else None)),
+        )
+        h.commit()
+        h.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"[health] could not record {source}: {e}")
+
+
 def main() -> int:
     args = parse_args()
     catalog = Path(args.data_dir) / "catalog.duckdb"
@@ -115,8 +146,15 @@ def main() -> int:
     db.commit()
     db.close()
     print(f"[market-signals] exported {len(rows)} cards into market_signals")
+    _record_health(args.db, "market_signals", "success", items=len(rows))
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _record_health(parse_args().db, "market_signals", "failure", error=exc)
+        raise

@@ -13,6 +13,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PHRASE_PATTERNS, STRUCTURAL_RULES } from './banned-patterns.mjs';
 import { chatJson, DEEPSEEK_MODEL, requireDeepSeekKey } from './deepseek.mjs';
+import { withHealth } from './db.mjs';
 import { fetchCalendar, flattenCalendarEvent } from './idh_poller.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -201,5 +202,5 @@ async function testMain() {
 const _cmd = import.meta.url === pathToFileURL(process.argv[1]).href ? process.argv[2] : null;
 if (_cmd === 'test' || _cmd === 'run') requireDeepSeekKey('macro');
 if (_cmd === 'test') testMain().catch(e => { console.error(e); process.exit(1); });
-else if (_cmd === 'run') runMode().catch(e => { console.error(e); process.exit(1); });
+else if (_cmd === 'run') withHealth('macro_release', runMode).catch(e => { console.error(e); process.exit(1); });
 else if (_cmd === 'poll') pollReleases().then(r => console.log(r)).catch(e => { console.error(e); process.exit(1); });

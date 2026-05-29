@@ -168,6 +168,40 @@ export function updateSourceHealth(db, source, { status = 'success', startedAt =
   });
 }
 
+/**
+ * Wrap a stream's entry function so its outcome is always recorded to
+ * source_health — success (sets last_success_at) or failure (records the
+ * error). This is what makes streams that run OUTSIDE run.mjs (circulars, RBI,
+ * alphastreet, macro releases, widget sync) observable in /api/health.json and
+ * to the watchdog; previously their failures were invisible. The health write
+ * is best-effort and never masks or alters the original result/error.
+ *
+ * If `fn` resolves to an object, recognised numeric fields (inserted, enriched,
+ * items) are recorded; otherwise a bare success is recorded.
+ */
+export async function withHealth(source, fn) {
+  const startedAt = Date.now();
+  try {
+    const result = await fn();
+    try {
+      const c = (result && typeof result === 'object') ? result : {};
+      updateSourceHealth(openDb(), source, {
+        status: 'success', startedAt,
+        inserted: c.inserted ?? null,
+        enriched: c.enriched ?? null,
+        items: c.items ?? null,
+        latestSourceTime: c.latestSourceTime ?? null,
+      });
+    } catch (e) { console.error(`[health] could not record success for ${source}:`, e.message); }
+    return result;
+  } catch (err) {
+    try {
+      updateSourceHealth(openDb(), source, { status: 'failure', startedAt, error: err?.message || String(err) });
+    } catch (e) { console.error(`[health] could not record failure for ${source}:`, e.message); }
+    throw err;
+  }
+}
+
 export function listUnenriched(db, scoreMin = 5, limit = 200) {
   return db.prepare(`
     SELECT r.* FROM filings_raw r

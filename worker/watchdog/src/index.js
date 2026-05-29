@@ -17,8 +17,9 @@
 //   GITHUB_REF          — branch to dispatch on, default "main"         (var)
 // Optional KV binding `WATCHDOG` enforces a dispatch cooldown so we never spam.
 
-const DEFAULTS = { STALE_MINUTES: 75, WORKFLOW_FILE: 'pipeline.yml', GITHUB_REF: 'main' };
+const DEFAULTS = { STALE_MINUTES: 75, WORKFLOW_FILE: 'pipeline.yml', GITHUB_REF: 'main', SOURCE_STALE_HOURS: 30 };
 const COOLDOWN_MINUTES = 30;
+const SOURCE_ALERT_COOLDOWN_MIN = 360; // 6h — don't re-nag about the same broken source
 
 // Active window in IST when we expect fresh data. Mon–Fri ~07:00–23:00 IST.
 // (IST = UTC+5:30.) Outside this window staleness is expected; don't dispatch.
@@ -56,6 +57,49 @@ function stalenessMinutes(health, now) {
   );
 }
 
+async function sendTelegram(env, text) {
+  if (!env.TG_BOT_TOKEN || !env.TG_CHAT_ID) return false;
+  const r = await fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: env.TG_CHAT_ID, text, disable_web_page_preview: true }),
+  });
+  return r.ok;
+}
+
+// Per-source alerting: a source is "bad" if it explicitly recorded failure or
+// its last success is older than the (generous) per-source staleness window.
+// Now that every stream writes source_health, this surfaces silent breakages
+// like a missing TIJORI_COOKIE that the overall-freshness check would miss.
+// Per-source KV cooldown prevents re-nagging; no-op if KV / Telegram absent.
+async function alertStaleSources(env, health, now) {
+  const sources = Array.isArray(health.sources) ? health.sources : [];
+  if (!sources.length) return [];
+  const staleMs = Number(env.SOURCE_STALE_HOURS || DEFAULTS.SOURCE_STALE_HOURS) * 60 * 60 * 1000;
+  const bad = sources.filter((s) => {
+    if (s.status === 'failure') return true;
+    const last = s.last_success_at;
+    return last != null && minutesSince(last, now) * 60000 > staleMs;
+  });
+  const alerted = [];
+  for (const s of bad) {
+    const key = `alert:${s.source}`;
+    if (env.WATCHDOG) {
+      const last = await env.WATCHDOG.get(key);
+      if (last && minutesSince(Number(last), now) < SOURCE_ALERT_COOLDOWN_MIN) continue;
+    }
+    const ageH = s.last_success_at ? Math.round(minutesSince(s.last_success_at, now) / 60) : '∞';
+    const ok = await sendTelegram(
+      env,
+      `⚠️ Tipsheet source degraded: ${s.source}\nstatus=${s.status || '?'} last_success=${ageH}h ago` +
+      (s.error ? `\nerror: ${String(s.error).slice(0, 200)}` : ''),
+    );
+    if (ok && env.WATCHDOG) await env.WATCHDOG.put(key, String(now.getTime()));
+    if (ok) alerted.push(s.source);
+  }
+  return alerted;
+}
+
 async function dispatchWorkflow(env) {
   const repo = env.GITHUB_REPOSITORY;
   const file = env.WORKFLOW_FILE || DEFAULTS.WORKFLOW_FILE;
@@ -88,17 +132,22 @@ async function check(env, now) {
   if (!inActiveWindow(now)) return { action: 'idle', reason: 'outside active window' };
 
   const health = await readHealth(env.HEALTH_URL);
+
+  // Per-source alerts run every tick — a single source can be broken while the
+  // site overall looks fresh.
+  const sourceAlerts = await alertStaleSources(env, health, now);
+
   const stale = stalenessMinutes(health, now);
   const threshold = Number(env.STALE_MINUTES || DEFAULTS.STALE_MINUTES);
-  if (stale <= threshold) return { action: 'ok', staleMinutes: Math.round(stale), threshold };
+  if (stale <= threshold) return { action: 'ok', staleMinutes: Math.round(stale), threshold, sourceAlerts };
 
   if (await onCooldown(env, now)) {
-    return { action: 'cooldown', staleMinutes: Math.round(stale), threshold };
+    return { action: 'cooldown', staleMinutes: Math.round(stale), threshold, sourceAlerts };
   }
 
   await dispatchWorkflow(env);
   if (env.WATCHDOG) await env.WATCHDOG.put('last_dispatch', String(now.getTime()));
-  return { action: 'dispatched', staleMinutes: Math.round(stale), threshold, workflow: env.WORKFLOW_FILE || DEFAULTS.WORKFLOW_FILE };
+  return { action: 'dispatched', staleMinutes: Math.round(stale), threshold, workflow: env.WORKFLOW_FILE || DEFAULTS.WORKFLOW_FILE, sourceAlerts };
 }
 
 export default {

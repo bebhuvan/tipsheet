@@ -157,12 +157,43 @@ def export_widget(db: sqlite3.Connection, symbol: str, slug: str, data_dir: str)
     return True, widget.get("name") or symbol
 
 
+def _record_health(db_path: str, source: str, status: str, items=None, error=None) -> None:
+    """Best-effort write to source_health so this stream is visible in
+    /api/health.json and to the watchdog. Never raises."""
+    import time
+    try:
+        now = int(time.time() * 1000)
+        h = sqlite3.connect(db_path)
+        h.execute(
+            """CREATE TABLE IF NOT EXISTS source_health (
+                 source TEXT PRIMARY KEY, status TEXT NOT NULL, started_at INTEGER,
+                 completed_at INTEGER, last_success_at INTEGER, inserted_count INTEGER,
+                 enriched_count INTEGER, item_count INTEGER, latest_source_time TEXT,
+                 error TEXT, meta_json TEXT)"""
+        )
+        h.execute(
+            """INSERT INTO source_health (source, status, completed_at, last_success_at, item_count, error)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(source) DO UPDATE SET
+                 status=excluded.status, completed_at=excluded.completed_at,
+                 last_success_at=COALESCE(excluded.last_success_at, source_health.last_success_at),
+                 item_count=excluded.item_count, error=excluded.error""",
+            (source, status, now, now if status == "success" else None, items,
+             (str(error)[:1000] if error else None)),
+        )
+        h.commit()
+        h.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"[health] could not record {source}: {e}")
+
+
 def main() -> int:
     args = parse_args()
     db = connect(args.db)
     rows = load_companies(db, args.limit, args.symbols)
     if not rows:
         print("[tijori-widgets] no companies to process")
+        _record_health(args.db, "tijori_widgets", "success", items=0)
         return 0
 
     # Fetch budget per run: first backfill companies NOT yet cached (coverage),
@@ -214,8 +245,18 @@ def main() -> int:
             print(f"  miss {row['symbol']:<12} {detail}", file=sys.stderr)
     db.commit()
     print(f"[tijori-widgets] exported={ok} missed={fail}")
+    _record_health(
+        args.db, "tijori_widgets", "success" if ok else "failure",
+        items=ok, error=None if ok else f"0 widgets exported ({fail} missed)",
+    )
     return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _record_health(parse_args().db, "tijori_widgets", "failure", error=exc)
+        raise
