@@ -30,9 +30,9 @@ const CFG = {
   baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
   apiKey:      process.env.LLM_API_KEY  || process.env.GOOGLE_API_KEY || process.env.OPENROUTER_API_KEY,
   model:       process.env.LLM_MODEL    || 'gemini-3.1-flash-lite',
-  maxTokens:   Number(process.env.LLM_MAX_TOKENS || 1500),
+  maxTokens:   Number(process.env.LLM_MAX_TOKENS || 3500),
   temperature: Number(process.env.LLM_TEMPERATURE || 1.0),
-  timeoutMs:   Number(process.env.LLM_TIMEOUT_MS || 30000),
+  timeoutMs:   Number(process.env.LLM_TIMEOUT_MS || 45000),
 };
 
 let _systemPrompt, _userTemplate;
@@ -95,8 +95,8 @@ function buildUserMessage(template, raw) {
   // news_summary is now the primary input. Falls back to rationale if absent.
   // The rationale is included as supporting context but explicitly flagged as containing
   // scoring-system meta-commentary the model should ignore.
-  const newsSummary = (raw.news_summary || '').slice(0, 4000);
-  const rationale = (raw.rationale || '').slice(0, 4000);
+  const newsSummary = (raw.news_summary || '').slice(0, 12000);
+  const rationale = (raw.rationale || '').slice(0, 12000);
 
   let metadata = [];
   if (raw.major_order) metadata.push(`- Major Order Size: ${raw.major_order_size || 'Not specified'}`);
