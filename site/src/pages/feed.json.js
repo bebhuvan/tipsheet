@@ -11,7 +11,7 @@ function briefingPublishedIso(b) {
 export async function GET({ site }) {
   const filings = listFilings({ limit: 50 });
   const briefings = listBriefings(2);
-  const siteUrl = site?.toString() || 'https://filings.in/';
+  const siteUrl = site?.toString() || 'https://tipsheet.markets/';
 
   const items = [];
   for (const b of briefings) {
@@ -54,7 +54,7 @@ export async function GET({ site }) {
     description: BRAND_DESCRIPTION,
     language: 'en-IN',
     icon: new URL('/logo.png', siteUrl).toString(),
-    favicon: new URL('/favicon.ico', siteUrl).toString(),
+    favicon: new URL('/favicon.svg', siteUrl).toString(),
     authors: [{ name: 'Tipsheet Editorial', url: new URL('/authors/filings-editorial/', siteUrl).toString() }],
     items,
   };

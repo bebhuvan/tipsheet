@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { BRAND_NAME, BRAND_TAGLINE, BRAND_DESCRIPTION, BRAND_FOUNDING_DATE } from '../lib/brand.mjs';
+import { BRAND_NAME, BRAND_TAGLINE, BRAND_DESCRIPTION, BRAND_FOUNDING_DATE, BRAND_SAMEAS } from '../lib/brand.mjs';
 
 interface Props {
   title: string;
@@ -63,7 +63,9 @@ const orgSchema = {
   masthead:                        new URL('/about/#team',          Astro.site).toString(),
   ownershipFundingInfo:            new URL('/ownership/',           Astro.site).toString(),
   actionableFeedbackPolicy:        new URL('/contact/',             Astro.site).toString(),
-  sameAs: [],  // TODO: add LinkedIn, X, Wikidata once we publish them
+  // Verified external identities — see BRAND_SAMEAS in lib/brand.mjs. Add the
+  // Wikidata Q-id + social profiles there as they go live.
+  sameAs: BRAND_SAMEAS,
 };
 ---
 <!doctype html>

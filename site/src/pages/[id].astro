@@ -4,7 +4,15 @@ import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { listAllForStaticPaths, getFiling, priorFilingsForSymbol, recordIdFromSlug, sourceLinks, getFundamentals, getFundamentalContext, tierFor, filingsCountForSymbol, tijoriCompanyUrl } from '../lib/queries.mjs';
 import { renderInline, renderProse } from '../lib/prose.mjs';
+import { BRAND_NAME, EDITORIAL_BYLINE, EDITORIAL_BYLINE_SLUG } from '../lib/brand.mjs';
 import '../styles/snapshot.css';
+
+// Canonical entity IDs — shared with Base.astro (#org) and the author page
+// (/authors/<slug>/#person) so publisher/author resolve to one node in the
+// graph instead of re-declaring disconnected Organizations on every article.
+const ORG_ID = (Astro.site?.toString() || '') + '#org';
+const PERSON_ID = (Astro.site?.toString() || '') + `authors/${EDITORIAL_BYLINE_SLUG}/#person`;
+const AUTHOR_URL = (Astro.site?.toString() || '') + `authors/${EDITORIAL_BYLINE_SLUG}/`;
 
 export async function getStaticPaths() {
   const all = listAllForStaticPaths();
@@ -192,11 +200,12 @@ const schema = {
     width: 1200,
     height: 630,
   }],
-  author: [{ '@type': 'Organization', name: 'Tipsheet Editorial', url: Astro.site?.toString() + 'about' }],
+  author: [{ '@type': 'Organization', '@id': PERSON_ID, name: EDITORIAL_BYLINE, url: AUTHOR_URL }],
   publisher: {
-    '@type': 'Organization',
-    name: 'Tipsheet',
-    logo: { '@type': 'ImageObject', url: new URL('/logo.png', Astro.site).toString(), width: 600, height: 60 },
+    '@type': 'NewsMediaOrganization',
+    '@id': ORG_ID,
+    name: BRAND_NAME,
+    logo: { '@type': 'ImageObject', url: new URL('/logo.png', Astro.site).toString(), width: 1000, height: 1000 },
   },
   description: filing.dek,
   mainEntityOfPage: { '@type': 'WebPage', '@id': new URL(filing.canonical_url, Astro.site).toString() },
@@ -228,7 +237,22 @@ const faqSchema = faqs.length > 0 ? {
   }))
 } : null;
 
-const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
+// BreadcrumbList — Home › Filings › <Company> › <headline>. Earns breadcrumb
+// rich results in Search and gives LLMs the page's place in the hierarchy.
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: Astro.site?.toString() },
+    { '@type': 'ListItem', position: 2, name: 'Filings', item: new URL('/filings/', Astro.site).toString() },
+    ...(filing.company || filing.symbol
+      ? [{ '@type': 'ListItem', position: 3, name: filing.company || filing.symbol, item: new URL(`/company/${String(filing.symbol).toLowerCase()}/`, Astro.site).toString() }]
+      : []),
+    { '@type': 'ListItem', position: filing.company || filing.symbol ? 4 : 3, name: filing.headline, item: new URL(filing.canonical_url, Astro.site).toString() },
+  ],
+};
+
+const schemaOutput = [schema, breadcrumbSchema, ...(faqSchema ? [faqSchema] : [])];
 ---
 <Base
   title={`${filing.headline}`}
@@ -269,6 +293,7 @@ const schemaOutput = faqSchema ? [schema, faqSchema] : schema;
 
       <div class="dateline">
         <span><strong>{filing.symbol}</strong></span>
+        <span class="byline">By <a href={AUTHOR_URL} rel="author" class="inline">{EDITORIAL_BYLINE}</a></span>
         <span>{dateOf(filing.created_on)} · {timeOf(filing.created_on)}</span>
         {(sources.bse_announcements || sources.nse_announcements) && (
           <span class="source-links">

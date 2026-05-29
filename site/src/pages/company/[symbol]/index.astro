@@ -68,11 +68,40 @@ const schema = {
     datePublished: String(f.created_on).replace(' ', 'T') + '+05:30',
   })),
 };
+
+// BreadcrumbList — matches the visible breadcrumb (Home › Filings › Company).
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: Astro.site?.toString() },
+    { '@type': 'ListItem', position: 2, name: 'Filings', item: new URL('/filings/', Astro.site).toString() },
+    { '@type': 'ListItem', position: 3, name: `${companyName} (${SYMBOL})`, item: new URL(`/company/${symbol}/`, Astro.site).toString() },
+  ],
+};
+
+// ItemList of the full note timeline — makes "all notes on <company>" trivially
+// extractable for LLMs answering "what's the latest on <company>".
+const timelineSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: `Tipsheet notes on ${companyName}`,
+  numberOfItems: filings.length,
+  itemListOrder: 'https://schema.org/ItemListOrderDescending',
+  itemListElement: filings.map((f, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    url: new URL(f.canonical_url, Astro.site).toString(),
+    name: f.headline,
+  })),
+};
+
+const schemaOutput = [schema, breadcrumbSchema, timelineSchema];
 ---
 <Base
   title={`${companyName} (${SYMBOL}) — notes timeline`}
   description={`Every note published about ${companyName}, newest first. Editorial reads on exchange filings with fundamentals snapshot from primary sources.`}
-  schema={schema}
+  schema={schemaOutput}
 >
   <Masthead activeNav="filings" />
 

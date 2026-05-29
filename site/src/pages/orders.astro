@@ -2,7 +2,8 @@
 import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import { listFilings, filingEyebrow } from '../lib/queries.mjs';
+import ArchiveList from '../components/ArchiveList.astro';
+import { listFilings } from '../lib/queries.mjs';
 
 const items = listFilings({ category: 'Order Wins', limit: 100 });
 function timeOf(iso) { const m = String(iso || '').match(/(\d{2}):(\d{2})/); if (!m) return ''; let h = +m[1]; const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12; return `${h}:${m[2]} ${ap} IST`; }
@@ -25,20 +26,7 @@ function dateOf(iso) {
         <h1 class="page-title">Order Wins.</h1>
         <p class="page-dek">Contract awards and order-book updates. {items.length} published. We weight by deal-size-to-market-cap, not headline number.</p>
       </header>
-      <div class="archive-list">
-        {items.length === 0 && <p style="font-style: italic; color: var(--text-muted); padding: 24px 0;">No order-win notes yet.</p>}
-        {items.map(f => (
-          <a href={f.canonical_url} class="archive-row">
-            <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
-            <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
-            <div class="archive-body">
-              <div class="kicker">{filingEyebrow(f, { category: false })}</div>
-              <h3>{f.headline}</h3>
-            </div>
-            <span class="archive-ticker">{f.symbol}</span>
-          </a>
-        ))}
-      </div>
+      <ArchiveList items={items} emptyText="No order-win notes yet." />
     </article>
   </main>
   <SiteFooter />

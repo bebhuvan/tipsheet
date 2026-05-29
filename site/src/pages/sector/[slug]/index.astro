@@ -2,7 +2,8 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { distinctSectorsWithFilings, sectorBySlug, sectorSlug, filingsForSector, companiesInSector, tierFor, filingEyebrow } from '../../../lib/queries.mjs';
+import ArchiveList from '../../../components/ArchiveList.astro';
+import { distinctSectorsWithFilings, sectorBySlug, sectorSlug, filingsForSector, companiesInSector } from '../../../lib/queries.mjs';
 
 export async function getStaticPaths() {
   const sectors = distinctSectorsWithFilings();
@@ -28,10 +29,38 @@ function fmtCr(n) {
   if (n >= 100000) return `₹${(n/100000).toFixed(2)} lakh cr`;
   return `₹${Math.round(n).toLocaleString('en-IN')} cr`;
 }
+
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: Astro.site?.toString() },
+    { '@type': 'ListItem', position: 2, name: 'Sectors', item: new URL('/sectors/', Astro.site).toString() },
+    { '@type': 'ListItem', position: 3, name: sector, item: new URL(`/sector/${slug}/`, Astro.site).toString() },
+  ],
+};
+
+// ItemList of the anchor companies in the sector — an extractable map of "who's
+// in <sector>" for both Search and LLM answers.
+const companiesSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: `${sector} companies tracked by Tipsheet`,
+  numberOfItems: companies.length,
+  itemListElement: companies.map((c, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    url: new URL(`/company/${String(c.symbol).toLowerCase()}/`, Astro.site).toString(),
+    name: c.symbol,
+  })),
+};
+
+const schemaOutput = [breadcrumbSchema, companiesSchema];
 ---
 <Base
   title={`${sector} — sector activity`}
   description={`Notes from companies in the ${sector} sector. Editorial coverage of every consequential disclosure, with company-level fundamentals snapshot.`}
+  schema={schemaOutput}
 >
   <Masthead activeNav="filings" />
 
@@ -57,20 +86,7 @@ function fmtCr(n) {
 
       <section class="sector-activity">
         <div class="block-title">Recent activity</div>
-        <div class="archive-list">
-          {items.length === 0 && <p style="font-style: italic; color: var(--text-muted); padding: 24px 0;">No notes from this sector yet.</p>}
-          {items.map(f => (
-            <a href={f.canonical_url} class="archive-row">
-              <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
-              <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
-              <div class="archive-body">
-                <div class="kicker">{[tierFor(f.score), filingEyebrow(f, { sector: false })].filter(Boolean).join(' · ')}</div>
-                <h3>{f.headline}</h3>
-              </div>
-              <span class="archive-ticker">{f.symbol}</span>
-            </a>
-          ))}
-        </div>
+        <ArchiveList items={items} emptyText="No notes from this sector yet." />
       </section>
     </article>
   </main>
