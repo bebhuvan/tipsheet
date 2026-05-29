@@ -29,6 +29,24 @@ export class DeepSeekError extends Error {
   }
 }
 
+/**
+ * Fail-fast guard for DeepSeek-backed entry points. Call this at the top of a
+ * script's run path so a missing key surfaces as a loud non-zero exit with an
+ * actionable message — instead of a silent `{ok:false}` swallowed by a
+ * `continue-on-error` workflow step (which is how RBI/macro/alphastreet
+ * enrichment can fail invisibly for days). The key itself is never logged.
+ */
+export function requireDeepSeekKey(source = 'deepseek') {
+  if (!process.env.DEEPSEEK_API_KEY) {
+    console.error(
+      `[${source}] FATAL: DEEPSEEK_API_KEY is not set. This enricher runs on DeepSeek ` +
+      `(separate from the Gemini LLM_* config). Set the DEEPSEEK_API_KEY secret/.env var. ` +
+      `Refusing to run so the failure is visible rather than silently skipped.`
+    );
+    process.exit(78); // EX_CONFIG
+  }
+}
+
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function isRetryable(status) { return status === 429 || status === 500 || status === 502 || status === 503; }
 

@@ -1,0 +1,37 @@
+name: Notify failure
+description: >-
+  Post a Telegram alert when a workflow fails. Use as the last step with
+  `if: failure()`. No-op (never fails the run) if Telegram secrets are absent,
+  so it is safe to add everywhere.
+inputs:
+  token:
+    description: Telegram bot token
+    required: false
+  chat_id:
+    description: Telegram chat/channel id
+    required: false
+  context:
+    description: Short human label for what failed (e.g. "Fast News ingest")
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Send Telegram failure alert
+      shell: bash
+      env:
+        TG_TOKEN: ${{ inputs.token }}
+        TG_CHAT: ${{ inputs.chat_id }}
+        CTX: ${{ inputs.context }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        if [[ -z "${TG_TOKEN:-}" || -z "${TG_CHAT:-}" ]]; then
+          echo "::warning::Telegram secrets not set — skipping failure alert for '$CTX'"
+          exit 0
+        fi
+        text="🚨 Tipsheet pipeline failed: ${CTX}"$'\n'"Run: ${RUN_URL}"
+        curl -fsS --max-time 20 -X POST \
+          "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+          -d chat_id="${TG_CHAT}" \
+          --data-urlencode text="${text}" \
+          -d disable_web_page_preview=true \
+          >/dev/null && echo "failure alert sent" || echo "::warning::failed to send Telegram alert"

@@ -1,0 +1,26 @@
+name = "tipsheet-watchdog"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+
+# Cron Trigger: every 15 minutes. The Worker itself gates on the active IST
+# window and the staleness threshold, so off-hours ticks are cheap no-ops.
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+GITHUB_REPOSITORY = "bebhuvan/tipsheet"          # owner/repo
+HEALTH_URL = "https://tipsheet.markets/api/health.json"
+WORKFLOW_FILE = "pipeline.yml"                    # Fast News (chains a deploy on success)
+GITHUB_REF = "main"
+STALE_MINUTES = "75"
+
+# Secret (set via `wrangler secret put GITHUB_TOKEN`):
+#   GITHUB_TOKEN — fine-grained PAT, scoped to this repo, Actions: Read and write.
+#
+# Optional KV for dispatch cooldown (prevents repeated dispatches while a
+# catch-up run is in flight). Create with:
+#   wrangler kv namespace create WATCHDOG
+# then uncomment and paste the id:
+# [[kv_namespaces]]
+# binding = "WATCHDOG"
+# id = "<kv-namespace-id>"

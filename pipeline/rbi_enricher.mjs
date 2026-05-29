@@ -15,7 +15,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { PHRASE_PATTERNS, STRUCTURAL_RULES } from './banned-patterns.mjs';
-import { chatJson, DEEPSEEK_MODEL } from './deepseek.mjs';
+import { chatJson, DEEPSEEK_MODEL, requireDeepSeekKey } from './deepseek.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DB = resolve(__dirname, '../data/filings.db');
@@ -172,5 +172,6 @@ async function runMode() {
 }
 
 const _cmd = import.meta.url === pathToFileURL(process.argv[1]).href ? process.argv[2] : null;
+if (_cmd === 'test' || _cmd === 'run') requireDeepSeekKey('rbi');
 if (_cmd === 'test') testMain().catch(e => { console.error(e); process.exit(1); });
 else if (_cmd === 'run') runMode().catch(e => { console.error(e); process.exit(1); });

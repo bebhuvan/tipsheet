@@ -17,7 +17,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PHRASE_PATTERNS, STRUCTURAL_RULES } from './banned-patterns.mjs';
-import { chatJson, DEEPSEEK_MODEL, usageLine } from './deepseek.mjs';
+import { chatJson, DEEPSEEK_MODEL, usageLine, requireDeepSeekKey } from './deepseek.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_DB = resolve(__dirname, '../data/filings.db');
@@ -229,6 +229,7 @@ async function runMode() {
 }
 
 const _cmd = import.meta.url === pathToFileURL(process.argv[1]).href ? (process.argv[2] || 'poll') : null;
+if (_cmd) requireDeepSeekKey('alphastreet');
 if (_cmd === 'test') testMain().catch(e => { console.error(e); process.exit(1); });
 else if (_cmd === 'run') runMode().catch(e => { console.error(e); process.exit(1); });
 else if (_cmd) main().catch(e => { console.error('alphastreet failed:', e.message); process.exit(1); });

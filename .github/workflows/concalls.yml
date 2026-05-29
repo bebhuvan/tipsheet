@@ -1,4 +1,7 @@
-name: Concalls + Deploy
+name: Concalls
+
+# Ingest-only: poll/enrich Tijori concalls + AlphaStreet notes, publish the DB.
+# publish-site.yml deploys automatically on success.
 
 on:
   schedule:
@@ -14,10 +17,6 @@ on:
         description: 'Max Tijori concalls to poll/enrich'
         type: string
         default: '50'
-      skip_deploy:
-        description: 'Skip Cloudflare Workers deploy'
-        type: boolean
-        default: false
 
 env:
   NODE_VERSION: '22'
@@ -26,7 +25,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: tipsheet-db-${{ github.ref }}
+  group: tipsheet-db-write
   cancel-in-progress: false
 
 jobs:
@@ -39,6 +38,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: pipeline/package-lock.json
 
       - name: Restore latest DB
         run: bash .github/scripts/restore-db.sh
@@ -78,32 +79,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
 
-      - name: Restore + persist OG image cache
-        if: ${{ !inputs.skip_deploy }}
-        uses: actions/cache@v4
+      - name: Alert on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
         with:
-          path: site/.og-cache
-          key: og-cache-${{ github.run_id }}
-          restore-keys: |
-            og-cache-
-
-      - name: Install site deps
-        if: ${{ !inputs.skip_deploy }}
-        run: cd site && npm ci
-
-      - name: Build site
-        if: ${{ !inputs.skip_deploy }}
-        run: cd site && npm run build
-
-      - name: Check internal links
-        if: ${{ !inputs.skip_deploy }}
-        run: cd site && npm run check:links
-
-      - name: Deploy to Cloudflare Workers
-        if: ${{ !inputs.skip_deploy }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: site
-          command: deploy
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          context: Concalls ingest
