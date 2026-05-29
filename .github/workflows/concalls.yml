@@ -61,6 +61,9 @@ jobs:
         env:
           TIJORI_CONCALLS_API_KEY: ${{ secrets.TIJORI_CONCALLS_API_KEY }}
           TIJORI_CONCALLS_BASE_URL: ${{ secrets.TIJORI_CONCALLS_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
           LIMIT: ${{ inputs.limit || '50' }}
 
       - name: Concall notes from AlphaStreet
