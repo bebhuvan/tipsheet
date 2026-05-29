@@ -275,9 +275,10 @@ async function maybeDispatchGitHubWatchdog(env) {
     workflow,
     branch,
     token,
+    // Fast News is ingest-only now; deploy chains via publish-site (workflow_run).
+    // Only enrich_limit remains a valid input — sending skip_pipeline/skip_deploy
+    // would 422 and silently break the watchdog.
     inputs: {
-      skip_pipeline: 'false',
-      skip_deploy: 'false',
       enrich_limit: '50',
     },
   });
@@ -353,7 +354,6 @@ async function maybeDispatchBriefingWatchdog(env) {
       inputs: {
         briefing: item.type,
         date: now.date,
-        skip_deploy: 'false',
       },
     });
     results.push({
