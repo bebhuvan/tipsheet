@@ -37,10 +37,17 @@ const MODELS = {
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1',
     apiKey:  process.env.DEEPSEEK_API_KEY,
   },
+  mimo: {
+    name:    process.env.MIMO_MODEL || 'mimo-v2.5-pro',
+    baseUrl: process.env.MIMO_BASE_URL || 'https://api.xiaomimimo.com/v1',
+    apiKey:  process.env.MIMO_API_KEY,
+    completionTokens: true,  // MiMo expects max_completion_tokens, not max_tokens
+    apiKeyHeader: true,      // MiMo docs also accept an `api-key` header
+  },
 };
 
 const TEMPERATURE = 0.7;   // Shared — not 1.0 (too noisy for comparison)
-const MAX_TOKENS  = 1500;
+const MAX_TOKENS  = 3500;  // matches the new prod enricher ceiling
 const TIMEOUT_MS  = 45000;
 
 // ─── Pick filings ───────────────────────────────────────────────────
@@ -84,6 +91,7 @@ async function callModel(modelConfig, systemPrompt, userMessage) {
       signal: ctrl.signal,
       headers: {
         'Authorization': `Bearer ${modelConfig.apiKey}`,
+        ...(modelConfig.apiKeyHeader ? { 'api-key': modelConfig.apiKey } : {}),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -94,7 +102,9 @@ async function callModel(modelConfig, systemPrompt, userMessage) {
         ],
         response_format: { type: 'json_object' },
         temperature: TEMPERATURE,
-        max_tokens: MAX_TOKENS,
+        ...(modelConfig.completionTokens
+          ? { max_completion_tokens: MAX_TOKENS }
+          : { max_tokens: MAX_TOKENS }),
       }),
     });
 
@@ -290,6 +300,14 @@ async function main() {
         headline: result.parsed?.headline,
         the_full_read_length: result.parsed?.the_full_read?.length || 0,
         the_full_read_words: (result.parsed?.the_full_read || '').split(/\s+/).length,
+        prose: {
+          headline: result.parsed?.headline,
+          dek: result.parsed?.dek,
+          why_it_matters: result.parsed?.why_it_matters,
+          whats_new: result.parsed?.whats_new,
+          what_were_watching: result.parsed?.what_were_watching,
+          the_full_read: result.parsed?.the_full_read,
+        },
       };
     }
     results.push(trialResult);
