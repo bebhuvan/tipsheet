@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PHRASE_PATTERNS } from './banned-patterns.mjs';
+import { compatHeaders, tokenParam } from './llm-compat.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PROMPT_PATH = resolve(__dirname, 'prompts/radar_system.txt');
@@ -166,8 +167,7 @@ async function callLLM(messages) {
       method: 'POST',
       signal: ctrl.signal,
       headers: {
-        'Authorization': `Bearer ${CFG.apiKey}`,
-        'Content-Type': 'application/json',
+        ...compatHeaders(CFG.baseUrl, CFG.apiKey),
         'HTTP-Referer': 'https://filings.local',
         'X-Title': 'Filings Radar enricher',
       },
@@ -176,7 +176,7 @@ async function callLLM(messages) {
         messages,
         response_format: { type: 'json_object' },
         temperature: CFG.temperature,
-        max_tokens: CFG.maxTokens,
+        ...tokenParam(CFG.baseUrl, CFG.maxTokens),
       }),
     });
     const elapsed_ms = Date.now() - t0;

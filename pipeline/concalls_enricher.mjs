@@ -12,6 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PHRASE_PATTERNS, STRUCTURAL_RULES, FEEDBACK_SUBSTITUTIONS } from './banned-patterns.mjs';
+import { compatHeaders, tokenParam } from './llm-compat.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PROMPT_PATH = resolve(__dirname, 'prompts/concalls_system.txt');
@@ -176,16 +177,13 @@ export async function enrichConcall(raw, previousAttempt = null) {
   try {
     const r = await fetch(`${CFG.baseUrl}/chat/completions`, {
       method: 'POST', signal: ctrl.signal,
-      headers: {
-        'Authorization': `Bearer ${CFG.apiKey}`,
-        'Content-Type':  'application/json',
-      },
+      headers: compatHeaders(CFG.baseUrl, CFG.apiKey),
       body: JSON.stringify({
         model: CFG.model,
         messages,
         response_format: { type: 'json_object' },
         temperature: CFG.temperature,
-        max_tokens: CFG.maxTokens,
+        ...tokenParam(CFG.baseUrl, CFG.maxTokens),
       }),
     });
     const elapsed_ms = Date.now() - t0;

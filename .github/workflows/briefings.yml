@@ -79,7 +79,7 @@ jobs:
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_MODEL: mimo-v2.5-pro
           BRIEFING_DATE: ${{ github.event.inputs.date || '' }}
 
       - name: Generate The Close briefing
@@ -88,7 +88,7 @@ jobs:
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_MODEL: mimo-v2.5-pro
           BRIEFING_DATE: ${{ github.event.inputs.date || '' }}
 
       - name: Show stats

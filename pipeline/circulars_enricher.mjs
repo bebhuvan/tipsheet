@@ -15,6 +15,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { withHealth } from './db.mjs';
 import { GoogleGenAI } from '@google/genai';
+import { compatHeaders, tokenParam } from './llm-compat.mjs';
 import { PHRASE_PATTERNS, STRUCTURAL_RULES, FEEDBACK_SUBSTITUTIONS } from './banned-patterns.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -116,6 +117,41 @@ export async function enrichCircular(row, previousAttempt = null) {
   if (!CFG.apiKey) return { ok: false, error: 'missing API key (set LLM_API_KEY or GOOGLE_API_KEY)' };
   const system = await loadSystem();
   const userMsg = buildUserMessage(row);
+
+  // Non-Gemini providers (MiMo) use the OpenAI-compatible path.
+  const baseUrl = process.env.LLM_BASE_URL || '';
+  if (baseUrl && !/googleapis|generativelanguage/i.test(baseUrl)) {
+    let user = userMsg;
+    if (previousAttempt?.parsed && previousAttempt?.validation?.issues?.length) {
+      user += `\n\nYour previous attempt:\n${JSON.stringify(previousAttempt.parsed)}\n\n${buildFeedbackMessage(previousAttempt.validation)}`;
+    }
+    const t0 = Date.now();
+    try {
+      const r = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: compatHeaders(baseUrl, CFG.apiKey),
+        body: JSON.stringify({
+          model: CFG.model,
+          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+          response_format: { type: 'json_object' },
+          temperature: CFG.temperature,
+          ...tokenParam(baseUrl, CFG.maxTokens),
+        }),
+      });
+      const elapsed_ms = Date.now() - t0;
+      if (!r.ok) return { ok: false, error: `HTTP ${r.status}`, elapsed_ms };
+      const b = await r.json();
+      const content = b.choices?.[0]?.message?.content ?? '';
+      const s = content.indexOf('{'), e = content.lastIndexOf('}');
+      let parsed;
+      try { parsed = JSON.parse(s >= 0 && e > s ? content.slice(s, e + 1) : content); }
+      catch (err) { return { ok: false, error: 'json_parse', raw_text: content.slice(0, 300), elapsed_ms }; }
+      const v = validate(parsed, row);
+      return { ok: v.ok, parsed, validation: v, model: CFG.model, promptVersion: CIRCULAR_PROMPT_VERSION, usage: b.usage || null, elapsed_ms };
+    } catch (e) {
+      return { ok: false, error: e.message, elapsed_ms: Date.now() - t0 };
+    }
+  }
 
   const contents = [];
   if (previousAttempt?.parsed && previousAttempt?.validation?.issues?.length) {
