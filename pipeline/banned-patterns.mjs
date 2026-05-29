@@ -279,6 +279,38 @@ function summaryClose(fullRead) {
   return null;
 }
 
+// Magnitude fidelity: "halved/doubled/tripled" must match the percentage it sits next to. The
+// model occasionally reaches for a round magnitude word ("halved") when the real change is
+// something else ("34%"). High precision: fires only when a contradicting % sits within ~40 chars
+// of the word — never when the change is given in absolute terms, or when the % agrees.
+const MAGNITUDE_TARGETS = [
+  [/\bhalv(?:e|ed|es|ing)\b/i, 50],
+  [/\bdoubl(?:e|ed|es|ing)\b/i, 100],
+  [/\btripl(?:e|ed|es|ing)\b/i, 200],
+  [/\bquadrupl(?:e|ed|es|ing)\b/i, 300],
+];
+function magnitudeContradiction(text) {
+  const s = String(text || '');
+  for (const [re, target] of MAGNITUDE_TARGETS) {
+    const m = re.exec(s);
+    if (!m) continue;
+    const window = s.slice(Math.max(0, m.index - 40), m.index + m[0].length + 40);
+    const pcts = [...window.matchAll(/(\d+(?:\.\d+)?)\s*%/g)].map(x => parseFloat(x[1]));
+    if (pcts.length && !pcts.some(p => Math.abs(p - target) <= 7)) {
+      return { name: 'magnitude_mismatch', evidence: `"${m[0]}" near ${pcts.join('/')}% (expected ~${target}%)` };
+    }
+  }
+  return null;
+}
+
+// The_full_read must end on a declarative verdict, never a rhetorical question — a prompt rule the
+// regex layer never enforced. Flag a trailing "?".
+function rhetoricalQuestionEnding(fullRead) {
+  const t = String(fullRead || '').trim();
+  if (/\?\s*$/.test(t)) return { name: 'rhetorical_question_ending', evidence: t.slice(-60) };
+  return null;
+}
+
 export const STRUCTURAL_RULES = [
   (text, { full_read }) => NEGATIVE_PARALLELISM.test(text)
     ? { name: 'negative_parallelism', evidence: text.match(NEGATIVE_PARALLELISM)?.[0] } : null,
@@ -289,6 +321,8 @@ export const STRUCTURAL_RULES = [
   (text) => paragraphOpeningAdverbs(text),
   (_text, { full_read }) => burstinessCheck(full_read),
   (_text, { full_read }) => summaryClose(full_read),
+  (text) => magnitudeContradiction(text),
+  (_text, { full_read }) => rhetoricalQuestionEnding(full_read),
 ];
 
 // ─── Suggested substitutions used in the feedback retry ────────────────
