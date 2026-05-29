@@ -5,6 +5,8 @@ import SiteFooter from '../../../components/SiteFooter.astro';
 import ArchiveList from '../../../components/ArchiveList.astro';
 import { listFilings, MARKET_CAP_TIERS, marketCapTierBySlug } from '../../../lib/queries.mjs';
 
+const PER_PAGE = 25;
+
 export async function getStaticPaths() {
   return MARKET_CAP_TIERS.map(t => ({ params: { tier: t.slug } }));
 }
@@ -14,26 +16,13 @@ const meta = marketCapTierBySlug(tier);
 if (!meta) return Astro.redirect('/404');
 
 const categories = ['Earnings','Concalls','Order Wins','M&A','Credit','Regulatory'];
-const items = listFilings({ marketCap: meta, limit: 50000 });
-
-function timeOf(iso) {
-  const m = String(iso || '').match(/(\d{2}):(\d{2})/);
-  if (!m) return '';
-  let h = +m[1];
-  const ap = h < 12 ? 'AM' : 'PM';
-  h = h % 12 || 12;
-  return `${h}:${m[2]} ${ap} IST`;
-}
-function dateOf(iso) {
-  const d = new Date(String(iso).replace(' ', 'T'));
-  if (Number.isNaN(d.valueOf())) return iso;
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]}`;
-}
+const all = listFilings({ marketCap: meta, limit: 50000 });
+const totalPages = Math.max(1, Math.ceil(all.length / PER_PAGE));
+const items = all.slice(0, PER_PAGE);
 ---
 <Base
   title={`${meta.label} notes archive`}
-  description={`${items.length} published notes from ${meta.label.toLowerCase()} companies. ${meta.dek}`}
+  description={`${all.length} published notes from ${meta.label.toLowerCase()} companies. ${meta.dek}`}
 >
   <Masthead activeNav="filings" capTier={tier} />
 
@@ -42,7 +31,7 @@ function dateOf(iso) {
       <header class="archive-header">
         <div class="kicker"><a href="/filings/">Archive</a> <span class="sep">/</span> <span>{meta.label}</span></div>
         <h1 class="page-title">{meta.label}</h1>
-        <p class="page-dek">{items.length} published. {meta.dek}</p>
+        <p class="page-dek">{all.length} published. {meta.dek}</p>
       </header>
 
       <div class="archive-filters">
@@ -62,6 +51,13 @@ function dateOf(iso) {
       </div>
 
       <ArchiveList items={items} emptyText="No notes in this market-cap tier yet." />
+
+      {totalPages > 1 && (
+        <nav class="pagination" aria-label="Pagination">
+          <span class="current">Page 1 of {totalPages}</span>
+          <a href={`/filings/market-cap/${tier}/page/2/`} rel="next">Next →</a>
+        </nav>
+      )}
     </article>
   </main>
 
