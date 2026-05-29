@@ -9,6 +9,12 @@ import { defineConfig } from 'astro/config';
 export default defineConfig({
   output: 'static',
   site: 'https://tipsheet.markets',
+  // Pinned to match every canonical_url (which already ends in `/`) and the
+  // `directory` build format. Behavior-preserving in static mode (output is
+  // still `/<slug>/index.html`); required so the eventual `output: 'server'`
+  // flip cannot silently change URL shape. Do not change without re-running
+  // the route-inventory diff (scripts/check-internal-links.mjs).
+  trailingSlash: 'always',
   compressHTML: true,
   build: {
     inlineStylesheets: 'always',              // inline all CSS — no render-blocking external stylesheets
