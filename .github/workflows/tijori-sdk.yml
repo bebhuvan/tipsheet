@@ -71,7 +71,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
 
       - name: Install Tijori SDK
         run: pip install "git+https://x-access-token:${TIJORI_SDK_TOKEN}@github.com/bebhuvan/tijori-codex.git"

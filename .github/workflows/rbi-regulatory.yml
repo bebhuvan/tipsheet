@@ -64,7 +64,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
 
       - name: Ingest RBI Bulletin articles
         if: ${{ github.event_name == 'schedule' && (github.event.schedule == '32 2 * * 1-5' || github.event.schedule == '22 5,11 * * 6,0') || github.event_name == 'workflow_dispatch' && inputs.include_bulletin }}
