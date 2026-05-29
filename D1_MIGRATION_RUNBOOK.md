@@ -113,7 +113,8 @@ Phase 3 parity is confirmed.**
   (concurrency 8, built-in retries/backoff). Replaces inline enrich +
   `continue-on-error`.
 - **Cron Triggers:** move pollers off GitHub cron (which silently drops runs).
-  The watchdog (`worker/watchdog`) already runs on CF cron.
+  The watchdog already runs on CF cron inside `site/worker-entry.js` (dispatches
+  pipeline/briefings on staleness + per-source failure alerts to Telegram).
 - **Durable Object:** exactly-once Telegram notify + a poll-lock so two ingest
   runs can't double-process. Replaces the `notified_at` + shared-lock approach.
 - **Workers Analytics Engine:** freshness/latency/error telemetry without a
@@ -132,4 +133,5 @@ reliability wins in Phases 0–3.
 | `pipeline/sync-to-d1.mjs` | Done. Dry-run validated against all 20 tables (16,534 rows). Needs `D1_DATABASE_ID` + a created DB to run live. |
 | `site/src/lib/content-store.mjs` | Async seam done (`createSqliteStore`). `createD1Store` reads implemented during Phase 4 step 3. |
 | `pipeline/schema.sql` | D1-compatible; the canonical schema to apply in Phase 3 step 2. |
-| `worker/watchdog/` | Done (Phase 1). Already CF-cron-native. |
+| `site/worker-entry.js` watchdog | Live. Dispatch-on-staleness (pre-existing) + per-source failure alerts (added). Needs `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` as worker secrets for alerts. |
+| Live D1 `tipsheet-db` | Phase 3 schema APPLIED (13 content tables incl. source_health). Populated by the `sync-to-d1` step in tijori-sdk.yml. |
