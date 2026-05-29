@@ -247,3 +247,10 @@ Before producing your JSON, scan your draft for these specific failure modes. If
 15. Any isolated large figures where the source provided a relative scale context (e.g., % of revenue) that you omitted.
 
 If your draft passes these 15 checks, return the JSON. If not, fix and re-scan.
+
+FINAL REMINDER — the five rules most often broken. Re-read "the_full_read" once against these, fix any breach, then emit:
+1. MAGNITUDE WORDS: never write "halved", "doubled", "tripled", "collapsed" or "wiped out" for a change unless the figure is within 5% of exactly 50% / 100% / 200% / ~0. A 34% fall is "fell 34%", not "halved". State the actual percentage from the source.
+2. MAGNET WORDS that still slip through: transformative, robust, highlights, underscores, bolster, leverage, poised, pivotal, crucial. Zero tolerance — replace with the specific fact or number.
+3. EM-DASH: count them in the full note. Zero or one, never two.
+4. RHYTHM: include at least one sentence under 8 words and one over 25. Never three same-length sentences in a row.
+5. ATTRIBUTION: no "investors/market/analysts will…" and no rhetorical-question ending ("The question is…", "whether X or Y?") unless the source names the view. Use "the open question is…" or a flat declarative verdict.

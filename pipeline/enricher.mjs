@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GoogleGenAI } from '@google/genai';
+import { chatJson, DEEPSEEK_MODEL } from './deepseek.mjs';
 import { PHRASE_PATTERNS, STRUCTURAL_RULES, FEEDBACK_SUBSTITUTIONS } from './banned-patterns.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -164,6 +165,42 @@ const responseSchema = {
   ]
 };
 
+// Resilience fallback: when Gemini is unavailable (monthly spend cap → HTTP 429, 5xx, network),
+// retry the SAME filing through DeepSeek so a single-provider outage can't silently stall the
+// whole pipeline (the May-2026 cap outage that froze publishing for days). Gemini stays primary
+// for prose quality; DeepSeek runs at a tighter temperature to curb its looser register, and its
+// output still passes through the same validator + banned-phrase gate.
+async function enrichViaDeepSeek({ system, userMsg, previousAttempt, raw, reason }) {
+  if (!process.env.DEEPSEEK_API_KEY) return null;
+  const model = process.env.DEEPSEEK_MODEL || DEEPSEEK_MODEL;
+  console.warn(`[enrich] Gemini unavailable (${reason}); falling back to DeepSeek ${model}`);
+  // DeepSeek doesn't use Gemini's multi-turn envelope; fold any prior-attempt feedback into the user text.
+  let user = userMsg;
+  if (previousAttempt?.parsed && previousAttempt?.validation?.issues?.length) {
+    user += `\n\nYour previous attempt:\n${JSON.stringify(previousAttempt.parsed)}\n\n${buildFeedbackMessage(previousAttempt.validation)}`;
+  }
+  const t0 = Date.now();
+  const res = await chatJson({
+    system,
+    user,
+    model,
+    temperature: Number(process.env.DEEPSEEK_TEMPERATURE || 0.5),
+    maxTokens: Math.max(CFG.maxTokens, 3000), // headroom for v4-flash reasoning tokens
+  });
+  if (!res.ok || !res.parsed) return null;
+  const v = validate(res.parsed, raw);
+  return {
+    ok: v.ok,
+    parsed: res.parsed,
+    validation: v,
+    model: res.model || model,
+    provider: 'deepseek',
+    promptVersion: PROMPT_VERSION,
+    usage: res.usage || null,
+    elapsed_ms: Date.now() - t0,
+  };
+}
+
 export async function enrich(raw, previousAttempt = null) {
   if (!CFG.apiKey) return { ok: false, error: 'missing API key (set LLM_API_KEY or GOOGLE_API_KEY)' };
   const { system, userTemplate } = await loadPrompts();
@@ -211,6 +248,8 @@ export async function enrich(raw, previousAttempt = null) {
       elapsed_ms,
     };
   } catch (e) {
+    const fallback = await enrichViaDeepSeek({ system, userMsg, previousAttempt, raw, reason: e.message });
+    if (fallback) return fallback;
     return { ok: false, error: e.message, elapsed_ms: Date.now() - t0 };
   }
 }
