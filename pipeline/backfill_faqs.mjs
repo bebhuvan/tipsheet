@@ -22,6 +22,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { GoogleGenAI } from '@google/genai';
+import { compatHeaders, tokenParam } from './llm-compat.mjs';
 import { PHRASE_PATTERNS } from './banned-patterns.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -118,23 +119,44 @@ function validateFaqs(faqs) {
 
 async function generateFaqs(ai, system, article) {
   const user = buildUserMessage(article);
+  const baseUrl = process.env.LLM_BASE_URL || '';
+  const useOpenAI = baseUrl && !/googleapis|generativelanguage/i.test(baseUrl);
   let lastIssues = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     const sys = (attempt === 1 || !lastIssues) ? system
       : `${system}\n\nYOUR PREVIOUS ATTEMPT FAILED these exact checks: ${lastIssues.join(' | ')}.\nFix precisely those — rewrite the offending question/answer and strip every flagged word — while keeping all the others sharp. Still 4–6 items, each answer 2–3 declarative sentences that lead with the answer.`;
     let res;
     try {
-      res = await ai.models.generateContent({
-        model: CFG.model,
-        contents: [{ role: 'user', parts: [{ text: user }] }],
-        config: {
-          systemInstruction: sys,
-          temperature: CFG.temperature,
-          maxOutputTokens: CFG.maxTokens,
-          responseMimeType: 'application/json',
-          responseSchema: faqsSchema,
-        },
-      });
+      if (useOpenAI) {
+        const r = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+          method: 'POST',
+          headers: compatHeaders(baseUrl, CFG.apiKey),
+          body: JSON.stringify({
+            model: CFG.model,
+            messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
+            response_format: { type: 'json_object' },
+            temperature: CFG.temperature,
+            ...tokenParam(baseUrl, CFG.maxTokens),
+          }),
+        });
+        if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+        const b = await r.json();
+        const c = b.choices?.[0]?.message?.content || '{}';
+        const s = c.indexOf('{'), e = c.lastIndexOf('}');
+        res = { text: (s >= 0 && e > s ? c.slice(s, e + 1) : c), usageMetadata: b.usage || null };
+      } else {
+        res = await ai.models.generateContent({
+          model: CFG.model,
+          contents: [{ role: 'user', parts: [{ text: user }] }],
+          config: {
+            systemInstruction: sys,
+            temperature: CFG.temperature,
+            maxOutputTokens: CFG.maxTokens,
+            responseMimeType: 'application/json',
+            responseSchema: faqsSchema,
+          },
+        });
+      }
     } catch (e) { return { ok: false, error: e.message }; }
     let parsed;
     try { parsed = JSON.parse(res.text || '{}'); } catch { lastIssues = ['invalid JSON']; continue; }
