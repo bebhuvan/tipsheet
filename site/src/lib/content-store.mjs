@@ -19,7 +19,10 @@
 // Migration is incremental and safe: a page can adopt the store the moment its
 // data needs become async; until then queries.mjs keeps working untouched.
 
-import * as Q from './queries.mjs';
+// NOTE: queries.mjs imports better-sqlite3 (a native module that cannot run in
+// a Cloudflare Worker). It is therefore loaded LAZILY, only on the SQLite path
+// (build time / local). The D1 path (Worker SSR) must never pull it into the
+// bundle — so do not add a top-level `import` of queries.mjs here.
 
 // Wrap every exported function as async; pass constants (e.g. MARKET_CAP_TIERS)
 // through untouched. An async wrapper over a sync function is harmless — it
@@ -36,8 +39,11 @@ function asyncFacade(mod) {
 }
 
 let _sqliteStore;
-export function createSqliteStore() {
-  return (_sqliteStore ??= asyncFacade(Q));
+export async function createSqliteStore() {
+  if (_sqliteStore) return _sqliteStore;
+  const Q = await import('./queries.mjs');
+  _sqliteStore = asyncFacade(Q);
+  return _sqliteStore;
 }
 
 export function createD1Store(/* db */) {
@@ -61,7 +67,7 @@ export function createD1Store(/* db */) {
 // env is the Astro/Workers runtime env. At static build time there is no
 // env.DB, so this returns the SQLite store. Under SSR on Workers (Phase 4),
 // env.DB is the bound D1 database.
-export function getStore(env) {
+export async function getStore(env) {
   if (env && env.DB) return createD1Store(env.DB);
   return createSqliteStore();
 }
