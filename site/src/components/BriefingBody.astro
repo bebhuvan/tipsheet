@@ -8,6 +8,7 @@ const {
   theme = 'close',      // 'open' | 'close' — drives the accent colour
   theTake = '',
   market = [],          // [{symbol, name, price, change_pct}]
+  sectorMarket = [],    // major NSE sectoral indices, rendered as the second market row
   events = [],          // resolved by getBriefingEvents()
   dayMap = [],          // sector/cap shape of the day
   concalls = [],        // [{symbol,date,prose}]
@@ -17,9 +18,6 @@ const {
   calendarLabel = 'On the calendar',
 } = Astro.props;
 
-const indexName = {
-  '^NSEI': 'Nifty 50', '^BSESN': 'Sensex', '^NSEBANK': 'Bank Nifty', '^INDIAVIX': 'India VIX',
-};
 function num(value, digits = 2) {
   const n = Number(value);
   return Number.isFinite(n) ? n.toLocaleString('en-IN', { maximumFractionDigits: digits, minimumFractionDigits: digits }) : '—';
@@ -46,6 +44,28 @@ function concallUrl(symbol, date) {
   if (!symbol || !date) return null;
   return `/concalls/${String(symbol).toLowerCase()}/${date}/`;
 }
+function shortCap(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(2)} L cr`;
+  return `₹${Math.round(n).toLocaleString('en-IN')} cr`;
+}
+function topLabels(rows, key, limit = 2) {
+  const counts = new Map();
+  for (const row of rows) {
+    const value = row?.[key];
+    if (!value) continue;
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+    .slice(0, limit)
+    .map(([label]) => label);
+}
+const takeParagraphs = String(theTake || '')
+  .split(/\n{2,}|\r?\n/)
+  .map(p => p.trim())
+  .filter(Boolean);
 
 const capGroups = (() => {
   const order = ['Mega cap', 'Large cap', 'Mid cap', 'Small cap', 'Micro cap'];
@@ -58,7 +78,12 @@ const capGroups = (() => {
   return [...map.entries()].sort((a, b) => {
     const ai = order.indexOf(a[0]); const bi = order.indexOf(b[0]);
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-  });
+  }).map(([label, rows]) => ({
+    label,
+    rows,
+    detail: topLabels(rows, 'category', 2).join(' / ') || topLabels(rows, 'sector', 2).join(' / '),
+    mcap: rows.reduce((sum, row) => sum + (Number(row.market_cap) || 0), 0),
+  }));
 })();
 
 const sectorGroups = (() => {
@@ -68,7 +93,12 @@ const sectorGroups = (() => {
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(ev);
   }
-  return [...map.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 8);
+  return [...map.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 8)
+    .map(([label, rows]) => ({
+      label,
+      rows,
+      detail: topLabels(rows, 'market_cap_label', 2).join(' / ') || topLabels(rows, 'category', 2).join(' / '),
+    }));
 })();
 ---
 
@@ -78,8 +108,8 @@ const sectorGroups = (() => {
     <div class="bf-ticker" aria-label="Market snapshot">
       {market.map(m => (
         <div class="bf-tick">
-          <span class="bf-tick-name">{indexName[m.symbol] || m.name || m.symbol}</span>
-          <span class="bf-tick-val">{num(m.price, m.symbol === '^BSESN' || m.symbol === '^NSEBANK' ? 0 : 2)}</span>
+          <span class="bf-tick-name">{m.name || m.symbol}</span>
+          <span class="bf-tick-val">{num(m.price, 2)}</span>
           <span class={`bf-tick-chg ${trend(m.change_pct)}`}>
             <i aria-hidden="true">{arrow(trend(m.change_pct))}</i>{pct(m.change_pct) || 'Flat'}
           </span>
@@ -88,10 +118,33 @@ const sectorGroups = (() => {
     </div>
   )}
 
-  {theTake && (
+  {sectorMarket.length > 0 && (
+    <div class="bf-sector-strip" aria-label="NSE sectoral indices">
+      <div class="bf-sector-head">
+        <span>Major NSE sectoral indices</span>
+        <em>latest</em>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Index</th><th>Level</th><th>Move</th></tr>
+        </thead>
+        <tbody>
+          {sectorMarket.map(s => (
+            <tr class={trend(s.change_pct)}>
+              <td>{s.name || s.symbol}</td>
+              <td>{num(s.price, 2)}</td>
+              <td>{pct(s.change_pct) || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+
+  {takeParagraphs.length > 0 && (
     <aside class="bf-take">
       <span class="bf-take-label">The take</span>
-      <p>{theTake}</p>
+      {takeParagraphs.map(p => <p>{p}</p>)}
     </aside>
   )}
 
@@ -107,16 +160,25 @@ const sectorGroups = (() => {
         <div>
           <span class="bf-map-label">By size</span>
           <div class="bf-pills">
-            {capGroups.map(([label, rows]) => (
-              <span class="bf-pill"><b>{label}</b><em>{rows.length}</em></span>
+            {capGroups.map(group => (
+              <span class="bf-pill">
+                <b>{group.label}</b>
+                <em>{group.rows.length}</em>
+                {group.detail && <small>{group.detail}</small>}
+                {group.mcap > 0 && <small>{shortCap(group.mcap)}</small>}
+              </span>
             ))}
           </div>
         </div>
         <div>
           <span class="bf-map-label">By sector</span>
           <div class="bf-pills">
-            {sectorGroups.map(([label, rows]) => (
-              <span class="bf-pill"><b>{label}</b><em>{rows.length}</em></span>
+            {sectorGroups.map(group => (
+              <span class="bf-pill">
+                <b>{group.label}</b>
+                <em>{group.rows.length}</em>
+                {group.detail && <small>{group.detail}</small>}
+              </span>
             ))}
           </div>
         </div>
@@ -136,12 +198,14 @@ const sectorGroups = (() => {
               <span class="bf-ev-eyebrow">
                 {ev.symbol && <em class="bf-ev-sym">{ev.symbol}</em>}
                 {ev.category && <em class="bf-ev-cat">{ev.category}</em>}
+                {ev.market_cap_label && <em class="bf-ev-cat">{ev.market_cap_label}</em>}
+                {ev.sector && <em class="bf-ev-cat">{ev.sector}</em>}
               </span>
               <h3>{ev.company || ev.symbol}</h3>
             </a>
             <p class="bf-ev-prose">{ev.prose}</p>
 
-            <div class="bf-ev-foot">
+            <div class:list={["bf-ev-foot", { 'has-stats': ev.financials.length > 0, 'has-chart': ev.history && ev.history.length >= 2 }]}>
               {ev.financials.length > 0 && (
                 <dl class="bf-stats">
                   {ev.financials.map(f => (
@@ -155,7 +219,8 @@ const sectorGroups = (() => {
 
               {ev.history && ev.history.length >= 2 && (
                 <a class={`bf-ev-chart ${trend(ev.history_change)}`} href={ev.canonical_url} aria-label={`${ev.symbol} one-week price chart`}>
-                  <Sparkline points={ev.history} width={148} height={40} ariaLabel={`${ev.symbol} 1-week trend`} />
+                  <span class="bf-chart-label">1-week price</span>
+                  <Sparkline points={ev.history} width={200} height={56} ariaLabel={`${ev.symbol} 1-week trend`} />
                   <span class="bf-chart-cap"><i aria-hidden="true">{arrow(trend(ev.history_change))}</i>{pct(ev.history_change) || '—'} · 1wk</span>
                 </a>
               )}
@@ -214,7 +279,7 @@ const sectorGroups = (() => {
 <style>
   .bf {
     --bf-accent: var(--brief-close);
-    margin-top: 30px;
+    margin-top: 36px;
   }
   .bf-open  { --bf-accent: var(--brief-open); }
   .bf-close { --bf-accent: var(--brief-close); }
@@ -228,55 +293,105 @@ const sectorGroups = (() => {
   }
   .bf-tick {
     min-width: 0;
-    padding: 14px 18px 13px;
+    padding: 16px 20px 15px;
     border-right: 1px solid var(--hairline);
   }
   .bf-tick:last-child { border-right: 0; }
   .bf-tick-name {
     display: block; margin-bottom: 9px;
-    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em;
     text-transform: uppercase; color: var(--text-muted);
   }
   .bf-tick-val {
     display: block;
-    font-family: var(--mono); font-size: 21px; font-weight: 500; line-height: 1;
+    font-family: var(--mono); font-size: 23px; font-weight: 500; line-height: 1;
     color: var(--text); font-feature-settings: "tnum" 1; letter-spacing: -0.01em;
   }
   .bf-tick-chg {
     display: flex; align-items: center; gap: 4px; margin-top: 8px;
-    font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em; color: var(--text-muted);
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.01em; color: var(--text-muted);
   }
   .bf-tick-chg i { font-style: normal; font-size: 8px; }
   .bf-tick-chg.up   { color: var(--up); }
   .bf-tick-chg.down { color: var(--down); }
 
+  .bf-sector-strip {
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+  .bf-sector-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 13px 0 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .bf-sector-head em {
+    font-style: normal;
+    color: var(--text-faint);
+  }
+  .bf-sector-strip table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .bf-sector-strip th,
+  .bf-sector-strip td {
+    padding: 9px 10px;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.3;
+    text-align: right;
+    font-feature-settings: "tnum" 1;
+  }
+  .bf-sector-strip th:first-child,
+  .bf-sector-strip td:first-child {
+    width: 52%;
+    text-align: left;
+    color: var(--text);
+  }
+  .bf-sector-strip th {
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .bf-sector-strip tr.up td:last-child { color: var(--up); }
+  .bf-sector-strip tr.down td:last-child { color: var(--down); }
+
   /* ── The take (pull-quote) ─────────────────────────────────── */
   .bf-take {
-    margin: 30px 0 8px;
-    padding: 4px 0 4px 24px;
+    margin: 36px 0 10px;
+    padding: 8px 0 8px 28px;
     border-left: 2px solid var(--bf-accent);
   }
   .bf-take-label {
     display: block; margin-bottom: 9px;
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
     text-transform: uppercase; color: var(--bf-accent); font-weight: 500;
   }
   .bf-take p {
-    margin: 0; max-width: 32ch;
-    font-family: var(--serif); font-style: italic; font-weight: 300;
-    font-size: clamp(21px, 2.4vw, 27px); line-height: 1.34; color: var(--text);
-    font-variation-settings: "opsz" 36; text-wrap: balance;
+    margin: 0; max-width: 61ch;
+    font-family: var(--serif); font-weight: 400;
+    font-size: clamp(20px, 2.05vw, 24px); line-height: 1.48; color: var(--text);
+    font-variation-settings: "opsz" 28;
   }
+  .bf-take p + p { margin-top: 12px; }
 
   /* ── Section headers ───────────────────────────────────────── */
   .bf-sec-head {
     display: flex; align-items: baseline; justify-content: space-between;
-    margin: 0 0 4px; padding-bottom: 12px;
+    margin: 0 0 6px; padding-bottom: 13px;
     border-bottom: 1.5px solid var(--text);
   }
 
   .bf-map {
-    margin-top: 32px;
+    margin-top: 38px;
   }
   .bf-map-lines {
     list-style: none;
@@ -289,8 +404,8 @@ const sectorGroups = (() => {
     position: relative;
     padding-left: 18px;
     font-family: var(--serif);
-    font-size: 16px;
-    line-height: 1.42;
+    font-size: 17.5px;
+    line-height: 1.45;
     color: var(--text);
   }
   .bf-map-lines li::before {
@@ -312,96 +427,127 @@ const sectorGroups = (() => {
     display: block;
     margin-bottom: 8px;
     font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.14em;
+    font-size: 11px;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-muted);
   }
   .bf-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+    gap: 8px;
   }
   .bf-pill {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 7px;
-    padding: 5px 8px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+    padding: 9px 10px;
     border: 1px solid var(--hairline);
     font-family: var(--mono);
-    font-size: 10px;
+    font-size: 11px;
+    line-height: 1.25;
     color: var(--text);
   }
   .bf-pill b { font-weight: 500; }
   .bf-pill em { font-style: normal; color: var(--bf-accent); }
+  .bf-pill small {
+    grid-column: 1 / -1;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
   .bf-eyebrow {
-    font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em;
     text-transform: uppercase; color: var(--bf-accent); font-weight: 500;
   }
   .bf-sec-count {
-    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text-faint);
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; color: var(--text-faint);
     font-feature-settings: "tnum" 1;
   }
 
   /* ── Events ────────────────────────────────────────────────── */
-  .bf-events { margin-top: 34px; }
+  .bf-events { margin-top: 40px; }
   .bf-ev {
     display: grid;
-    grid-template-columns: 44px 1fr;
-    gap: 0 18px;
-    padding: 26px 0;
+    grid-template-columns: 54px 1fr;
+    gap: 0 24px;
+    padding: 34px 0;
     border-bottom: 1px solid var(--hairline);
   }
   .bf-ev:last-child { border-bottom: 0; }
   .bf-ev-num {
-    font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: 0.04em;
-    color: var(--bf-accent); padding-top: 5px; font-feature-settings: "tnum" 1;
+    font-family: var(--mono); font-size: 14px; font-weight: 500; letter-spacing: 0.04em;
+    color: var(--bf-accent); padding-top: 7px; font-feature-settings: "tnum" 1;
+    border-right: 1px solid var(--hairline);
   }
   .bf-ev-main { min-width: 0; }
   .bf-ev-head { display: block; text-decoration: none; color: var(--text); }
   .bf-ev-eyebrow {
-    display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; margin-bottom: 7px;
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    display: flex; flex-wrap: wrap; gap: 13px; align-items: baseline; margin-bottom: 8px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
   }
   .bf-ev-sym { font-style: normal; color: var(--bf-accent); font-weight: 600; }
   .bf-ev-cat { font-style: normal; color: var(--text-muted); }
   .bf-ev-head h3 {
     margin: 0; font-family: var(--serif); font-weight: 500;
-    font-size: clamp(22px, 2.3vw, 27px); line-height: 1.12; letter-spacing: -0.012em;
+    font-size: clamp(25px, 2.5vw, 31px); line-height: 1.11; letter-spacing: -0.012em;
     color: var(--text); font-variation-settings: "opsz" 32; text-wrap: balance;
     transition: color 140ms ease;
   }
   .bf-ev-head:hover h3 { color: var(--bf-accent); }
   .bf-ev-prose {
-    margin: 13px 0 0; max-width: 58ch;
-    font-family: var(--serif); font-size: 18px; line-height: 1.58; color: var(--text-soft);
+    margin: 14px 0 0; max-width: 62ch;
+    font-family: var(--serif); font-size: 19px; line-height: 1.58; color: var(--text-soft);
   }
 
+  /* Fundamentals — an understated figure strip, not a boxed dashboard.
+     Hairline rules top and bottom, no fills, open spacing; the price chart
+     sits flush on the right, divided by a single faint rule. */
   .bf-ev-foot {
-    display: flex; justify-content: space-between; align-items: flex-end;
-    gap: 18px 36px; margin-top: 20px; flex-wrap: wrap;
+    margin-top: 26px;
+    border-top: 1px solid var(--hairline-strong);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .bf-ev-foot.has-stats.has-chart {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 236px;
+    align-items: stretch;
   }
   .bf-stats {
-    margin: 0; display: flex; flex-wrap: wrap; gap: 18px 26px; flex: 1 1 320px;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 0;
   }
-  .bf-stat { min-width: 0; }
+  .bf-stat {
+    min-width: 0;
+    padding: 17px 24px 17px 0;
+  }
   .bf-stat-v {
-    margin: 0; font-family: var(--mono); font-size: 17px; font-weight: 500; line-height: 1;
+    margin: 0; font-family: var(--mono); font-size: 18px; font-weight: 500; line-height: 1.15;
     color: var(--text); font-feature-settings: "tnum" 1; letter-spacing: -0.01em;
   }
   .bf-stat-v.up   { color: var(--up); }
   .bf-stat-v.down { color: var(--down); }
   .bf-stat-l {
-    margin: 6px 0 0; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--text-muted);
+    margin: 9px 0 0; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.02em; line-height: 1.4;
+    color: var(--text-faint);
   }
 
-  .bf-ev-chart { flex: 0 0 auto; display: block; text-decoration: none; text-align: right; }
-  .bf-ev-chart :global(svg.spark) { display: block; width: 148px; height: 40px; margin-left: auto; }
+  /* Chart cell — vertically centred, divided from the figures by one rule. */
+  .bf-ev-chart {
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 10px; padding: 16px 0 16px 26px; text-decoration: none;
+    border-left: 1px solid var(--hairline);
+  }
+  .bf-chart-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .bf-ev-chart :global(svg.spark) { display: block; width: 100%; height: 54px; }
   .bf-chart-cap {
-    display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 7px;
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--text-muted);
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.04em;
+    color: var(--text-muted); font-feature-settings: "tnum" 1;
   }
   .bf-chart-cap i { font-style: normal; font-size: 8px; }
   .bf-ev-chart.up   .bf-chart-cap { color: var(--up); }
@@ -409,7 +555,7 @@ const sectorGroups = (() => {
 
   .bf-ev-more {
     display: inline-block; margin-top: 16px;
-    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--text-muted); text-decoration: none; transition: color 140ms ease;
   }
   .bf-ev-more span { transition: margin-left 140ms ease; }
@@ -417,14 +563,14 @@ const sectorGroups = (() => {
   .bf-ev-more:hover span { margin-left: 3px; }
 
   /* ── Mgmt flags + calendar ─────────────────────────────────── */
-  .bf-block { margin-top: 48px; }
-  .bf-flags { list-style: none; padding: 0; margin: 22px 0 0; }
-  .bf-flags li { margin: 0 0 22px; padding-left: 16px; border-left: 2px solid var(--hairline-strong); }
+  .bf-block { margin-top: 54px; }
+  .bf-flags { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 0; border-top: 1px solid var(--hairline); }
+  .bf-flags li { margin: 0; padding: 18px 0 18px 20px; border-left: 2px solid var(--bf-accent); border-bottom: 1px solid var(--hairline); }
   .bf-flags li:last-child { margin-bottom: 0; }
-  .bf-flags p { margin: 0; max-width: 60ch; font-family: var(--serif); font-size: 18px; line-height: 1.56; color: var(--text-soft); }
+  .bf-flags p { margin: 0; max-width: 66ch; font-family: var(--serif); font-size: 19px; line-height: 1.56; color: var(--text-soft); }
   .bf-flags a, .bf-cal a {
     display: inline-block; margin-top: 8px;
-    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--text-muted); text-decoration: none; transition: color 140ms ease;
   }
   .bf-flags a:hover { color: var(--bf-accent); }
@@ -432,7 +578,7 @@ const sectorGroups = (() => {
   .bf-cal li {
     display: flex; align-items: baseline; gap: 12px;
     padding: 13px 0; border-bottom: 1px solid var(--hairline);
-    font-family: var(--serif); font-size: 17px; line-height: 1.45; color: var(--text-soft);
+    font-family: var(--serif); font-size: 18px; line-height: 1.45; color: var(--text-soft);
   }
   .bf-cal li::before {
     content: ''; flex: 0 0 auto; width: 5px; height: 5px; margin-top: 9px;
@@ -445,13 +591,39 @@ const sectorGroups = (() => {
     .bf-ticker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .bf-tick:nth-child(2n) { border-right: 0; }
     .bf-tick:nth-child(n + 3) { border-top: 1px solid var(--hairline); }
-    .bf-tick-val { font-size: 19px; }
+    .bf-tick { padding: 14px 14px 13px; }
+    .bf-tick-val { font-size: 21px; }
+    .bf-sector-strip th,
+    .bf-sector-strip td {
+      padding: 9px 6px;
+      font-size: 11px;
+    }
+    .bf-sector-strip th:first-child,
+    .bf-sector-strip td:first-child {
+      width: 50%;
+    }
+    .bf-map-grid { grid-template-columns: 1fr; }
+    .bf-pill { width: 100%; }
     .bf-ev { grid-template-columns: 1fr; gap: 0; }
-    .bf-ev-num { display: none; }
-    .bf-ev-foot { align-items: flex-start; }
-    .bf-ev-chart { text-align: left; }
-    .bf-ev-chart :global(svg.spark) { margin-left: 0; }
-    .bf-chart-cap { justify-content: flex-start; }
-    .bf-take p { font-size: 21px; }
+    .bf-ev-num { display: none; border-right: 0; }
+    .bf-ev-prose { font-size: 18.5px; }
+    .bf-ev-foot.has-stats.has-chart { grid-template-columns: 1fr; }
+    .bf-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .bf-stat:nth-child(2n) { border-right: 0; }
+    .bf-stat:first-child { grid-column: 1 / -1; }
+    .bf-ev-chart {
+      border-left: 0;
+      border-top: 1px solid var(--hairline-strong);
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .bf-chart-label { order: -1; flex-basis: 100%; }
+    .bf-ev-chart :global(svg.spark) { width: auto; flex: 1 1 60%; height: 60px; }
+    .bf-take { padding-left: 16px; }
+    .bf-take p { font-size: 20px; }
   }
 </style>

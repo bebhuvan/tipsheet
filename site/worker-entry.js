@@ -34,7 +34,13 @@ const CACHE_RULES = [
   { pattern: /^\/article-redirects\.json$/, maxAge: 300 },
 ];
 
-const DEFAULT_PAGE_MAX_AGE = 300;
+const BRIEFING_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
+const BRIEFING_CDN_CACHE_CONTROL = 'no-store';
+const FRESH_PAGE_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
+const FRESH_PAGE_CDN_CACHE_CONTROL = 'no-store';
+const HTML_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
+const HTML_CDN_CACHE_CONTROL = 'no-store';
+const WORKER_RELEASE = '2026-05-28-no-html-cache';
 const IST_OFFSET_MIN = 330;
 const BRIEFING_SCHEDULES = [
   { type: 'open', dueHour: 8, dueMinute: 0, graceEnv: 'BRIEFING_OPEN_GRACE_MIN' },
@@ -49,10 +55,35 @@ function applySecurityHeaders(headers) {
 }
 
 function cacheControlFor(pathname) {
+  if (pathname === '/sw.js') {
+    return {
+      browser: 'no-cache, no-store, must-revalidate',
+      cdn: 'no-store',
+      cloudflareCdn: 'no-store',
+      dropAssetCacheStatus: true,
+    };
+  }
+  if (isAlwaysFreshPage(pathname)) {
+    return {
+      browser: FRESH_PAGE_BROWSER_CACHE_CONTROL,
+      cdn: FRESH_PAGE_CDN_CACHE_CONTROL,
+      cloudflareCdn: FRESH_PAGE_CDN_CACHE_CONTROL,
+      dropAssetCacheStatus: true,
+    };
+  }
+  if (/^\/briefings\/the-(open|close)\//.test(pathname)) {
+    return {
+      browser: BRIEFING_BROWSER_CACHE_CONTROL,
+      cdn: BRIEFING_CDN_CACHE_CONTROL,
+      cloudflareCdn: BRIEFING_CDN_CACHE_CONTROL,
+      dropAssetCacheStatus: true,
+    };
+  }
   for (const rule of CACHE_RULES) {
     if (rule.pattern.test(pathname)) {
       const extra = rule.immutable ? ', immutable' : '';
-      return `public, max-age=${rule.maxAge}${extra}`;
+      const value = `public, max-age=${rule.maxAge}${extra}`;
+      return { browser: value, cdn: value, cloudflareCdn: null };
     }
   }
   // Treat clean/extensionless URLs as HTML pages. Articles are served at "/slug/"
@@ -62,9 +93,41 @@ function cacheControlFor(pathname) {
   // page (covers "/", "/slug/", "/slug"); real assets were already matched above.
   const lastSegment = pathname.slice(pathname.lastIndexOf('/') + 1);
   if (pathname.endsWith('.html') || !lastSegment.includes('.')) {
-    return `public, max-age=${DEFAULT_PAGE_MAX_AGE}, stale-while-revalidate=3600`;
+    return {
+      browser: HTML_BROWSER_CACHE_CONTROL,
+      cdn: HTML_CDN_CACHE_CONTROL,
+      cloudflareCdn: HTML_CDN_CACHE_CONTROL,
+      dropAssetCacheStatus: true,
+    };
   }
   return null;
+}
+
+function isAlwaysFreshPage(pathname) {
+  return /^\/(?:regulation|economy)\/?$/.test(pathname);
+}
+
+function freshAssetPath(pathname) {
+  if (/^\/regulation\/?$/.test(pathname)) return '/fresh/regulation/';
+  if (/^\/economy\/?$/.test(pathname)) return '/fresh/economy/';
+  return null;
+}
+
+function assetFetchRequest(request, pathname) {
+  const freshPath = freshAssetPath(pathname);
+  if (!freshPath) return request;
+  const url = new URL(request.url);
+  url.pathname = freshPath;
+  url.search = '';
+  const headers = new Headers(request.headers);
+  headers.set('Cache-Control', 'no-cache');
+  headers.set('Pragma', 'no-cache');
+  return new Request(url.toString(), {
+    method: request.method,
+    headers,
+    redirect: request.redirect,
+    cf: { cacheTtl: 0, cacheEverything: false },
+  });
 }
 
 function json(data, status = 200, maxAge = 300) {
@@ -366,6 +429,12 @@ export default {
     if (url.pathname === '/sector' || url.pathname === '/sector/') {
       return redirectPath(url, '/sectors/', 301);
     }
+    if (url.pathname === '/fresh/regulation' || url.pathname === '/fresh/regulation/') {
+      return redirectPath(url, '/regulation/', 301);
+    }
+    if (url.pathname === '/fresh/economy' || url.pathname === '/fresh/economy/') {
+      return redirectPath(url, '/economy/', 301);
+    }
     if (
       url.pathname === '/category' ||
       url.pathname === '/category/' ||
@@ -378,7 +447,7 @@ export default {
     const widget = await handleWidgetApi(url.pathname, env);
     if (widget) return widget;
 
-    const response = await env.ASSETS.fetch(request);
+    const response = await env.ASSETS.fetch(assetFetchRequest(request, url.pathname));
 
     if (response.status === 404 && url.pathname !== '/') {
       const articleRedirect = await maybeRedirectArticleSlug(url, env);
@@ -394,11 +463,14 @@ export default {
 
     const headers = new Headers(response.headers);
     applySecurityHeaders(headers);
+    headers.set('X-Tipsheet-Worker-Release', WORKER_RELEASE);
 
     const cc = cacheControlFor(url.pathname);
     if (cc) {
-      headers.set('Cache-Control', cc);
-      headers.set('CDN-Cache-Control', cc);
+      headers.set('Cache-Control', cc.browser);
+      headers.set('CDN-Cache-Control', cc.cdn);
+      if (cc.cloudflareCdn) headers.set('Cloudflare-CDN-Cache-Control', cc.cloudflareCdn);
+      if (cc.dropAssetCacheStatus) headers.delete('CF-Cache-Status');
     }
 
     return new Response(response.body, {

@@ -4,8 +4,8 @@
 Two jobs, both writing into the Tipsheet DB so the site never touches a market
 data provider at build/runtime (licensing — site reads only the DB):
 
-  1. market_snapshots — latest level + day move for Nifty / Sensex / Bank Nifty /
-     India VIX. Powers the briefing market strip.
+  1. market_snapshots — latest level + day move for the briefing breadth ladder
+     and major NSE sectoral indices.
   2. market_history   — ~1 week of daily closes for the stocks most likely to
      appear in the next briefing (top filings by score in the window). Powers the
      per-stock sparkline in each briefing event item.
@@ -35,6 +35,27 @@ INDICES = {
     "^BSESN": ("Sensex", "broad"),
     "^NSEBANK": ("Bank Nifty", "broad"),
     "^INDIAVIX": ("India VIX", "broad"),
+    "NIFTY_TOTAL_MKT.NS": ("Nifty Total Market", "broad"),
+    "NIFTY_500.NS": ("Nifty 500", "broad"),
+    "NIFTY_MIDCAP_150.NS": ("Nifty Midcap 150", "broad"),
+    "NIFTY_SMLCAP_250.NS": ("Nifty Smallcap 250", "broad"),
+    "NIFTY_MICROCAP250.NS": ("Nifty Microcap 250", "broad"),
+    "^CNXAUTO": ("Nifty Auto", "sector"),
+    "^CNXENERGY": ("Nifty Energy", "sector"),
+    "^CNXFIN": ("Nifty Financial Services", "sector"),
+    "^CNXFMCG": ("Nifty FMCG", "sector"),
+    "^CNXIT": ("Nifty IT", "sector"),
+    "^CNXMEDIA": ("Nifty Media", "sector"),
+    "^CNXMETAL": ("Nifty Metal", "sector"),
+    "^CNXPHARMA": ("Nifty Pharma", "sector"),
+    "^CNXPSUBANK": ("Nifty PSU Bank", "sector"),
+    "^CNXREALTY": ("Nifty Realty", "sector"),
+    "NIFTY_CEMENT.NS": ("Nifty Cement", "sector"),
+    "NIFTY_CHEMICALS.NS": ("Nifty Chemicals", "sector"),
+    "NIFTY_CONSR_DURBL.NS": ("Nifty Consumer Durables", "sector"),
+    "NIFTY_HEALTHCARE.NS": ("Nifty Healthcare", "sector"),
+    "NIFTY_OIL_AND_GAS.NS": ("Nifty Oil & Gas", "sector"),
+    "NIFTY_REITS_REALTY.NS": ("Nifty REITs & Realty", "sector"),
 }
 
 

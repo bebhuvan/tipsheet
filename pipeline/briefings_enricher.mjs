@@ -4,7 +4,7 @@
 //   - filings_enriched (top by score in the last 24h)
 //   - concalls_enriched (recent mgmt-consistency flags)
 //   - macro_calendar (today's India + high-impact global events)
-//   - market_snapshots (latest Nifty / Sensex / Bank Nifty / India VIX)
+//   - market_snapshots (Nifty breadth indices, plus sectoral indices for context)
 //
 // Composes a single LLM call with structured input, validates output against the same
 // validator used for filings (PHRASE_PATTERNS + STRUCTURAL_RULES).
@@ -17,13 +17,13 @@ import { PHRASE_PATTERNS, STRUCTURAL_RULES } from './banned-patterns.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PATH = resolve(__dirname, 'prompts/briefings_system.txt');
 const USER_PATH   = resolve(__dirname, 'prompts/briefings_user.txt');
-export const BRIEFING_PROMPT_VERSION = 'briefing.v5';
+export const BRIEFING_PROMPT_VERSION = 'briefing.v6';
 
 const CFG = {
   baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
   apiKey:      process.env.LLM_API_KEY  || process.env.GOOGLE_API_KEY,
   model:       process.env.LLM_MODEL    || 'gemini-3.1-flash-lite',
-  maxTokens:   Number(process.env.LLM_MAX_TOKENS_BRIEFING || 3600),
+  maxTokens:   Number(process.env.LLM_MAX_TOKENS_BRIEFING || 5200),
   temperature: Number(process.env.LLM_TEMPERATURE || 1.0),
   timeoutMs:   Number(process.env.LLM_TIMEOUT_MS || 45000),
 };
@@ -63,6 +63,8 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 30 } = {
     LIMIT 32
   `).all(cutoffIso);
 
+  attachPriorFilingContext(db, topFilings);
+
   // Recent mgmt-consistency flags (last 7 days)
   const concallCutoff = new Date(dateYmd + 'T00:00:00+05:30');
   concallCutoff.setDate(concallCutoff.getDate() - 7);
@@ -79,7 +81,7 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 30 } = {
   const recentConcalls = db.prepare(`
     SELECT c.symbol, c.company_name, c.sector, c.event_time,
            e.headline, e.dek, e.the_take, e.inconsistency_flag,
-           e.whats_new, e.key_quotes, e.the_brief
+           e.whats_new, e.themes, e.guidance_watch, e.risk_flags, e.key_quotes, e.the_brief
     FROM concalls_raw c JOIN concalls_enriched e ON e.isin = c.isin AND e.event_time = c.event_time
     WHERE e.validation_ok = 1 AND c.event_time >= ?
     ORDER BY c.event_time DESC
@@ -97,13 +99,14 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 30 } = {
     LIMIT 8
   `).all(dateYmd);
 
-  // Market snapshot — Nifty, Sensex, Bank Nifty, India VIX
+  // Market snapshot — breadth ladder first. Nifty Indices classifies Total Market,
+  // Nifty 500, Midcap 150, Smallcap 250 and Microcap 250 under broad-based indices.
   const marketRows = db.prepare(`
     SELECT s.symbol, s.name, s.price, s.change_abs, s.change_pct, s.prev_close
     FROM market_snapshots s
     INNER JOIN (
       SELECT symbol, MAX(fetched_at) AS max_t FROM market_snapshots
-      WHERE symbol IN ('^NSEI', '^BSESN', '^NSEBANK', '^INDIAVIX')
+      WHERE symbol IN ('NIFTY_500.NS', 'NIFTY_MIDCAP_150.NS', 'NIFTY_SMLCAP_250.NS', 'NIFTY_MICROCAP250.NS')
       GROUP BY symbol
     ) latest ON latest.symbol = s.symbol AND latest.max_t = s.fetched_at
   `).all();
@@ -116,6 +119,28 @@ export function gatherBriefingInputs(db, type, dateYmd, { windowHours = 30 } = {
     macro_events_today: macroEvents,
     market_snapshot: marketRows,
   };
+}
+
+function attachPriorFilingContext(db, rows) {
+  if (!rows.length) return rows;
+  const stmt = db.prepare(`
+    SELECT r.record_id, r.created_on, r.event_category_canonical AS category,
+           e.headline, e.dek, e.the_number_value, e.the_number_label, e.why_it_matters
+    FROM filings_raw r
+    JOIN filings_enriched e ON e.record_id = r.record_id
+    WHERE e.validation_ok = 1
+      AND r.symbol = ?
+      AND r.record_id != ?
+      AND r.created_on < ?
+    ORDER BY r.created_on DESC
+    LIMIT 5
+  `);
+  for (const row of rows) {
+    row.prior_notes = row.symbol && row.created_on
+      ? stmt.all(row.symbol, row.record_id, row.created_on)
+      : [];
+  }
+  return rows;
 }
 
 function renderTopFilings(rows) {
@@ -141,7 +166,12 @@ function renderTopFilings(rows) {
       r.revenue_growth != null ? `revenue growth ${fmt(r.revenue_growth, '%')}` : null,
       r.pat_growth != null ? `PAT growth ${fmt(r.pat_growth, '%')}` : null,
     ].filter(Boolean).join(' · ');
-    return `[filing_id ${r.record_id}] ${r.symbol || '?'} · ${r.company || ''} · score ${r.score} · ${r.category}\n  Sector/cap: ${[r.sector, capTier(r.market_cap)].filter(Boolean).join(' · ') || 'n/a'}\n  Headline: ${r.headline}\n  Number: ${r.the_number_value || ''} (${r.the_number_label || ''})\n  Financial context: ${financial || 'n/a'}\n  Why: ${r.why_it_matters || ''}`;
+    const prior = (r.prior_notes || []).map(p => {
+      const number = p.the_number_value ? ` · ${p.the_number_value}${p.the_number_label ? ` (${p.the_number_label})` : ''}` : '';
+      const why = p.why_it_matters ? `\n      Why then: ${p.why_it_matters}` : '';
+      return `    - ${String(p.created_on || '').slice(0, 10)} · ${p.category || 'Other'} · ${p.headline || p.dek || ''}${number}${why}`;
+    }).join('\n');
+    return `[filing_id ${r.record_id}] ${r.symbol || '?'} · ${r.company || ''} · score ${r.score} · ${r.category}\n  Sector/cap: ${[r.sector, capTier(r.market_cap)].filter(Boolean).join(' · ') || 'n/a'}\n  Headline: ${r.headline}\n  Number: ${r.the_number_value || ''} (${r.the_number_label || ''})\n  Financial context: ${financial || 'n/a'}\n  Why: ${r.why_it_matters || ''}\n  Prior Tipsheet context for this company:\n${prior || '    - none in archive'}`;
   }).join('\n\n');
 }
 function renderRecentConcallNotes(rows) {
@@ -149,8 +179,14 @@ function renderRecentConcallNotes(rows) {
   const parse = (s) => { try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
   return rows.map(r => {
     const bullets = parse(r.whats_new).slice(0, 4).map(x => `    - ${x}`).join('\n');
+    const themes = parse(r.themes).slice(0, 3).map(x => {
+      if (typeof x === 'string') return `    - ${x}`;
+      return `    - ${x.label || 'Theme'}: ${x.detail || x.value || ''}`;
+    }).join('\n');
+    const guidance = parse(r.guidance_watch).slice(0, 3).map(x => `    - ${x}`).join('\n');
+    const risks = parse(r.risk_flags).slice(0, 3).map(x => `    - ${x}`).join('\n');
     const quotes = parse(r.key_quotes).slice(0, 2).map(q => `    - "${q.quote}" — ${q.attribution || 'management'}`).join('\n');
-    return `- ${r.company_name} (${r.symbol || '?'}) · ${String(r.event_time).slice(0,10)} · ${r.sector || 'n/a'}\n  Headline: ${r.headline || ''}\n  Dek: ${r.dek || ''}\n  Take: ${r.the_take || ''}\n  Consistency flag: ${r.inconsistency_flag || 'none'}\n  What's new:\n${bullets || '    - n/a'}\n  Quotes:\n${quotes || '    - n/a'}`;
+    return `- ${r.company_name} (${r.symbol || '?'}) · ${String(r.event_time).slice(0,10)} · ${r.sector || 'n/a'}\n  Headline: ${r.headline || ''}\n  Dek: ${r.dek || ''}\n  Take: ${r.the_take || ''}\n  Consistency flag: ${r.inconsistency_flag || 'none'}\n  Themes:\n${themes || '    - n/a'}\n  Guidance watch:\n${guidance || '    - n/a'}\n  Risk flags:\n${risks || '    - n/a'}\n  What's new:\n${bullets || '    - n/a'}\n  Quotes:\n${quotes || '    - n/a'}`;
   }).join('\n\n');
 }
 function renderMgmtFlags(rows) {
@@ -255,7 +291,7 @@ function buildFeedbackMessage(validation) {
     lines.push('');
     lines.push('Event problems:');
     for (const e of validation.eventIssues) lines.push(`  - ${e}`);
-    lines.push('  Each event needs a real filing_id from top_filings and 2-3 sentences of prose. Aim for 6-10 events.');
+    lines.push('  Each event needs a real filing_id from top_filings and 2-4 sentences of prose. Aim for 10-14 events when the input supports it.');
   }
   if (validation.banned?.length) {
     lines.push('');
@@ -288,7 +324,8 @@ function validate(parsed, inputs) {
   if (typeof parsed?.headline !== 'string' || parsed.headline.length === 0) issues.push('headline_missing');
   else if (parsed.headline.length > 100) issues.push(`headline_too_long:${parsed.headline.length}`);
   if (typeof parsed?.dek !== 'string') issues.push('dek_missing');
-  if (typeof parsed?.the_take !== 'string' || parsed.the_take.length < 15) issues.push('the_take_thin');
+  if (typeof parsed?.the_take !== 'string' || parsed.the_take.trim().length < 240) issues.push('the_take_thin');
+  if (typeof parsed?.the_take === 'string' && parsed.the_take.length > 1200) issues.push(`the_take_too_long:${parsed.the_take.length}`);
 
   // Events: must reference real filing_ids and carry real prose.
   const events = Array.isArray(parsed?.events) ? parsed.events : null;
@@ -305,7 +342,7 @@ function validate(parsed, inputs) {
     let badId = 0, thin = 0;
     for (const ev of events) {
       if (!validIds.has(Number(ev?.filing_id))) badId++;
-      if (typeof ev?.prose !== 'string' || ev.prose.trim().length < 40) thin++;
+      if (typeof ev?.prose !== 'string' || ev.prose.trim().length < 90) thin++;
     }
     if (badId)  { issues.push(`event_filing_id_unknown:${badId}`); eventIssues.push(`${badId} event(s) used a filing_id not in top_filings.`); }
     if (thin)   { issues.push(`event_prose_thin:${thin}`);          eventIssues.push(`${thin} event(s) under 2-3 sentences.`); }

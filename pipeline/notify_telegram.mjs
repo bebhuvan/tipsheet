@@ -37,6 +37,19 @@ if (!TOKEN || !CHAT) {
 const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const tierFor = (s) => (s >= 9 ? '🔴 Alert' : s >= 7 ? '🟠 Lead' : '⚪️ Brief');
 const plainTierFor = (s) => (s >= 9 ? 'Alert' : s >= 7 ? 'Lead' : 'Brief');
+const trimText = (s, n = 280) => {
+  const text = String(s ?? '').replace(/\s+/g, ' ').trim();
+  return text.length > n ? `${text.slice(0, n - 1).trim()}…` : text;
+};
+const capTierFor = (marketCap) => {
+  const v = Number(marketCap);
+  if (!Number.isFinite(v) || v <= 0) return null;
+  if (v >= 100000) return 'mega cap';
+  if (v >= 20000) return 'large cap';
+  if (v >= 5000) return 'mid cap';
+  if (v >= 1000) return 'small cap';
+  return 'micro cap';
+};
 
 async function send(html) {
   const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
@@ -151,9 +164,16 @@ async function buildAiDigest(rows) {
     score: r.score,
     tier: plainTierFor(r.score),
     category: r.canonical_category,
-    headline: r.headline,
-    dek: r.dek,
-    number: r.the_number_value ? `${r.the_number_value} ${r.the_number_label || ''}`.trim() : null,
+    sector: r.sector,
+    market_cap_tier: capTierFor(r.market_cap),
+    market_cap_cr: Number.isFinite(Number(r.market_cap)) ? Number(r.market_cap) : null,
+    headline: trimText(r.headline, 180),
+    dek: trimText(r.dek, 220),
+    number: r.the_number_value ? {
+      value: r.the_number_value,
+      label: r.the_number_label || '',
+    } : null,
+    why_it_matters: trimText(r.why_it_matters, 280),
     url: articleUrl(r),
   }));
 
@@ -161,11 +181,15 @@ async function buildAiDigest(rows) {
     {
       role: 'system',
       content: [
-        'You write one concise Telegram digest for Tipsheet, an Indian-equities filings publication.',
-        'Goal: reduce alert spam while making the refresh period actionable.',
-        'Write in plain, direct English. No hype. No invented facts. Do not mention market reaction unless source says it.',
+        'You write one Telegram digest for Tipsheet, an Indian-equities filings publication.',
+        'This is a desk note, not a headline dump. The reader should know the lead item, the pattern across the refresh, and which filings deserve a click.',
+        'Use only the supplied fields. No invented facts, numbers, prices, market reaction, analyst views, or sector context.',
+        'Rank by reader importance, not by score alone: material large/mid-cap developments first; forensic governance, large orders relative to market cap, funding stress, guidance changes and promoter/control events can outrank routine earnings. Micro-caps need a specific reason to make the cut.',
+        'The headline should frame the refresh, not say "Tipsheet digest". The take should connect two or three threads across the list in one or two plain sentences.',
+        'Each item line must name what changed and why it matters. Use the number or market-cap tier when it sharpens the read. Do not repeat the headline verbatim.',
+        'Style: FT Lex / markets desk. Plain English, active voice, no hype, no filler, no "investors will", no "underscores/highlights/showcases", no "robust/significant/transformative", no wrap words like overall/ultimately.',
         'Return JSON only: {"headline":"string","take":"string","items":[{"symbol":"string","line":"string","url":"string"}]}',
-        'headline <= 70 chars. take <= 180 chars. items 4-8, ordered by reader importance. line <= 150 chars.',
+        'Limits: headline <= 68 chars. take <= 260 chars. items 5-8 unless fewer supplied. line <= 175 chars. Order items by importance.',
       ].join(' '),
     },
     {
@@ -182,8 +206,8 @@ async function buildAiDigest(rows) {
         model: LLM.model,
         messages,
         response_format: { type: 'json_object' },
-        temperature: 0.6,
-        max_tokens: 900,
+        temperature: 0.45,
+        max_tokens: 1100,
       }),
     });
     if (!r.ok) return null;
@@ -324,18 +348,24 @@ async function main() {
   const rows = TEST
     ? db.prepare(`
         SELECT r.symbol, r.company, r.score, r.record_id,
-               e.headline, e.dek, e.the_number_value, e.the_number_label, e.canonical_category, e.slug
+               e.headline, e.dek, e.the_number_value, e.the_number_label,
+               e.why_it_matters, e.canonical_category, e.sector, e.slug,
+               f.market_cap
         FROM filings_enriched e
         JOIN filings_raw r ON r.record_id = e.record_id
+        LEFT JOIN fundamentals f ON f.symbol = r.symbol
         WHERE e.validation_ok = 1
         ORDER BY e.enriched_at DESC
         LIMIT 1
       `).all()
     : db.prepare(`
         SELECT r.symbol, r.company, r.score, r.record_id,
-               e.headline, e.dek, e.the_number_value, e.the_number_label, e.canonical_category, e.slug
+               e.headline, e.dek, e.the_number_value, e.the_number_label,
+               e.why_it_matters, e.canonical_category, e.sector, e.slug,
+               f.market_cap
         FROM filings_enriched e
         JOIN filings_raw r ON r.record_id = e.record_id
+        LEFT JOIN fundamentals f ON f.symbol = r.symbol
         WHERE e.validation_ok = 1 AND e.notified_at IS NULL AND r.score >= ?
         ORDER BY e.enriched_at ASC
         LIMIT ?

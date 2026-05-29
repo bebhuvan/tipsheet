@@ -3,7 +3,7 @@ import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
 import BriefingBody from '../../../components/BriefingBody.astro';
-import { getBriefing, getBriefingEvents, getBriefingMarketStrip, listAllBriefingsForStaticPaths } from '../../../lib/queries.mjs';
+import { getBriefing, getBriefingEvents, getBriefingMarketStrip, getBriefingSectorStrip, listAllBriefingsForStaticPaths } from '../../../lib/queries.mjs';
 
 export async function getStaticPaths() {
   return listAllBriefingsForStaticPaths()
@@ -17,6 +17,7 @@ if (!briefing) return Astro.redirect('/404');
 
 const events = getBriefingEvents(briefing.events);
 const market = getBriefingMarketStrip();
+const sectorMarket = getBriefingSectorStrip();
 
 function dateOf(ymd) {
   const d = new Date(ymd + 'T00:00:00');
@@ -64,6 +65,7 @@ const schema = {
         theme="open"
         theTake={briefing.the_take}
         market={market}
+        sectorMarket={sectorMarket}
         events={events}
         dayMap={briefing.day_map}
         concalls={briefing.concalls}
@@ -83,7 +85,16 @@ const schema = {
 </Base>
 
 <style>
-  .briefing-page { max-width: 760px; margin: 0 auto; padding: 72px 0 0; }
+  .briefing-page {
+    width: min(840px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 72px 0 0;
+  }
+  .briefing-page :global(h1.headline) { max-width: 16ch; }
+  .briefing-page :global(.dek) {
+    max-width: 43ch;
+    font-size: clamp(21px, 1.85vw, 27px);
+  }
   .briefing-foot {
     margin-top: 56px; padding-top: 22px;
     border-top: 1.5px solid var(--text);
@@ -93,5 +104,10 @@ const schema = {
   }
   .briefing-foot a { color: var(--text-muted); text-decoration: none; }
   .briefing-foot a:hover { color: var(--accent); }
-  @media (max-width: 700px) { .briefing-page { padding-top: 40px; } }
+  @media (max-width: 700px) {
+    .briefing-page {
+      width: min(100% - 32px, 840px);
+      padding-top: 40px;
+    }
+  }
 </style>

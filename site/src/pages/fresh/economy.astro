@@ -1,15 +1,16 @@
 ---
-import Base from '../layouts/Base.astro';
-import Masthead from '../components/Masthead.astro';
-import PolicyArchive from '../components/PolicyArchive.astro';
-import SiteFooter from '../components/SiteFooter.astro';
-import { listEconomy } from '../lib/queries.mjs';
+import Base from '../../layouts/Base.astro';
+import Masthead from '../../components/Masthead.astro';
+import PolicyArchive from '../../components/PolicyArchive.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { listEconomy } from '../../lib/queries.mjs';
 
 const items = listEconomy({ limit: 150 });
 ---
 <Base
   title="Economy — India's macro data, read for the signal"
   description="RBI and official data — forex reserves, lending and deposit rates, trade, the RBI Bulletin — turned into short, sourced reads on what each print signals for markets and policy."
+  canonical={new URL('/economy/', Astro.site).toString()}
 >
   <Masthead activeNav="economy" />
   <main>

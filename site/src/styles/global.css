@@ -366,6 +366,54 @@ a.inline:hover { background-size: 100% 2px; }
   .site-nav a { font-size: 15px; }
 }
 
+/* ─── persistent "browse by size" sort bar (under the section nav) ── */
+.cap-nav {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 11px 56px 12px;
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.cap-nav-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.cap-nav ul {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.cap-nav a {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 11px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+.cap-nav a:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--hairline-strong)); }
+.cap-nav a.active {
+  color: var(--bg);
+  background: var(--text);
+  border-color: var(--text);
+  font-weight: 500;
+}
+@media (max-width: 700px) {
+  .cap-nav { padding: 9px 16px 10px; gap: 12px; }
+  .cap-nav ul { gap: 6px; }
+  .cap-nav a { padding: 4px 9px; font-size: 11px; letter-spacing: 0.08em; }
+}
+
 /* ─── briefing ribbon (homepage) ────────────────────────────────── */
 .briefing-ribbon {
   max-width: 1240px;
@@ -427,10 +475,12 @@ section.hero {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
   gap: 72px;
-  align-items: start;
+  align-items: stretch;
   border-bottom: 1px solid var(--hairline);
 }
-.hero-lead { min-width: 0; }
+/* Flex column so the companions row can anchor to the bottom and meet the
+   rail's last item — no dead void below the sub-leads. */
+.hero-lead { min-width: 0; display: flex; flex-direction: column; }
 .hero-rail {
   display: flex;
   flex-direction: column;
@@ -534,12 +584,26 @@ article.filing .kicker a.inline:hover { color: var(--accent); }
 .lead-meta .read:hover::after { transform: translateX(4px); }
 
 .lead-companions {
-  margin-top: 48px;
+  position: relative;
+  margin-top: auto;
   padding-top: 32px;
   border-top: 1px solid var(--hairline);
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0 36px;
+  gap: 0 48px;
+  align-items: start;
+}
+/* Full-height divider centred in the gutter — independent of column length,
+   so an uneven pair reads like two clean newspaper columns, not a stretched
+   grid with a dead gap above the pinned meta. */
+.lead-companions::before {
+  content: '';
+  position: absolute;
+  top: 32px;
+  bottom: 0;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  background: var(--hairline);
 }
 .lc-item {
   display: flex;
@@ -550,7 +614,6 @@ article.filing .kicker a.inline:hover { color: var(--accent); }
   transition: opacity 180ms ease;
   min-width: 0;
 }
-.lc-item + .lc-item { padding-left: 36px; border-left: 1px solid var(--hairline); }
 .lc-item:hover { opacity: 0.7; }
 .lc-kicker {
   font-family: 'JetBrains Mono', monospace;
@@ -597,7 +660,7 @@ article.filing .kicker a.inline:hover { color: var(--accent); }
 }
 .lc-meta {
   display: flex; gap: 14px;
-  margin-top: auto;
+  margin-top: 4px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   letter-spacing: 0.1em;
@@ -606,7 +669,8 @@ article.filing .kicker a.inline:hover { color: var(--accent); }
 .lc-meta .ticker { color: var(--text); font-weight: 500; letter-spacing: 0.14em; }
 @media (max-width: 700px) {
   .lead-companions { grid-template-columns: 1fr; gap: 24px; }
-  .lc-item + .lc-item { padding-left: 0; padding-top: 24px; border-left: 0; border-top: 1px solid var(--hairline); }
+  .lead-companions::before { display: none; }
+  .lc-item + .lc-item { padding-top: 24px; border-top: 1px solid var(--hairline); }
 }
 
 /* ─── homepage sub-leads (in the hero-rail) — unified with .lc-item typography ── */
@@ -867,24 +931,32 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
 .brief-list { list-style: none; margin: 0; padding: 0; }
 .brief-list li { border-bottom: 1px solid var(--hairline); }
 .brief-list li:last-child { border-bottom: 0; }
+/* A numbered desk ranking: the index anchors each row, so a short list reads
+   as a deliberate "top of the desk" leaderboard rather than a stray stack. */
 .brief-item {
-  display: block;
-  padding: 18px 0 20px;
-  transition: background 180ms ease, padding-left 220ms ease;
-  margin: 0 -10px;
-  padding-left: 10px;
-  padding-right: 10px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 0 18px;
+  align-items: start;
+  padding: 16px 0;
+  transition: color 160ms ease;
 }
-.brief-item:hover {
-  background: var(--bg-soft);
-  padding-left: 16px;
-  padding-right: 4px;
+.bi-index {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-feature-settings: "tnum" 1;
+  color: var(--text-faint);
+  padding-top: 4px;
+  transition: color 160ms ease;
 }
+.brief-item:hover .bi-index { color: var(--accent); }
+.bi-body { min-width: 0; }
 .bi-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 9px;
   flex-wrap: wrap;
 }
 .bi-ticker,
@@ -907,9 +979,7 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
   margin-right: 8px;
   color: var(--text-faint);
 }
-.brief-item > .bi-ticker {
-  margin-bottom: 10px;
-}
+.bi-body > .bi-ticker { display: block; margin-bottom: 9px; }
 /* Binary signal: only top-conviction filings (score >= 9) carry the accent;
    everything else is one quiet, uniform muted tone — no ambiguous third shade. */
 .bi-ticker.score-hi { color: var(--accent); }
@@ -923,7 +993,9 @@ section.briefs { padding: 96px 0 88px; border-bottom: 1px solid var(--hairline);
   margin: 0;
   text-wrap: balance;
   font-variation-settings: "opsz" 20;
+  transition: color 160ms ease;
 }
+.brief-item:hover .bi-headline { color: var(--accent); }
 .brief-more {
   display: inline-block;
   margin-top: 20px;
@@ -1036,36 +1108,6 @@ section.wire-section { padding: 104px 0 128px; }
   font-variation-settings: "opsz" 18;
 }
 .wire-more > a:hover { color: var(--accent); border-color: var(--accent); }
-.cap-browse {
-  display: flex;
-  justify-content: center;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-.cap-browse span { color: var(--text-faint); }
-.cap-browse a {
-  font-family: 'JetBrains Mono', monospace;
-  font-style: normal;
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  color: var(--text-muted);
-  border: 0;
-  padding: 0;
-  text-transform: uppercase;
-}
-.cap-browse a::before {
-  content: '/';
-  color: var(--hairline-strong);
-  margin-right: 12px;
-}
-.cap-browse a:hover { color: var(--accent); border: 0; }
-
 /* ─── right rail (markets list — used on /markets/ only) ────────── */
 .market-list { display: flex; flex-direction: column; gap: 10px; }
 .market-row {

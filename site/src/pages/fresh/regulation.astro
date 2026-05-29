@@ -1,15 +1,16 @@
 ---
-import Base from '../layouts/Base.astro';
-import Masthead from '../components/Masthead.astro';
-import PolicyArchive from '../components/PolicyArchive.astro';
-import SiteFooter from '../components/SiteFooter.astro';
-import { listRegulation } from '../lib/queries.mjs';
+import Base from '../../layouts/Base.astro';
+import Masthead from '../../components/Masthead.astro';
+import PolicyArchive from '../../components/PolicyArchive.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { listRegulation } from '../../lib/queries.mjs';
 
 const items = listRegulation({ limit: 150 });
 ---
 <Base
   title="Regulation — SEBI, NSE, BSE & RBI, decoded"
   description="Editorial notes on the orders, circulars and rule changes from SEBI, the exchanges and the RBI that actually matter — enforcement, surveillance, derivatives, corporate actions and banking regulation."
+  canonical={new URL('/regulation/', Astro.site).toString()}
 >
   <Masthead activeNav="regulation" />
   <main>

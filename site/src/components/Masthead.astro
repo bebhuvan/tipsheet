@@ -7,6 +7,7 @@ interface Props {
   timeIst?: string;
   stamp?: string;
   activeNav?: string;
+  capTier?: string;
 }
 const today = new Date();
 const istParts = Object.fromEntries(
@@ -32,6 +33,7 @@ const {
   timeIst = `${time12} IST`,
   stamp = `${istParts.day} ${monthShort} · ${time12} IST`,
   activeNav = 'today',
+  capTier = '',
 } = Astro.props;
 
 const navItems = [
@@ -44,6 +46,15 @@ const navItems = [
   { id: 'regulation',  label: 'Regulation',  href: '/regulation/' },
   { id: 'economy',     label: 'Economy',     href: '/economy/' },
   { id: 'markets',     label: 'Markets',     href: '/markets/' },
+];
+// Mirrors MARKET_CAP_TIERS in queries.mjs — kept inline so the masthead stays
+// decoupled from the data layer. A persistent "browse by size" sort control.
+const capTiers = [
+  { slug: 'mega-cap',  label: 'Mega' },
+  { slug: 'large-cap', label: 'Large' },
+  { slug: 'mid-cap',   label: 'Mid' },
+  { slug: 'small-cap', label: 'Small' },
+  { slug: 'micro-cap', label: 'Micro' },
 ];
 ---
 <header class="masthead">
@@ -74,6 +85,15 @@ const navItems = [
   <ul>
     {navItems.map(n => (
       <li><a href={n.href} class:list={[n.id === activeNav && 'active']}>{n.label}</a></li>
+    ))}
+  </ul>
+</nav>
+
+<nav class="cap-nav" aria-label="Browse filings by market capitalisation">
+  <span class="cap-nav-label">By size</span>
+  <ul>
+    {capTiers.map(t => (
+      <li><a href={`/filings/market-cap/${t.slug}/`} class:list={[t.slug === capTier && 'active']}>{t.label}</a></li>
     ))}
   </ul>
 </nav>

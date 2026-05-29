@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes, filingEyebrow, MARKET_CAP_TIERS } from '../lib/queries.mjs';
+import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes, filingEyebrow } from '../lib/queries.mjs';
 import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
 
 const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalToday, totalPublished, hiScore, hiScoreToday, latestPublishedAt, latestYmd } = getHomepageBundle();
@@ -225,14 +225,17 @@ const mastheadTime = mastheadPartsFromIso(latestPublishedAt);
                 <span class="ct"><span class="ct-num">{b.total}</span> published</span>
               </header>
               <ol class="brief-list">
-                {b.items.slice(0, 4).map(item => (
+                {b.items.slice(0, 4).map((item, i) => (
                   <li>
                     <a href={item.canonical_url} class="brief-item">
-                      <span class="bi-meta">
-                        <span class:list={['bi-ticker', scoreBand(item.score)]} title={item.score >= 9 ? 'High-conviction read — top of the desk today' : undefined}>{item.symbol}</span>
-                        {item.market_cap_label && <span class="bi-cap">{item.market_cap_label}</span>}
+                      <span class="bi-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                      <span class="bi-body">
+                        <span class="bi-meta">
+                          <span class:list={['bi-ticker', scoreBand(item.score)]} title={item.score >= 9 ? 'High-conviction read — top of the desk today' : undefined}>{item.symbol}</span>
+                          {item.market_cap_label && <span class="bi-cap">{item.market_cap_label}</span>}
+                        </span>
+                        <h4 class="bi-headline">{item.headline}</h4>
                       </span>
-                      <h4 class="bi-headline">{item.headline}</h4>
                     </a>
                   </li>
                 ))}
@@ -256,10 +259,13 @@ const mastheadTime = mastheadPartsFromIso(latestPublishedAt);
             <section class="brief">
               <header class="brief-head"><h3>Regulation</h3><span class="ct"><span class="ct-num">{regItems.length}</span> latest</span></header>
               <ol class="brief-list">
-                {regItems.slice(0, 5).map(n => (
+                {regItems.slice(0, 5).map((n, i) => (
                   <li><a href={n.canonical_url} class="brief-item">
-                    <span class="bi-ticker">{n.source}</span>
-                    <h4 class="bi-headline">{n.headline}</h4>
+                    <span class="bi-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                    <span class="bi-body">
+                      <span class="bi-ticker">{n.source}</span>
+                      <h4 class="bi-headline">{n.headline}</h4>
+                    </span>
                   </a></li>
                 ))}
               </ol>
@@ -270,10 +276,13 @@ const mastheadTime = mastheadPartsFromIso(latestPublishedAt);
             <section class="brief">
               <header class="brief-head"><h3>Economy</h3><span class="ct"><span class="ct-num">{econItems.length}</span> latest</span></header>
               <ol class="brief-list">
-                {econItems.slice(0, 5).map(n => (
+                {econItems.slice(0, 5).map((n, i) => (
                   <li><a href={n.canonical_url} class="brief-item">
-                    <span class="bi-ticker">{n.source}</span>
-                    <h4 class="bi-headline">{n.headline}</h4>
+                    <span class="bi-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                    <span class="bi-body">
+                      <span class="bi-ticker">{n.source}</span>
+                      <h4 class="bi-headline">{n.headline}</h4>
+                    </span>
                   </a></li>
                 ))}
               </ol>
@@ -284,10 +293,13 @@ const mastheadTime = mastheadPartsFromIso(latestPublishedAt);
             <section class="brief">
               <header class="brief-head"><h3>Concall notes</h3><span class="ct"><span class="ct-num">{concallNotes.length}</span> latest</span></header>
               <ol class="brief-list">
-                {concallNotes.slice(0, 5).map(n => (
+                {concallNotes.slice(0, 5).map((n, i) => (
                   <li><a href={n.canonical_url} class="brief-item">
-                    <span class="bi-ticker">{n.ticker}</span>
-                    <h4 class="bi-headline">{n.headline}</h4>
+                    <span class="bi-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                    <span class="bi-body">
+                      <span class="bi-ticker">{n.ticker}</span>
+                      <h4 class="bi-headline">{n.headline}</h4>
+                    </span>
                   </a></li>
                 ))}
               </ol>
@@ -301,15 +313,7 @@ const mastheadTime = mastheadPartsFromIso(latestPublishedAt);
     <section class="wire-section">
       <div class="wire-head">
         <h2><em>The Wire</em></h2>
-        <div class="wire-tools">
-          <span class="meta">{wireSummary}</span>
-          <nav class="cap-browse" aria-label="Browse filings by market cap">
-            <span>By size</span>
-            {MARKET_CAP_TIERS.filter(t => t.slug !== 'mega-cap').map(t => (
-              <a href={`/filings/market-cap/${t.slug}/`}>{t.label.replace(' cap', '')}</a>
-            ))}
-          </nav>
-        </div>
+        <span class="meta">{wireSummary}</span>
       </div>
       <div class="wire-list">
         {wire.map(f => (

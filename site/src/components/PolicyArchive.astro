@@ -1,0 +1,473 @@
+---
+const {
+  items = [],
+  section = 'regulation',
+  kicker = 'Regulation',
+  title = 'Regulation.',
+  dek = '',
+  empty = 'No notes yet.',
+} = Astro.props;
+
+function countBy(key) {
+  const counts = new Map();
+  for (const item of items) {
+    const value = key(item);
+    if (!value) continue;
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+function sourceClass(source) {
+  return `src-${String(source || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+}
+
+const latest = items[0] || null;
+const sources = countBy(item => item.source);
+const categories = countBy(item => item.category_label).slice(0, 8);
+const maxCategoryCount = Math.max(...categories.map(x => x.count), 1);
+const sourceLabel = sources.map(x => x.label).join(' / ');
+---
+
+<article class={`policy-archive policy-${section}`}>
+  <header class="policy-hero">
+    <div class="policy-hero-copy">
+      <div class="policy-kicker"><span>{kicker}</span></div>
+      <h1>{title}</h1>
+      <p>{dek}</p>
+    </div>
+    <aside class="policy-ledger" aria-label={`${kicker} coverage snapshot`}>
+      <div>
+        <span>Notes</span>
+        <strong>{items.length}</strong>
+      </div>
+      <div>
+        <span>Latest</span>
+        <strong>{latest?.date_label || '—'}</strong>
+      </div>
+      <div>
+        <span>Sources</span>
+        <strong>{sourceLabel || '—'}</strong>
+      </div>
+    </aside>
+  </header>
+
+  {latest && (
+    <a class="policy-lead" href={latest.canonical_url}>
+      <p class="policy-meta">
+        <span class={`policy-source ${sourceClass(latest.source)}`}>{latest.source}</span>
+        <span class="policy-meta-rest"> · {latest.date_label} · {latest.category_label}{latest.severity ? ` · ${latest.severity}` : ''}</span>
+      </p>
+      <h2>{latest.headline}</h2>
+      {latest.dek && <p class="policy-lead-dek">{latest.dek}</p>}
+    </a>
+  )}
+
+  <div class="policy-shell">
+    <aside class="policy-rail" aria-label={`${kicker} feed breakdown`}>
+      <section>
+        <h2>By source</h2>
+        <ul class="policy-source-list">
+          {sources.map(source => (
+            <li>
+              <span class={`policy-source ${sourceClass(source.label)}`}>{source.label}</span>
+              <strong>{source.count}</strong>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h2>By subject</h2>
+        <ul class="policy-bars">
+          {categories.map(category => (
+            <li>
+              <span class="policy-bar-label">{category.label}</span>
+              <span class="policy-bar-track"><span style={`width: ${(category.count / maxCategoryCount) * 100}%`}></span></span>
+              <strong>{category.count}</strong>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </aside>
+
+    <section class="policy-feed" aria-label={`Latest ${kicker} notes`}>
+      <div class="policy-feed-head">
+        <h2>Latest notes</h2>
+        <span>Newest first</span>
+      </div>
+      {items.length === 0 && <p class="policy-empty">{empty}</p>}
+      {items.map(n => (
+        <a href={n.canonical_url} class="policy-row">
+          <span class="policy-date">{n.date_label}</span>
+          <div class="policy-row-body">
+            <p class="policy-row-meta">
+              <span class={`policy-source ${sourceClass(n.source)}`}>{n.source}</span>
+              <span class="policy-meta-rest"> · {n.category_label}{n.severity ? ` · ${n.severity}` : ''}</span>
+            </p>
+            <h3>{n.headline}</h3>
+            {n.dek && <p>{n.dek}</p>}
+          </div>
+        </a>
+      ))}
+    </section>
+  </div>
+</article>
+
+<style>
+  .policy-archive {
+    width: min(1120px, calc(100% - 56px));
+    margin: 0 auto;
+    padding: 64px 0 104px;
+  }
+
+  .policy-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 72px;
+    align-items: end;
+    padding-bottom: 34px;
+    border-bottom: 1px solid var(--text);
+  }
+
+  .policy-kicker,
+  .policy-meta,
+  .policy-row-meta,
+  .policy-date,
+  .policy-feed-head span,
+  .policy-ledger span,
+  .policy-rail h2 {
+    font-family: var(--mono);
+    text-transform: uppercase;
+  }
+
+  .policy-kicker {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    margin-bottom: 18px;
+  }
+
+  .policy-economy .policy-kicker {
+    color: var(--brief-close);
+  }
+
+  .policy-hero h1 {
+    font-family: var(--serif);
+    font-size: clamp(44px, 6.5vw, 78px);
+    line-height: 0.96;
+    font-weight: 300;
+    letter-spacing: -0.025em;
+    font-variation-settings: "opsz" 64;
+    max-width: 12ch;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .policy-hero p {
+    font-family: var(--serif);
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.35;
+    color: var(--text-soft);
+    max-width: 31em;
+    margin: 22px 0 0;
+    text-wrap: pretty;
+  }
+
+  .policy-ledger {
+    border-top: 1px solid var(--hairline-strong);
+    font-family: var(--data);
+  }
+
+  .policy-ledger div {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 18px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .policy-ledger span {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--text-faint);
+  }
+
+  .policy-ledger strong {
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .policy-lead {
+    display: block;
+    padding: 34px 0;
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+
+  .policy-lead h2 {
+    font-family: var(--serif);
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.06;
+    font-weight: 400;
+    letter-spacing: -0.018em;
+    margin: 12px 0 0;
+    max-width: 22ch;
+    text-wrap: pretty;
+  }
+
+  .policy-lead-dek,
+  .policy-row p {
+    color: var(--text-muted);
+    margin: 10px 0 0;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .policy-lead-dek {
+    font-size: 18px;
+    max-width: 56ch;
+  }
+
+  .policy-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+    margin-top: 42px;
+  }
+
+  .policy-rail {
+    position: sticky;
+    top: 20px;
+    display: grid;
+    gap: 34px;
+  }
+
+  .policy-rail h2,
+  .policy-feed-head h2 {
+    margin: 0;
+  }
+
+  .policy-rail h2 {
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--text-faint);
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+
+  .policy-source-list,
+  .policy-bars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .policy-source-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--hairline);
+    font-size: 13px;
+  }
+
+  .policy-source-list strong,
+  .policy-bars strong {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .policy-bars li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 54px 28px;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .policy-bar-label {
+    font-family: var(--data);
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--text-soft);
+  }
+
+  .policy-bar-track {
+    height: 2px;
+    background: var(--hairline-strong);
+  }
+
+  .policy-bar-track span {
+    display: block;
+    height: 100%;
+    background: var(--text);
+  }
+
+  .policy-feed-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--text);
+  }
+
+  .policy-feed-head h2 {
+    font-family: var(--serif);
+    font-size: 24px;
+    line-height: 1;
+    font-weight: 400;
+  }
+
+  .policy-feed-head span,
+  .policy-meta,
+  .policy-row-meta,
+  .policy-date {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+
+  .policy-row {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 28px;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--hairline);
+    align-items: start;
+  }
+
+  .policy-meta,
+  .policy-row-meta {
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .policy-meta-rest {
+    color: var(--text-muted);
+  }
+
+  .policy-date {
+    padding-top: 1px;
+  }
+
+  .policy-row:hover h3,
+  .policy-lead:hover h2 {
+    color: var(--accent);
+  }
+
+  .policy-row h3 {
+    font-family: var(--serif);
+    font-size: clamp(22px, 2.3vw, 30px);
+    line-height: 1.12;
+    font-weight: 400;
+    letter-spacing: -0.012em;
+    margin: 5px 0 0;
+    max-width: 27ch;
+    text-wrap: pretty;
+    transition: color 160ms ease;
+  }
+
+  .policy-source {
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .policy-source.src-sebi {
+    color: var(--accent);
+  }
+
+  .policy-source.src-rbi {
+    color: var(--brief-close);
+  }
+
+  .policy-source.src-nse,
+  .policy-source.src-bse,
+  .policy-source.src-india-data-hub {
+    color: var(--up);
+  }
+
+  .policy-empty {
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 24px 0;
+  }
+
+  @media (max-width: 860px) {
+    .policy-archive {
+      width: min(100% - 32px, 680px);
+      padding: 42px 0 82px;
+    }
+
+    .policy-hero,
+    .policy-shell,
+    .policy-row {
+      grid-template-columns: 1fr;
+    }
+
+    .policy-hero {
+      gap: 28px;
+      padding-bottom: 28px;
+    }
+
+    .policy-hero h1 {
+      max-width: none;
+      font-size: clamp(42px, 14vw, 62px);
+      text-wrap: pretty;
+    }
+
+    .policy-hero p {
+      font-size: 20px;
+      line-height: 1.4;
+    }
+
+    .policy-ledger div {
+      grid-template-columns: 82px 1fr;
+    }
+
+    .policy-lead {
+      padding: 28px 0;
+    }
+
+    .policy-lead h2 {
+      max-width: none;
+    }
+
+    .policy-lead-dek {
+      font-size: 17px;
+    }
+
+    .policy-shell {
+      gap: 34px;
+      margin-top: 32px;
+    }
+
+    .policy-rail {
+      position: static;
+      gap: 24px;
+    }
+
+    .policy-row {
+      gap: 6px;
+      padding: 22px 0;
+    }
+
+    .policy-row h3 {
+      max-width: none;
+      font-size: 25px;
+    }
+  }
+</style>

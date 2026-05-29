@@ -669,11 +669,29 @@ const fmtPctSigned = (n) => {
   if (!Number.isFinite(v)) return null;
   return `${v > 0 ? '+' : ''}${v}%`;
 };
+const compactLabel = (s, fallback = 'Number') => {
+  const raw = String(s || '').trim();
+  if (!raw) return fallback;
+  const cleaned = raw
+    .replace(/\bmarket\s+capitali[sz]ation\b/ig, 'Mkt cap')
+    .replace(/\bmarket\s+cap\b/ig, 'Mkt cap')
+    .replace(/\border\s+value\b/ig, 'Order')
+    .replace(/\bcontract\s+value\b/ig, 'Contract')
+    .replace(/\brevenue\s+growth\b/ig, 'Rev growth')
+    .replace(/\bprofit\s+after\s+tax\b/ig, 'PAT');
+  if (cleaned.length <= 34) return cleaned;
+  return cleaned.slice(0, 34).replace(/\s+\S*$/, '');
+};
 
 /** A compact 3-5 metric line for a briefing event, straight from fundamentals (no LLM numbers). */
 function compactFinancials(row) {
   const out = [];
-  if (row.market_cap != null)     out.push({ label: 'Mkt cap', value: fmtCrShort(row.market_cap) });
+  if (row.the_number_value) {
+    out.push({ label: compactLabel(row.the_number_label, 'Filing number'), value: row.the_number_value });
+  }
+  const cap = Number(row.market_cap) > 0 ? fmtCrShort(row.market_cap) : null;
+  const capTier = marketCapLabel(row.market_cap);
+  if (cap) out.push({ label: capTier ? `${capTier} mcap` : 'Mkt cap', value: cap });
   // Only show P/E when it's a meaningful positive multiple — skip losses (≤0) and
   // absurd readings from near-zero earnings (a "10,759x P/E" reads as broken, not a fact).
   const pe = Number(row.pe);
@@ -682,7 +700,7 @@ function compactFinancials(row) {
   else if (row.roe != null)       out.push({ label: 'ROE', value: `${row.roe}%` });
   if (row.revenue_growth != null) out.push({ label: 'Rev', value: fmtPctSigned(row.revenue_growth) });
   if (row.debt_to_equity != null) out.push({ label: 'D/E', value: `${row.debt_to_equity}x` });
-  return out.filter(m => m.value).slice(0, 5);
+  return out.filter(m => m.value).slice(0, 6);
 }
 
 /**
@@ -724,6 +742,7 @@ export function getBriefingEvents(events, { historyDays = 7 } = {}) {
       category:      row.category,
       sector:        row.sector,
       market_cap_label: marketCapLabel(row.market_cap),
+      market_cap:    row.market_cap,
       score:         row.score,
       prose:         String(ev?.prose || ''),
       canonical_url: `/${row.slug || buildSlug(row.symbol, row.headline, row.record_id)}/`,
@@ -734,19 +753,58 @@ export function getBriefingEvents(events, { historyDays = 7 } = {}) {
   }).filter(Boolean);
 }
 
-/** Latest Nifty / Sensex / Bank Nifty / India VIX snapshot for the briefing market strip. */
-export function getBriefingMarketStrip() {
-  return db().prepare(`
-    SELECT s.symbol, s.name, s.price, s.change_abs, s.change_pct, s.prev_close
+const BRIEFING_BREADTH_INDICES = [
+  { symbol: 'NIFTY_500.NS',         name: 'Nifty 500' },
+  { symbol: 'NIFTY_MIDCAP_150.NS',  name: 'Nifty Midcap 150' },
+  { symbol: 'NIFTY_SMLCAP_250.NS',  name: 'Nifty Smallcap 250' },
+  { symbol: 'NIFTY_MICROCAP250.NS', name: 'Nifty Microcap 250' },
+];
+
+const BRIEFING_SECTOR_INDICES = [
+  { symbol: '^NSEBANK',              name: 'Nifty Bank' },
+  { symbol: '^CNXAUTO',              name: 'Nifty Auto' },
+  { symbol: '^CNXENERGY',            name: 'Nifty Energy' },
+  { symbol: '^CNXFIN',               name: 'Nifty Financial Services' },
+  { symbol: '^CNXFMCG',              name: 'Nifty FMCG' },
+  { symbol: 'NIFTY_HEALTHCARE.NS',   name: 'Nifty Healthcare' },
+  { symbol: '^CNXIT',                name: 'Nifty IT' },
+  { symbol: '^CNXMEDIA',             name: 'Nifty Media' },
+  { symbol: '^CNXMETAL',             name: 'Nifty Metal' },
+  { symbol: '^CNXPHARMA',            name: 'Nifty Pharma' },
+  { symbol: 'NIFTYPVTBANK.NS',       name: 'Nifty Private Bank' },
+  { symbol: '^CNXPSUBANK',           name: 'Nifty PSU Bank' },
+  { symbol: '^CNXREALTY',            name: 'Nifty Realty' },
+  { symbol: 'NIFTY_CEMENT.NS',       name: 'Nifty Cement' },
+  { symbol: 'NIFTY_CHEMICALS.NS',    name: 'Nifty Chemicals' },
+  { symbol: 'NIFTY_CONSR_DURBL.NS',  name: 'Nifty Consumer Durables' },
+  { symbol: 'NIFTY_OIL_AND_GAS.NS',  name: 'Nifty Oil & Gas' },
+];
+
+function latestSnapshotsFor(symbols) {
+  if (!Array.isArray(symbols) || symbols.length === 0) return new Map();
+  const placeholders = symbols.map(() => '?').join(',');
+  const rows = db().prepare(`
+    SELECT s.symbol, s.name, s.price, s.change_abs, s.change_pct, s.prev_close, s.fetched_at
     FROM market_snapshots s
     INNER JOIN (
       SELECT symbol, MAX(fetched_at) AS max_t FROM market_snapshots
-      WHERE symbol IN ('^NSEI', '^BSESN', '^NSEBANK', '^INDIAVIX')
+      WHERE symbol IN (${placeholders})
       GROUP BY symbol
     ) latest ON latest.symbol = s.symbol AND latest.max_t = s.fetched_at
-    ORDER BY CASE s.symbol
-      WHEN '^NSEI' THEN 1 WHEN '^BSESN' THEN 2 WHEN '^NSEBANK' THEN 3 WHEN '^INDIAVIX' THEN 4 ELSE 9 END
-  `).all();
+  `).all(...symbols);
+  return new Map(rows.map(r => [r.symbol, r]));
+}
+
+/** Latest Nifty breadth snapshot for the briefing market strip. */
+export function getBriefingMarketStrip() {
+  const bySymbol = latestSnapshotsFor(BRIEFING_BREADTH_INDICES.map(i => i.symbol));
+  return BRIEFING_BREADTH_INDICES.map(i => ({ ...i, ...(bySymbol.get(i.symbol) || {}) }));
+}
+
+/** Latest major NSE sectoral-index snapshot for the briefing sector table. */
+export function getBriefingSectorStrip() {
+  const bySymbol = latestSnapshotsFor(BRIEFING_SECTOR_INDICES.map(i => i.symbol));
+  return BRIEFING_SECTOR_INDICES.map(i => ({ ...i, ...(bySymbol.get(i.symbol) || {}) }));
 }
 
 export function getBriefing(type, dateYmd) {
