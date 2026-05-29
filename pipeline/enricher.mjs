@@ -27,6 +27,9 @@ export const PROMPT_VERSION = 'filing-note.v4';
 //     calls are minutes apart). No code change required to benefit; just keep the system
 //     prompt byte-identical across calls.
 const CFG = {
+  // provider: 'gemini' (default, uses the @google/genai SDK) or anything else
+  // ('mimo', 'openai', …) → the OpenAI-compatible /chat/completions path.
+  provider:    process.env.LLM_PROVIDER || 'gemini',
   baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
   apiKey:      process.env.LLM_API_KEY  || process.env.GOOGLE_API_KEY || process.env.OPENROUTER_API_KEY,
   model:       process.env.LLM_MODEL    || 'gemini-3.1-flash-lite',
@@ -170,6 +173,67 @@ const responseSchema = {
 // whole pipeline (the May-2026 cap outage that froze publishing for days). Gemini stays primary
 // for prose quality; DeepSeek runs at a tighter temperature to curb its looser register, and its
 // output still passes through the same validator + banned-phrase gate.
+// Primary path for OpenAI-compatible providers (MiMo etc.), selected when
+// LLM_PROVIDER != 'gemini'. MiMo accepts the standard Bearer header (verified
+// via bakeoff) but expects `max_completion_tokens`, and documents an `api-key`
+// header — we send both for safety. Returns a result object (ok may be false on
+// validation failure — run.mjs retries those), or null on transport/parse
+// failure so enrich() can fall back to DeepSeek.
+async function enrichViaOpenAICompat({ system, userMsg, previousAttempt, raw }) {
+  const isMimo = /xiaomimimo/i.test(CFG.baseUrl);
+  let user = userMsg;
+  if (previousAttempt?.parsed && previousAttempt?.validation?.issues?.length) {
+    user += `\n\nYour previous attempt:\n${JSON.stringify(previousAttempt.parsed)}\n\n${buildFeedbackMessage(previousAttempt.validation)}`;
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), CFG.timeoutMs);
+  const t0 = Date.now();
+  try {
+    const r = await fetch(`${CFG.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Authorization': `Bearer ${CFG.apiKey}`,
+        ...(isMimo ? { 'api-key': CFG.apiKey } : {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: CFG.model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: CFG.temperature,
+        ...(isMimo ? { max_completion_tokens: CFG.maxTokens } : { max_tokens: CFG.maxTokens }),
+      }),
+    });
+    const elapsed_ms = Date.now() - t0;
+    if (!r.ok) {
+      console.warn(`[enrich] ${CFG.model} HTTP ${r.status}; trying DeepSeek fallback`);
+      return null;
+    }
+    const body = await r.json();
+    const content = body.choices?.[0]?.message?.content ?? '';
+    const s = content.indexOf('{'), e = content.lastIndexOf('}');
+    if (s === -1 || e <= s) return null;
+    let parsed;
+    try { parsed = JSON.parse(content.slice(s, e + 1)); } catch { return null; }
+    const v = validate(parsed, raw);
+    return {
+      ok: v.ok, parsed, validation: v,
+      model: CFG.model, provider: CFG.provider,
+      promptVersion: PROMPT_VERSION,
+      usage: body.usage || null, elapsed_ms,
+    };
+  } catch (e) {
+    console.warn(`[enrich] ${CFG.model} error (${e.message}); trying DeepSeek fallback`);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function enrichViaDeepSeek({ system, userMsg, previousAttempt, raw, reason }) {
   if (!process.env.DEEPSEEK_API_KEY) return null;
   const model = process.env.DEEPSEEK_MODEL || DEEPSEEK_MODEL;
@@ -205,6 +269,15 @@ export async function enrich(raw, previousAttempt = null) {
   if (!CFG.apiKey) return { ok: false, error: 'missing API key (set LLM_API_KEY or GOOGLE_API_KEY)' };
   const { system, userTemplate } = await loadPrompts();
   const userMsg = buildUserMessage(userTemplate, raw);
+
+  // Non-Gemini providers (MiMo etc.) use the OpenAI-compatible path, with
+  // DeepSeek as the resilience fallback. Gemini keeps its SDK path below.
+  if (CFG.provider !== 'gemini') {
+    const primary = await enrichViaOpenAICompat({ system, userMsg, previousAttempt, raw });
+    if (primary) return primary;
+    const fb = await enrichViaDeepSeek({ system, userMsg, previousAttempt, raw, reason: `${CFG.model} unavailable` });
+    return fb || { ok: false, error: `${CFG.model} + DeepSeek fallback both failed` };
+  }
 
   const contents = [];
   if (previousAttempt?.parsed && previousAttempt?.validation?.issues?.length) {
