@@ -2,7 +2,8 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { listFilings, filingEyebrow, MARKET_CAP_TIERS } from '../../../lib/queries.mjs';
+import ArchiveList from '../../../components/ArchiveList.astro';
+import { listFilings, MARKET_CAP_TIERS } from '../../../lib/queries.mjs';
 
 const CATEGORIES = [
   { slug: 'earnings',    name: 'Earnings',    dek: 'Quarterly and annual results, audited financials, board outcomes on results.' },
@@ -68,22 +69,7 @@ function dateOf(iso) {
         ))}
       </div>
 
-      <div class="archive-list">
-        {items.length === 0 && <p style="font-style: italic; color: var(--text-muted); padding: 24px 0;">No notes in this category yet.</p>}
-        {items.map(f => (
-          <a href={f.canonical_url} class="archive-row">
-            <span class="archive-row-meta">
-              <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
-              <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
-              <span class="archive-ticker">{f.symbol}</span>
-            </span>
-            <div class="archive-body">
-              <div class="kicker">{filingEyebrow(f, { category: false })}</div>
-              <h3>{f.headline}</h3>
-            </div>
-          </a>
-        ))}
-      </div>
+      <ArchiveList items={items} emptyText="No notes in this category yet." />
     </article>
   </main>
 

@@ -21,6 +21,21 @@ export const BRAND_TAGLINE        = 'What matters at India’s listed companies'
 // Public Telegram channel (shown in the masthead). Set to the real handle.
 export const BRAND_TELEGRAM_URL   = 'https://t.me/tipsheetalerts';
 
+// Verified external identities for the publication. Wired into the sitewide
+// NewsMediaOrganization `sameAs` — the single highest-leverage entity-authority
+// signal for Google's Knowledge Graph and for LLM attribution. ONLY list URLs
+// that resolve to a real, publicly owned profile.
+//
+// TODO (highest priority, mostly off-code work):
+//   • Create a Wikidata item for Tipsheet and add it here, e.g.
+//     'https://www.wikidata.org/wiki/Q________'
+//   • Add the LinkedIn company page and X/Twitter profile once live, e.g.
+//     'https://www.linkedin.com/company/tipsheet-markets/',
+//     'https://x.com/tipsheetmkts',
+export const BRAND_SAMEAS = [
+  BRAND_TELEGRAM_URL,
+].filter(Boolean);
+
 // What a single article is called. Editorial term used in copy.
 // Kept as 'Story'/'Stories' to avoid the operator-tips connotation if we'd used "tip".
 export const ARTICLE_TYPE         = 'Story';

@@ -1,0 +1,94 @@
+---
+import Base from '../layouts/Base.astro';
+import Masthead from '../components/Masthead.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+---
+<Base
+  title="About Tijori — our data partner"
+  description="Filings is built on data from Tijori, the Indian-equities research platform behind Tijori Finance and the Tijori Stack AI toolkit. What they do, and what we use."
+>
+  <Masthead />
+  <main>
+    <article class="prose-page">
+      <header>
+        <div class="kicker"><span>Data partner</span></div>
+        <h1 class="page-title">Built on Tijori.</h1>
+      </header>
+
+      <hr class="rule" />
+
+      <p>
+        Most of what you read here begins as data from <a href="https://www.tijorifinance.com" target="_blank" rel="noopener">Tijori</a>.
+        The filings we summarise, the company fundamentals in the snapshot boxes, the
+        concall notes, the market signals — the raw material is theirs. We think the
+        people who built that deserve a plain word of credit, and our readers deserve to
+        know where the numbers come from.
+      </p>
+      <p>
+        Tijori is a Bengaluru company, founded in 2016 and backed by Zerodha, that has
+        spent the better part of a decade doing the unglamorous work of structuring
+        Indian-equity data. That groundwork is what lets a small publication like this one
+        move fast without inventing the data layer from scratch.
+      </p>
+
+      <h2>Tijori Finance — the research platform</h2>
+      <p>
+        <a href="https://www.tijorifinance.com" target="_blank" rel="noopener">Tijori Finance</a>
+        is a research and tracking platform for Indian listed companies. Its distinctive bet
+        is on <em>operational</em> and alternative data — the kind pulled out of annual reports
+        rather than off the price ticker. Market share, revenue mix, geographic exposure,
+        store counts, capacity, supply-chain detail: the platform indexes thousands of such
+        metrics that most screeners simply don't carry, alongside the usual financials,
+        shareholding, filings and earnings calls.
+      </p>
+      <p>The parts of it worth knowing:</p>
+      <ul>
+        <li><a href="https://www.tijorifinance.com/in/ideas-dashboard/" target="_blank" rel="noopener">Ideas Dashboard</a> — curated screens for finding companies worth a look.</li>
+        <li><a href="https://www.tijorifinance.com/filter/popular-queries" target="_blank" rel="noopener">Stock Screener</a> — natural-language filtering over the full metric set.</li>
+        <li><a href="https://www.tijorifinance.com/results/quarterly-results/" target="_blank" rel="noopener">Results Tracker</a> — quarterly results as they're declared.</li>
+        <li><a href="https://www.tijorifinance.com/in/markets" target="_blank" rel="noopener">Market Monitor</a> — niche, sector-level indices.</li>
+        <li><a href="https://www.tijorifinance.com/in/macro" target="_blank" rel="noopener">Macro Indicators</a> and <a href="https://www.tijorifinance.com/in/raw-materials" target="_blank" rel="noopener">Raw Materials</a> — the backdrop most equity tools ignore.</li>
+      </ul>
+      <p>
+        It integrates with Zerodha for portfolio tracking, and its data also powers parts of
+        Zerodha's own Console. There's a free tier and a premium subscription; a companion
+        service, <a href="https://tijorialerts.com" target="_blank" rel="noopener">Tijori Alerts</a>,
+        pushes real-time stock updates over WhatsApp.
+      </p>
+
+      <h2>Tijori Stack — the AI toolkit</h2>
+      <p>
+        <a href="https://www.tijoristack.ai" target="_blank" rel="noopener">Tijori Stack</a> is the
+        newer, builder-facing side of the house: a catalogue of AI tools for equity analysis,
+        priced pay-as-you-go rather than by seat. Built by the same team, it turns the
+        underlying data into things you can act on quickly:
+      </p>
+      <ul>
+        <li><a href="https://www.tijoristack.ai/concall-monitor/" target="_blank" rel="noopener">Concall Monitor</a> — AI summaries, transcripts and recordings of earnings calls, minutes after they end.</li>
+        <li><a href="https://www.tijoristack.ai/report-on-demand/" target="_blank" rel="noopener">Report on Demand</a> — generated company reports when you need one.</li>
+        <li><a href="https://www.tijoristack.ai/radar/" target="_blank" rel="noopener">Radar</a> — signal-spotting across the market.</li>
+        <li><a href="https://www.tijoristack.ai/atlas/" target="_blank" rel="noopener">Atlas</a> — the wider map of what they track.</li>
+      </ul>
+
+      <h2>What Filings uses</h2>
+      <p>
+        We lean on Tijori for the filings feed that seeds our notes, company fundamentals for
+        the snapshot boxes, the Concall Monitor for earnings-call material, and market signals
+        for the briefings. Everything published here is our own editorial work — the reading,
+        the judgement, and the words are ours — but the spine of facts beneath it is Tijori's.
+        Where a note leans on their data, that's the lineage.
+      </p>
+
+      <h2>Find them</h2>
+      <ul>
+        <li>Web — <a href="https://www.tijorifinance.com" target="_blank" rel="noopener">tijorifinance.com</a> · <a href="https://www.tijoristack.ai" target="_blank" rel="noopener">tijoristack.ai</a></li>
+        <li>X — <a href="https://x.com/Tijori1" target="_blank" rel="noopener">@Tijori1</a> · Instagram — <a href="https://www.instagram.com/tijorifinance/" target="_blank" rel="noopener">@tijorifinance</a></li>
+      </ul>
+      <p style="color: var(--text-faint); font-size: 14px;">
+        Tijori Finance is a product of Tijori Financial Services Private Limited. We're an
+        independent publication and not affiliated with Tijori beyond using their data.
+      </p>
+    </article>
+  </main>
+  <SiteFooter />
+</Base>

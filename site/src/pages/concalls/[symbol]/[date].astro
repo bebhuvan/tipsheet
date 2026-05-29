@@ -3,6 +3,11 @@ import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
 import { listAllConcallsForStaticPaths, getConcall, priorConcallsForIsin, getFundamentals } from '../../../lib/queries.mjs';
+import { BRAND_NAME, EDITORIAL_BYLINE, EDITORIAL_BYLINE_SLUG } from '../../../lib/brand.mjs';
+
+const ORG_ID = (Astro.site?.toString() || '') + '#org';
+const PERSON_ID = (Astro.site?.toString() || '') + `authors/${EDITORIAL_BYLINE_SLUG}/#person`;
+const AUTHOR_URL = (Astro.site?.toString() || '') + `authors/${EDITORIAL_BYLINE_SLUG}/`;
 
 export async function getStaticPaths() {
   const all = listAllConcallsForStaticPaths();
@@ -37,11 +42,12 @@ const schema = {
   alternativeHeadline: concall.dek,
   datePublished: concall.event_time,
   dateModified: concall.event_time,
-  author: [{ '@type': 'Organization', name: 'Tipsheet Editorial', url: Astro.site?.toString() + 'about' }],
+  author: [{ '@type': 'Organization', '@id': PERSON_ID, name: EDITORIAL_BYLINE, url: AUTHOR_URL }],
   publisher: {
-    '@type': 'Organization',
-    name: 'Tipsheet',
-    logo: { '@type': 'ImageObject', url: new URL('/logo.png', Astro.site).toString(), width: 600, height: 60 },
+    '@type': 'NewsMediaOrganization',
+    '@id': ORG_ID,
+    name: BRAND_NAME,
+    logo: { '@type': 'ImageObject', url: new URL('/logo.png', Astro.site).toString(), width: 1000, height: 1000 },
   },
   description: concall.dek,
   mainEntityOfPage: { '@type': 'WebPage', '@id': new URL(concall.canonical_url, Astro.site).toString() },

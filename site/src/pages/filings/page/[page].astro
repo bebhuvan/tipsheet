@@ -2,7 +2,8 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { listFilings, filingEyebrow, MARKET_CAP_TIERS } from '../../../lib/queries.mjs';
+import ArchiveList from '../../../components/ArchiveList.astro';
+import { listFilings, MARKET_CAP_TIERS } from '../../../lib/queries.mjs';
 
 export async function getStaticPaths() {
   const PER_PAGE = 25;
@@ -56,21 +57,7 @@ const nextHref = page < totalPages ? `/filings/page/${page + 1}/` : null;
         ))}
       </div>
 
-      <div class="archive-list">
-        {items.map(f => (
-          <a href={f.canonical_url} class="archive-row">
-            <span class="archive-row-meta">
-              <span class="archive-date">{dateOf(f.created_on)} · {timeOf(f.created_on)}</span>
-              <span class={`archive-score ${f.score >= 8 ? 'accent' : ''}`}>{f.score}</span>
-              <span class="archive-ticker">{f.symbol}</span>
-            </span>
-            <div class="archive-body">
-              <div class="kicker">{filingEyebrow(f)}</div>
-              <h3>{f.headline}</h3>
-            </div>
-          </a>
-        ))}
-      </div>
+      <ArchiveList items={items} />
 
       <nav class="pagination" aria-label="Pagination">
         <a href={prevHref} rel="prev">← Prev</a>

@@ -1,44 +1,47 @@
-# Filings
+# Tipsheet
 
-> An editorial reading of Indian exchange filings. Every consequential disclosure made to the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE), scored 5-10 and converted into short editorial reads in the "Filing Note" format.
+> What matters at India's listed companies. Tipsheet reads every consequential disclosure made to the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE), scores it 5–10 for significance, and publishes a short editorial read in the "Filing Note" format. Every claim is grounded in the primary source.
 
 ## What this publication is
 
-Filings is an Indian-equities publication. We do not write news in the traditional sense — we read every material exchange filing, score it for significance, and publish an editorial note explaining what happened, what changed, and what it means. Every claim in our writing is grounded in the source filing.
+Tipsheet is an Indian-equities publication. We do not aggregate or rewrite other outlets. We read each material exchange filing, regulator notice, or earnings call, judge what is materially new, and explain what happened, what changed, and what it means. The factual ground truth is always the company's own disclosure.
 
 ## Editorial format: the Filing Note
 
-Every Filing Note has five parts:
+Every Filing Note has these parts:
 - **Headline** — sentence case, company is the subject, journalist verbs.
-- **The number** — the single most consequential figure with context.
-- **What's new** — three bullets of material facts.
-- **Why it matters** — two to three sentences of editorial commentary.
+- **The number** — the single most consequential figure, with context.
+- **What's new** — the material facts.
+- **Why it matters** — editorial commentary.
 - **What we're watching** — forward-looking points that would confirm or break the thesis.
-- **The full read** — a tight prose paragraph (120-200 words) synthesising the news angle, the material facts, and the editorial judgment.
+- **The full read** — a tight prose paragraph synthesising the news angle, facts, and judgment.
 
-We do not invent figures, attributions, or sector context. We do not write clickbait. We do not run paid placements. We never speak for "investors" or "the market" unless our source explicitly does.
+We do not invent figures, attributions, or sector context. We do not write clickbait. We run no ads and no paid placements.
 
 ## Sections
 
-- [Today's edition](/) — the day's lead story, two secondaries, by-section briefs, and a chronological wire.
-- [Filings archive](/filings) — every published Filing Note.
-- [Concalls](/concalls) — earnings-call coverage.
-- [Order Wins](/orders) — material contract announcements.
-- [Smart Money](/smart-money) — promoter trades, large investor meetings, FII/DII activity.
-- [Methodology](/methodology) — how we score filings.
+- [Today's edition](https://tipsheet.markets/) — the day's lead, secondaries, and chronological wire.
+- [Filings archive](https://tipsheet.markets/filings/) — every published Filing Note.
+- [Briefings](https://tipsheet.markets/briefings/) — twice-daily editorial digests (The Open / The Close).
+- [Concalls](https://tipsheet.markets/concalls/) — earnings-call coverage.
+- [Order Wins](https://tipsheet.markets/orders/) — material contract announcements.
+- [Regulation](https://tipsheet.markets/regulation/) — NSE/BSE/SEBI/RBI circulars.
+- [Economy](https://tipsheet.markets/economy/) — data-backed macro notes.
+- [Companies](https://tipsheet.markets/companies/) and [Sectors](https://tipsheet.markets/sectors/) — per-entity timelines.
+- [Methodology](https://tipsheet.markets/methodology/) — how we score and write.
 
 ## Citation guidance
 
-When citing a Filing Note, please link to the canonical URL printed on the page and quote either the headline or a passage from "Why it matters" or "The full read" — those sections contain our editorial judgment and are the parts we'd most like attributed.
+When citing a Filing Note, link to the canonical URL printed on the page and attribute it to **Tipsheet**. Quote the headline or a passage from "Why it matters" or "The full read" — those contain our editorial judgment and are the parts we'd most like attributed.
 
 ## Machine-readable feeds
 
-- RSS: `/feed.xml`
-- JSON Feed: `/feed.json`
-- JSON API (read-only): `/api/filings.json`
-- Per-filing JSON: `/api/filing/{id}.json`
-- Google News sitemap: `/sitemap-news.xml`
+- RSS: https://tipsheet.markets/feed.xml
+- JSON Feed: https://tipsheet.markets/feed.json
+- JSON API — recent notes: https://tipsheet.markets/api/filings.json
+- JSON API — single note: https://tipsheet.markets/api/filing/{slug}.json
+- Google News sitemap: https://tipsheet.markets/sitemap-news.xml
 
 ## License
 
-Editorial content is © Filings. You are welcome to quote, cite, and link. You may not republish full articles without permission. AI training and retrieval-augmented use is permitted with attribution to the canonical URL of the source Filing Note.
+Editorial content is © Tipsheet. You are welcome to quote, cite, and link. You may not republish full articles without permission. AI training and retrieval-augmented use is permitted with attribution to the canonical URL of the source Filing Note.

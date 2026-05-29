@@ -126,10 +126,26 @@ export function brandSvg() {
 </svg>`;
 }
 
-// Render any SVG to a PNG buffer at 1200×630.
-export function renderPng(svg) {
+// Organisation logo — square 1000×1000, used by NewsMediaOrganization.logo,
+// every NewsArticle publisher.logo, and the JSON feed icon. Google requires a
+// reachable publisher logo for news rich results; a flat wordmark on paper
+// renders fast and matches the OG cards. Declared dimensions everywhere that
+// references /logo.png MUST stay 1000×1000 to match this output.
+export function logoSvg() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <rect width="1000" height="1000" fill="${PAPER}"/>
+  <path d="M 500 372 L 532 426 L 468 426 Z" fill="${ACCENT}"/>
+  <text x="500" y="588" text-anchor="middle" font-family="Newsreader" font-size="132" font-weight="500" letter-spacing="-3" fill="${INK}">Tipsheet</text>
+  <text x="500" y="648" text-anchor="middle" font-family="JetBrains Mono" font-size="22" font-weight="500" letter-spacing="6" fill="${ACCENT}">INDIA · LISTED</text>
+</svg>`;
+}
+
+// Render any SVG to a PNG buffer. Width defaults to the 1200px OG card; pass a
+// width matching the SVG's intrinsic size for square assets (e.g. the logo).
+export function renderPng(svg, { width = 1200 } = {}) {
   const resvg = new Resvg(svg, {
-    fitTo: { mode: 'width', value: 1200 },
+    fitTo: { mode: 'width', value: width },
     font: {
       fontBuffers: FONT_BUFFERS,
       loadSystemFonts: false,
