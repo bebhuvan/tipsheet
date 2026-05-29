@@ -74,12 +74,17 @@ jobs:
         env:
           TIJORI_FEED_URL: ${{ secrets.TIJORI_FEED_URL }}
 
+      # Filings primary model is MiMo v2.5 (sharper prose + best number fidelity
+      # in the bakeoff, cheapest). Enricher auto-detects the non-Gemini base URL
+      # → OpenAI-compatible path. DeepSeek stays as the resilience fallback.
+      # Other enrichers (briefings/circulars/etc.) remain on Gemini for now.
       - name: Enrich filings
         run: cd pipeline && node --env-file=../.env.ci run.mjs enrich "$LIMIT"
         env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_API_KEY: ${{ secrets.MIMO_API_KEY }}
+          LLM_BASE_URL: https://api.xiaomimimo.com/v1
+          LLM_MODEL: mimo-v2.5
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           LIMIT: ${{ inputs.enrich_limit || '50' }}
 
       - name: Show stats

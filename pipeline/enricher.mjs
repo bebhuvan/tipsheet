@@ -26,11 +26,13 @@ export const PROMPT_VERSION = 'filing-note.v4';
 //     prefix matches a prior request within the cache window (~85% hit rate observed when
 //     calls are minutes apart). No code change required to benefit; just keep the system
 //     prompt byte-identical across calls.
+const LLM_BASE = process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
 const CFG = {
-  // provider: 'gemini' (default, uses the @google/genai SDK) or anything else
-  // ('mimo', 'openai', …) → the OpenAI-compatible /chat/completions path.
-  provider:    process.env.LLM_PROVIDER || 'gemini',
-  baseUrl:     process.env.LLM_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
+  // 'gemini' (default, @google/genai SDK) vs the OpenAI-compatible /chat/completions
+  // path. Auto-detected from the base URL, so pointing LLM_BASE_URL at a non-Gemini
+  // host (e.g. MiMo) activates the OpenAI path with no extra flag. Override via LLM_PROVIDER.
+  provider:    process.env.LLM_PROVIDER || (/googleapis|generativelanguage/i.test(LLM_BASE) ? 'gemini' : 'openai'),
+  baseUrl:     LLM_BASE,
   apiKey:      process.env.LLM_API_KEY  || process.env.GOOGLE_API_KEY || process.env.OPENROUTER_API_KEY,
   model:       process.env.LLM_MODEL    || 'gemini-3.1-flash-lite',
   maxTokens:   Number(process.env.LLM_MAX_TOKENS || 3500),
