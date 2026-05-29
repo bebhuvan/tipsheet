@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import os
 import sqlite3
+import sys
 import time
 from pathlib import Path
 
@@ -132,6 +133,20 @@ def main() -> int:
 
     db = sqlite3.connect(args.db)
     db.executescript(SCHEMA)
+
+    # Fail SAFE: market_signals is a snapshot table we replace each refresh.
+    # But if the scrape returned nothing (almost always an expired TIJORI_COOKIE
+    # or a failed `tijori-scraper market-ingest`), do NOT wipe the table — that
+    # would erase last-known-good data and blank the site. Keep what we have,
+    # record a loud failure, and exit non-zero so the step shows red + alerts.
+    if not out:
+        existing = db.execute("SELECT COUNT(*) FROM market_signals").fetchone()[0]
+        db.close()
+        msg = f"0 cards scraped; kept {existing} existing rows (check TIJORI_COOKIE / market-ingest)"
+        print(f"[market-signals] {msg}", file=sys.stderr)
+        _record_health(args.db, "market_signals", "failure", items=0, error=msg)
+        return 1
+
     db.execute("DELETE FROM market_signals")  # snapshot table — replace each refresh
     db.executemany(
         """
