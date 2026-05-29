@@ -1,9 +1,10 @@
-name: Backfill FAQs (one-off)
+name: Backfill FAQs
 
 # Manual-only. Regenerates ONLY the faqs column on existing articles (4–6 sharper
-# Q&As via the enrichment model), then rebuilds + deploys. Never touches the
-# headline / dek / body / slug, so published URLs and analysis are unchanged.
-# Operates on the canonical CI database published as the filings-db-latest release asset.
+# Q&As via the enrichment model). Never touches the headline / dek / body / slug,
+# so published URLs and analysis are unchanged. Ingest-only — publish-site.yml
+# deploys automatically on success. Operates on the canonical CI database
+# published as the filings-db-latest release asset.
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: tipsheet-db-${{ github.ref }}
+  group: tipsheet-db-write
   cancel-in-progress: false
 
 jobs:
@@ -32,6 +33,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: pipeline/package-lock.json
 
       - name: Restore latest DB
         run: bash .github/scripts/restore-db.sh
@@ -50,7 +53,6 @@ jobs:
           LIMIT: ${{ inputs.limit }}
         run: cd pipeline && node --env-file=../.env.ci backfill_faqs.mjs --limit "$LIMIT" --concurrency 5
 
-      # Persist the backfilled DB so future pipeline runs build from it.
       - name: Publish latest DB
         if: always()
         run: bash .github/scripts/publish-db.sh
@@ -58,28 +60,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
 
-      # Headlines are unchanged, so the OG cache fully hits (no re-render).
-      - name: Restore + persist OG image cache
-        uses: actions/cache@v4
+      - name: Alert on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
         with:
-          path: site/.og-cache
-          key: og-cache-${{ github.run_id }}
-          restore-keys: |
-            og-cache-
-
-      - name: Install site deps
-        run: cd site && npm ci
-
-      - name: Build site
-        run: cd site && npm run build
-
-      - name: Check internal links
-        run: cd site && npm run check:links
-
-      - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: site
-          command: deploy
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          context: Backfill FAQs

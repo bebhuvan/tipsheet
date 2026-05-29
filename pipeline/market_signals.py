@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import os
 import sqlite3
+import sys
 import time
 from pathlib import Path
 
@@ -44,6 +45,37 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--db", default=str(DEFAULT_DB))
     p.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="SDK market cache dir (has catalog.duckdb).")
     return p.parse_args()
+
+
+def _record_health(db_path: str, source: str, status: str, items=None, error=None) -> None:
+    """Best-effort write to source_health so this stream is visible in
+    /api/health.json and to the watchdog. Never raises (a health-write failure
+    must not mask the real result)."""
+    import time
+    try:
+        now = int(time.time() * 1000)
+        h = sqlite3.connect(db_path)
+        h.execute(
+            """CREATE TABLE IF NOT EXISTS source_health (
+                 source TEXT PRIMARY KEY, status TEXT NOT NULL, started_at INTEGER,
+                 completed_at INTEGER, last_success_at INTEGER, inserted_count INTEGER,
+                 enriched_count INTEGER, item_count INTEGER, latest_source_time TEXT,
+                 error TEXT, meta_json TEXT)"""
+        )
+        h.execute(
+            """INSERT INTO source_health (source, status, completed_at, last_success_at, item_count, error)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(source) DO UPDATE SET
+                 status=excluded.status, completed_at=excluded.completed_at,
+                 last_success_at=COALESCE(excluded.last_success_at, source_health.last_success_at),
+                 item_count=excluded.item_count, error=excluded.error""",
+            (source, status, now, now if status == "success" else None, items,
+             (str(error)[:1000] if error else None)),
+        )
+        h.commit()
+        h.close()
+    except Exception as e:  # noqa: BLE001
+        print(f"[health] could not record {source}: {e}")
 
 
 def main() -> int:
@@ -101,6 +133,20 @@ def main() -> int:
 
     db = sqlite3.connect(args.db)
     db.executescript(SCHEMA)
+
+    # Fail SAFE: market_signals is a snapshot table we replace each refresh.
+    # But if the scrape returned nothing (almost always an expired TIJORI_COOKIE
+    # or a failed `tijori-scraper market-ingest`), do NOT wipe the table — that
+    # would erase last-known-good data and blank the site. Keep what we have,
+    # record a loud failure, and exit non-zero so the step shows red + alerts.
+    if not out:
+        existing = db.execute("SELECT COUNT(*) FROM market_signals").fetchone()[0]
+        db.close()
+        msg = f"0 cards scraped; kept {existing} existing rows (check TIJORI_COOKIE / market-ingest)"
+        print(f"[market-signals] {msg}", file=sys.stderr)
+        _record_health(args.db, "market_signals", "failure", items=0, error=msg)
+        return 1
+
     db.execute("DELETE FROM market_signals")  # snapshot table — replace each refresh
     db.executemany(
         """
@@ -115,8 +161,15 @@ def main() -> int:
     db.commit()
     db.close()
     print(f"[market-signals] exported {len(rows)} cards into market_signals")
+    _record_health(args.db, "market_signals", "success", items=len(rows))
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        _record_health(parse_args().db, "market_signals", "failure", error=exc)
+        raise

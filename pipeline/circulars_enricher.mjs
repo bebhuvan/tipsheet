@@ -13,6 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
+import { withHealth } from './db.mjs';
 import { GoogleGenAI } from '@google/genai';
 import { PHRASE_PATTERNS, STRUCTURAL_RULES, FEEDBACK_SUBSTITUTIONS } from './banned-patterns.mjs';
 
@@ -299,4 +300,4 @@ async function runMode() {
 
 const _cmd = import.meta.url === pathToFileURL(process.argv[1]).href ? process.argv[2] : null;
 if (_cmd === 'test') testMain().catch(e => { console.error(e); process.exit(1); });
-else if (_cmd === 'run') runMode().catch(e => { console.error(e); process.exit(1); });
+else if (_cmd === 'run') withHealth('circulars_enrichment', runMode).catch(e => { console.error(e); process.exit(1); });

@@ -1,4 +1,7 @@
-name: Market Briefings + Deploy
+name: Market Briefings
+
+# Ingest-only: generate The Open / The Close briefings and publish the DB.
+# publish-site.yml deploys automatically on success.
 
 on:
   schedule:
@@ -16,10 +19,6 @@ on:
           - open
           - close
         default: all
-      skip_deploy:
-        description: 'Skip Cloudflare Workers deploy'
-        type: boolean
-        default: false
       date:
         description: 'Briefing date in IST, YYYY-MM-DD. Leave blank for today.'
         type: string
@@ -32,7 +31,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: tipsheet-db-${{ github.ref }}
+  group: tipsheet-db-write
   cancel-in-progress: false
 
 jobs:
@@ -45,6 +44,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: pipeline/package-lock.json
 
       - name: Restore latest DB
         run: bash .github/scripts/restore-db.sh
@@ -65,6 +66,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
 
       - name: Fetch market data (yfinance)
         run: |
@@ -100,49 +102,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
 
-      - name: Restore + persist OG image cache
-        if: ${{ !inputs.skip_deploy }}
-        uses: actions/cache@v4
+      - name: Alert on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
         with:
-          path: site/.og-cache
-          key: og-cache-${{ github.run_id }}
-          restore-keys: |
-            og-cache-
-
-      - name: Install site deps
-        if: ${{ !inputs.skip_deploy }}
-        run: cd site && npm ci
-
-      - name: Build site
-        if: ${{ !inputs.skip_deploy }}
-        run: cd site && npm run build
-
-      - name: Check internal links
-        if: ${{ !inputs.skip_deploy }}
-        run: cd site && npm run check:links
-
-      - name: Deploy to Cloudflare Workers
-        if: ${{ !inputs.skip_deploy }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4"
-          workingDirectory: site
-          command: deploy
-
-      - name: Notify Telegram
-        if: ${{ !inputs.skip_deploy }}
-        run: cd pipeline && node --env-file=../.env.ci notify_telegram.mjs
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_SCOPE: briefings
-          SITE_URL: https://tipsheet.markets
-
-      - name: Publish post-notification DB
-        if: always()
-        run: bash .github/scripts/publish-db.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          context: Market Briefings ingest

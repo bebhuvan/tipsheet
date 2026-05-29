@@ -371,6 +371,62 @@ async function maybeDispatchBriefingWatchdog(env) {
   return { date: now.date, results };
 }
 
+async function sendTelegramAlert(env, text) {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  const chat = env.TELEGRAM_CHAT_ID;
+  if (!token || !chat) return false;
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
+  });
+  return r.ok;
+}
+
+// Per-source alerting: any stream that explicitly recorded a failure in
+// source_health (now that every ingest stream does) gets a Telegram ping, with
+// a per-source cooldown so a persistent failure doesn't nag every 5-min tick.
+// Alerts only on explicit status='failure' (not staleness) to avoid false
+// positives across streams with different cadences — overall staleness is
+// already handled by maybeDispatchGitHubWatchdog. No-op without Telegram creds.
+async function maybeAlertFailedSources(env) {
+  const db = env.tipsheet_db;
+  if (!db) return { skipped: 'no-d1' };
+  const cooldownMs = Number(env.SOURCE_ALERT_COOLDOWN_MIN || 360) * 60000;
+  try {
+    await db.prepare(
+      'CREATE TABLE IF NOT EXISTS watchdog_alert_state (source TEXT PRIMARY KEY, last_alert_at INTEGER)',
+    ).run();
+    const failed = (await db.prepare(
+      "SELECT source, error FROM source_health WHERE status = 'failure'",
+    ).all()).results || [];
+    if (!failed.length) return { failed: 0 };
+
+    const now = Date.now();
+    const state = (await db.prepare('SELECT source, last_alert_at FROM watchdog_alert_state').all()).results || [];
+    const lastAlert = Object.fromEntries(state.map(r => [r.source, Number(r.last_alert_at) || 0]));
+
+    const alerted = [];
+    for (const row of failed) {
+      if (now - (lastAlert[row.source] || 0) < cooldownMs) continue;
+      const ok = await sendTelegramAlert(
+        env,
+        `⚠️ Tipsheet source degraded: ${row.source}\n${row.error ? String(row.error).slice(0, 200) : 'recorded a failure'}`,
+      );
+      if (ok) {
+        await db.prepare(
+          'INSERT INTO watchdog_alert_state (source, last_alert_at) VALUES (?, ?) ' +
+          'ON CONFLICT(source) DO UPDATE SET last_alert_at = excluded.last_alert_at',
+        ).bind(row.source, now).run();
+        alerted.push(row.source);
+      }
+    }
+    return { failed: failed.length, alerted };
+  } catch (err) {
+    return { error: err?.message || String(err) };
+  }
+}
+
 async function handleWidgetApi(pathname, env) {
   const match = pathname.match(/^\/api\/widget\/([a-zA-Z0-9_-]+)$/);
   if (!match) return null;
@@ -407,8 +463,9 @@ export default {
       Promise.all([
         maybeDispatchGitHubWatchdog(env),
         maybeDispatchBriefingWatchdog(env),
-      ]).then(([pipeline, briefings]) => {
-        console.log('[watchdog]', JSON.stringify({ pipeline, briefings }));
+        maybeAlertFailedSources(env),
+      ]).then(([pipeline, briefings, alerts]) => {
+        console.log('[watchdog]', JSON.stringify({ pipeline, briefings, alerts }));
       }).catch(error => {
         console.error('[watchdog] failed:', error?.message || error);
       }),

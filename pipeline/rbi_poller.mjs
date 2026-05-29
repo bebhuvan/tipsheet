@@ -13,6 +13,7 @@
 //       node pipeline/rbi_poller.mjs --rejects  (also list rejects)
 
 import Database from 'better-sqlite3';
+import { withHealth } from './db.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -153,4 +154,4 @@ async function main() {
   console.log('');
   db.close();
 }
-main().catch(e => { console.error('rbi-poller failed:', e.message); process.exit(1); });
+withHealth('rbi_poll', main).catch(e => { console.error('rbi-poller failed:', e.message); process.exit(1); });

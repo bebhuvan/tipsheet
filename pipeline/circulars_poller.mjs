@@ -22,6 +22,7 @@
 //       node pipeline/circulars_poller.mjs --rejects  (also list near-miss rejects, for tuning)
 
 import Database from 'better-sqlite3';
+import { withHealth } from './db.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -326,4 +327,4 @@ async function main() {
   db.close();
 }
 
-main().catch(e => { console.error('circulars-poller failed:', e.message); process.exit(1); });
+withHealth('circulars_poll', main).catch(e => { console.error('circulars-poller failed:', e.message); process.exit(1); });
