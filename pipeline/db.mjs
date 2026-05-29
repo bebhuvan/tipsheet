@@ -13,7 +13,9 @@ const SCHEMA_PATH = resolve(__dirname, 'schema.sql');
 let _db;
 
 export function openDb(path = process.env.DB_PATH || DEFAULT_DB) {
-  if (_db) return _db;
+  // Reopen if a previous caller closed the cached handle (e.g. a script that
+  // calls sqlite.close() before withHealth records its outcome).
+  if (_db && _db.open) return _db;
   mkdirSync(dirname(path), { recursive: true });
   _db = new Database(path);
   _db.pragma('journal_mode = WAL');
