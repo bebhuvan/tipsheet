@@ -40,3 +40,11 @@
 
 /sitemap-news.xml
   Cache-Control: public, max-age=1800
+
+# Plain-text discovery files. Pin charset so non-ASCII (em-dashes, currency
+# glyphs) can't render as mojibake under X-Content-Type-Options: nosniff.
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=3600
+/robots.txt
+  Content-Type: text/plain; charset=utf-8

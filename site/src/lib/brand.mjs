@@ -12,7 +12,10 @@
 //     can't be safely auto-templated without risking grammar issues.
 //   • The /authors/filings-editorial/ URL slug. If you change the editorial-byline
 //     pattern, rename the file too and add a redirect.
-//   • llms.txt and robots.txt in /public/ — edit by hand.
+//   • robots.txt in /public/ — edit by hand.
+//   • llms.txt is GENERATED from this file (src/pages/llms.txt.js) — the brand
+//     name and domain are pulled from here, so they can't desync. The prose
+//     lives in that route; edit it there.
 
 export const BRAND_NAME           = 'Tipsheet';
 export const BRAND_NAME_POSSESSIVE = "Tipsheet's";
