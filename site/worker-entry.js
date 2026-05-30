@@ -427,6 +427,92 @@ async function maybeAlertFailedSources(env) {
   }
 }
 
+function filingBuildSlug(symbol, headline, recordId) {
+  const sym = String(symbol || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const hd = String(headline || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return hd ? `${sym}-${hd}-${recordId}` : `${sym}-${recordId}`;
+}
+
+function filingParseJson(s) { try { return s ? JSON.parse(s) : null; } catch { return null; } }
+
+async function handleFilingApi(pathname, env) {
+  if (!pathname.startsWith('/api/filing/') || !pathname.endsWith('.json')) return null;
+  if (!env.tipsheet_db) return json({ error: 'unavailable' }, 503, 0);
+
+  const slug = pathname.slice('/api/filing/'.length, -'.json'.length);
+  const idMatch = slug.match(/-(\d+)$/);
+  if (!idMatch) return json({ error: 'not_found' }, 404, 60);
+  const recordId = idMatch[1];
+
+  try {
+    const row = await env.tipsheet_db.prepare(`
+      SELECT r.record_id, r.symbol, r.scripcode, r.company, r.score, r.sentiment,
+        r.event_type, r.event_category_raw, r.event_category_canonical AS canonical_category,
+        r.created_on,
+        COALESCE((SELECT f.sector FROM fundamentals f WHERE f.symbol = r.symbol LIMIT 1), e.sector) AS sector,
+        e.headline, e.dek, e.the_number_value, e.the_number_label,
+        e.whats_new, e.why_it_matters, e.what_were_watching, e.faqs, e.the_full_read,
+        e.editorial_tone, e.slug
+      FROM filings_raw r
+      JOIN filings_enriched e ON e.record_id = r.record_id
+      WHERE r.record_id = ? AND e.validation_ok = 1
+    `).bind(recordId).first();
+
+    if (!row) return json({ error: 'not_found' }, 404, 60);
+
+    const fund = await env.tipsheet_db.prepare(
+      'SELECT market_cap, pe, roe, debt_to_equity, dividend_yield, tijori_slug FROM fundamentals WHERE symbol = ?'
+    ).bind(row.symbol).first();
+
+    const articleSlug = row.slug || filingBuildSlug(row.symbol, row.headline, row.record_id);
+    const siteUrl = String(env.SITE_URL || 'https://tipsheet.markets').replace(/\/+$/, '');
+    const src = {};
+    if (row.scripcode) src.bse_announcements = `https://www.bseindia.com/corporates/ann.html?scrip=${row.scripcode}&dur=A`;
+    if (row.symbol) src.nse_announcements = `https://www.nseindia.com/companies-listing/corporate-filings-announcements?symbol=${encodeURIComponent(row.symbol)}`;
+
+    const theNumber = filingParseJson(row.the_number_value) !== null ? row.the_number_value : null;
+    const payload = {
+      publication: 'Tipsheet',
+      author: { name: 'Tipsheet Editorial', url: `${siteUrl}/authors/filings-editorial/` },
+      url: `${siteUrl}/${articleSlug}/`,
+      id: row.record_id,
+      headline: row.headline,
+      dek: row.dek,
+      published: String(row.created_on).replace(' ', 'T') + '+05:30',
+      symbol: row.symbol,
+      company: row.company,
+      sector: row.sector,
+      category: row.canonical_category,
+      score: row.score,
+      tier: row.score >= 9 ? 'Alert' : row.score >= 7 ? 'Story' : 'Update',
+      the_number: row.the_number_value ? { value: row.the_number_value, label: row.the_number_label } : null,
+      whats_new: filingParseJson(row.whats_new) ?? [],
+      why_it_matters: row.why_it_matters,
+      what_were_watching: filingParseJson(row.what_were_watching) ?? [],
+      the_full_read: row.the_full_read,
+      editorial_tone: row.editorial_tone,
+      faqs: filingParseJson(row.faqs) ?? [],
+      fundamentals: fund ? {
+        market_cap: fund.market_cap, pe: fund.pe, roe: fund.roe,
+        debt_to_equity: fund.debt_to_equity, dividend_yield: fund.dividend_yield,
+      } : null,
+      primary_sources: [src.bse_announcements, src.nse_announcements].filter(Boolean),
+      research: fund?.tijori_slug ? `https://www.tijorifinance.com/company/${encodeURIComponent(fund.tijori_slug)}/` : undefined,
+      license: 'Quote and cite with attribution to the canonical URL above. AI training and retrieval-augmented use permitted with attribution.',
+    };
+
+    return new Response(JSON.stringify(payload, null, 2), {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (err) {
+    return json({ error: 'unavailable' }, 503, 0);
+  }
+}
+
 async function handleWidgetApi(pathname, env) {
   const match = pathname.match(/^\/api\/widget\/([a-zA-Z0-9_-]+)$/);
   if (!match) return null;
@@ -503,6 +589,9 @@ export default {
 
     const widget = await handleWidgetApi(url.pathname, env);
     if (widget) return widget;
+
+    const filingApi = await handleFilingApi(url.pathname, env);
+    if (filingApi) return filingApi;
 
     const response = await env.ASSETS.fetch(assetFetchRequest(request, url.pathname));
 
