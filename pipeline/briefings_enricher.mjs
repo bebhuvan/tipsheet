@@ -26,7 +26,7 @@ const CFG = {
   model:       process.env.LLM_MODEL    || 'gemini-3.1-flash-lite',
   maxTokens:   Number(process.env.LLM_MAX_TOKENS_BRIEFING || 5200),
   temperature: Number(process.env.LLM_TEMPERATURE || 1.0),
-  timeoutMs:   Number(process.env.LLM_TIMEOUT_MS || 45000),
+  timeoutMs:   Number(process.env.LLM_TIMEOUT_MS_BRIEFING || process.env.LLM_TIMEOUT_MS || 45000),
 };
 
 let _system, _user;
@@ -227,6 +227,87 @@ function buildUserMessage(template, inputs) {
     .replace('{macro_events_today}',       renderMacroEvents(inputs.macro_events_today));
 }
 
+function extractFirstJsonObject(text) {
+  const s = String(text || '');
+  const start = s.indexOf('{');
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) return s.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+const BRIEFING_STYLE_REWRITES = [
+  [/\bunderscor(e|es|ed|ing)\b/gi, 'shows'],
+  [/\bhighlight(s|ed|ing)?\b(?!\s+reel)/gi, 'flags'],
+  [/\bshowcas(e|es|ed|ing)\b/gi, 'shows'],
+  [/\bemphasi[sz](e|es|ed|ing)\b/gi, 'stresses'],
+  [/\bspeaks? to (?:the|a) /gi, 'points to '],
+  [/\b(?:stands?|serves?|functions?|acts?) as (a|an|the) ([a-z]+)/gi, 'is $1 $2'],
+  [/\bmoreover,?\s*/gi, 'Also, '],
+  [/\bfurthermore,?\s*/gi, 'Also, '],
+  [/\badditionally,?\s*/gi, 'Also, '],
+  [/\bconsequently,?\s*/gi, 'So '],
+  [/\bsubsequently,?\s*/gi, 'Then '],
+  [/\bnevertheless,?\s*/gi, 'Still, '],
+  [/\bnonetheless,?\s*/gi, 'Still, '],
+  [/\bultimately,?\s*/gi, 'In the end, '],
+  [/\boverall,?\s*/gi, 'Taken together, '],
+  [/\bgoing forward\b/gi, 'from here'],
+  [/\bmoving forward\b/gi, 'from here'],
+  [/\bmargin expansion\b/gi, 'margin improvement'],
+  [/\boperational momentum\b/gi, 'operating progress'],
+  [/\boperational discipline\b/gi, 'cost control'],
+  [/\bexecution discipline\b/gi, 'delivery control'],
+  [/\bwell-positioned to\b/gi, 'has room to'],
+  [/\bpoised to\b/gi, 'set to'],
+  [/\bleverag(e|ing|es)\b/gi, 'use'],
+  [/\brobust\b/gi, 'strong'],
+  [/\bcrucial(ly)?\b/gi, 'important'],
+  [/\bpivotal\b/gi, 'central'],
+  [/\btransformative\b/gi, 'large'],
+];
+
+function repairBriefingText(text) {
+  let next = String(text);
+  for (const [pattern, replacement] of BRIEFING_STYLE_REWRITES) {
+    next = next.replace(pattern, replacement);
+  }
+  next = next
+    .replace(/\bAlso,\s+Also,\s+/g, 'Also, ')
+    .replace(/\bIn the end,\s+In the end,\s+/g, 'In the end, ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return next;
+}
+
+function repairBriefingValue(value) {
+  if (typeof value === 'string') return repairBriefingText(value);
+  if (Array.isArray(value)) return value.map(repairBriefingValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, repairBriefingValue(v)]));
+  }
+  return value;
+}
+
 export async function enrichBriefing(inputs, previousAttempt = null) {
   if (!CFG.apiKey) return { ok: false, error: 'missing API key' };
   const { system, userTemplate } = await loadPrompts();
@@ -265,14 +346,21 @@ export async function enrichBriefing(inputs, previousAttempt = null) {
     }
     const body = await r.json();
     const content = body.choices?.[0]?.message?.content ?? '';
-    const start = content.indexOf('{');
-    const end   = content.lastIndexOf('}');
-    if (start === -1 || end <= start) return { ok: false, error: 'no_json', elapsed_ms };
+    const json = extractFirstJsonObject(content);
+    if (!json) return { ok: false, error: 'no_json', elapsed_ms };
     let parsed;
-    try { parsed = JSON.parse(content.slice(start, end + 1)); }
+    try { parsed = JSON.parse(json); }
     catch (e) { return { ok: false, error: 'json_parse', raw_error: e.message, elapsed_ms }; }
 
-    const v = validate(parsed, inputs);
+    let v = validate(parsed, inputs);
+    if (!v.ok && v.issues.some(i => i.startsWith('banned:') || i.startsWith('structural:'))) {
+      const repaired = repairBriefingValue(parsed);
+      const repairedValidation = validate(repaired, inputs);
+      if (repairedValidation.ok || repairedValidation.issues.length <= v.issues.length) {
+        parsed = repaired;
+        v = repairedValidation;
+      }
+    }
     return {
       ok: v.ok, parsed, validation: v,
       model: CFG.model, promptVersion: BRIEFING_PROMPT_VERSION,

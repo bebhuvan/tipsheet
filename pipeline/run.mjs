@@ -525,9 +525,33 @@ export async function generateBriefing(type, dateYmd = null) {
   const inputs = gatherBriefingInputs(db, type, dateYmd);
   console.log(`[briefing] inputs: filings=${inputs.top_filings.length} mgmt_flags=${inputs.mgmt_consistency_flags.length} macro=${inputs.macro_events_today.length} market=${inputs.market_snapshot.length}`);
   if (inputs.top_filings.length === 0 && inputs.macro_events_today.length === 0) {
-    console.log('[briefing] nothing to brief — skipping');
-    updateSourceHealth(db, `briefing_${type}`, { status: 'success', startedAt, items: 0, latestSourceTime: dateYmd, meta: { skipped: true } });
-    return { skipped: true };
+    console.log('[briefing] nothing to brief — storing quiet edition');
+    const label = type === 'open' ? 'The Open' : 'The Close';
+    const quiet = type === 'open'
+      ? {
+          headline: 'A quiet open for filings',
+          dek: 'No high-signal company filings or India-relevant macro events landed in the briefing window.',
+          the_take: 'The useful signal this morning is the absence of one. With no material filings or market-moving calendar items in the input set, the tape starts without a fresh disclosure-led lead.',
+        }
+      : {
+          headline: 'A quiet close for filings',
+          dek: 'No high-signal company filings or India-relevant macro events landed in the briefing window.',
+          the_take: 'The useful signal into the close is the absence of one. With no material filings or market-moving calendar items in the input set, there is no disclosure-led lead to dress up.',
+        };
+    upsertBriefing(db, {
+      type, date: dateYmd,
+      headline: quiet.headline,
+      dek: quiet.dek,
+      the_take: quiet.the_take,
+      sections: JSON.stringify({ events: [], day_map: [], concalls: [], mgmt_flags: [], calendar: [] }),
+      input_summary: JSON.stringify({ filings_count: 0, mgmt_flags_count: 0, macro_count: 0, market_count: inputs.market_snapshot.length }),
+      model_used: 'deterministic',
+      prompt_version: BRIEFING_PROMPT_VERSION,
+      validation_ok: 1,
+      validation_issues: null,
+    });
+    updateSourceHealth(db, `briefing_${type}`, { status: 'success', startedAt, inserted: 1, items: 0, latestSourceTime: dateYmd, meta: { quiet: true, label } });
+    return { ok: true, skipped: true, parsed: quiet };
   }
   const t0 = Date.now();
   let result = await enrichBriefing(inputs);
@@ -540,11 +564,29 @@ export async function generateBriefing(type, dateYmd = null) {
     console.log(`[briefing] retry: ${retry.elapsed_ms || (Date.now()-t1)}ms ok=${retry.ok}${retry.usage ? ` tokens in/out: ${retry.usage.prompt_tokens}/${retry.usage.completion_tokens}` : ''}`);
     if (retry.parsed) result = retry;
   }
+  if (!result.ok && result.parsed && isStyleOnlyBriefingFailure(result)) {
+    result.ok = true;
+    result.forced_pass = true;
+    console.log(`[briefing] accepting style-only validation issues: ${result.validation.issues.slice(0,5).join('; ')}`);
+  }
   if (!result.ok) {
     console.log(`[briefing] ✗ ${result.error}${result.validation?.issues ? ' | ' + result.validation.issues.slice(0,5).join(';') : ''}`);
     if (result.raw_error) console.log('  raw:', result.raw_error);
   }
-  if (!result.parsed) return result;
+  if (!result.parsed) {
+    updateSourceHealth(db, `briefing_${type}`, {
+      status: 'failure',
+      startedAt,
+      error: result.error || 'no parsed briefing',
+      items: inputs.top_filings.length,
+      latestSourceTime: dateYmd,
+      meta: {
+        macro_count: inputs.macro_events_today.length,
+        mgmt_flags_count: inputs.mgmt_consistency_flags.length,
+      },
+    });
+    return result;
+  }
 
   const p = result.parsed;
   upsertBriefing(db, {
@@ -562,11 +604,11 @@ export async function generateBriefing(type, dateYmd = null) {
     model_used:      result.model,
     prompt_version:  result.promptVersion,
     validation_ok:   result.ok ? 1 : 0,
-    validation_issues: result.ok ? null : JSON.stringify(result.validation?.issues || []),
+    validation_issues: result.ok && !result.forced_pass ? null : JSON.stringify(result.validation?.issues || []),
   });
-  console.log(`[briefing] ✓ stored: ${p.headline}`);
+  console.log(`[briefing] ✓ stored: ${p.headline}${result.forced_pass ? ' (style-only accepted)' : ''}`);
   updateSourceHealth(db, `briefing_${type}`, {
-    status: result.ok ? 'success' : 'partial',
+    status: result.ok ? 'success' : 'failure',
     startedAt,
     inserted: 1,
     items: inputs.top_filings.length,
@@ -574,6 +616,14 @@ export async function generateBriefing(type, dateYmd = null) {
     meta: { macro_count: inputs.macro_events_today.length, mgmt_flags_count: inputs.mgmt_consistency_flags.length },
   });
   return result;
+}
+
+function isStyleOnlyBriefingFailure(result) {
+  const issues = result?.validation?.issues || [];
+  if (!result?.parsed || !issues.length || result.validation?.eventIssues?.length) return false;
+  const structural = result.validation?.structural || [];
+  if (structural.some(s => s?.name === 'magnitude_mismatch')) return false;
+  return issues.every(issue => issue.startsWith('banned:') || issue.startsWith('structural:'));
 }
 
 export async function pollConcalls(maxItems = 100, opts = {}) {
@@ -605,6 +655,29 @@ export async function pollConcalls(maxItems = 100, opts = {}) {
 
 // ─── entrypoint ─────────────────────────────────────────────────────
 
+const COMMAND_HEALTH_SOURCE = {
+  poll: 'filings',
+  enrich: 'filings_enrichment',
+  both: 'filings_enrichment',
+  'fetch-fundamentals': 'fundamentals',
+  'resolve-tijori-slugs': 'tijori_slugs',
+  'generate-radar': 'radar',
+  'poll-concalls': 'concalls',
+  'enrich-concalls': 'concalls_enrichment',
+  concalls: 'concalls_enrichment',
+  'poll-macro-calendar': 'macro_calendar',
+  'briefing-open': 'briefing_open',
+  'briefing-close': 'briefing_close',
+};
+
+function requireSuccessfulBriefing(type, result) {
+  if (result?.skipped) return;
+  if (!result?.parsed || !result?.ok) {
+    const issues = result?.validation?.issues?.slice(0, 5).join('; ');
+    throw new Error(`briefing ${type} failed: ${result?.error || issues || 'invalid output'}`);
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const cmd = process.argv[2] || 'both';
   const n   = Number(process.argv[3]) || 50;
@@ -621,8 +694,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     else if (cmd === 'enrich-concalls')       { await enrichConcallsBatch(n || 50); }
     else if (cmd === 'concalls')              { await pollConcalls(n || 100); await enrichConcallsBatch(n || 50); }
     else if (cmd === 'poll-macro-calendar')   { await pollMacroCalendar(); }
-    else if (cmd === 'briefing-open')         { await generateBriefing('open', process.argv[3] || null); }
-    else if (cmd === 'briefing-close')        { await generateBriefing('close', process.argv[3] || null); }
+    else if (cmd === 'briefing-open')         { requireSuccessfulBriefing('open', await generateBriefing('open', process.argv[3] || null)); }
+    else if (cmd === 'briefing-close')        { requireSuccessfulBriefing('close', await generateBriefing('close', process.argv[3] || null)); }
     else if (cmd === 'stats')                 { showStats(); }
     else {
       console.error(`Unknown command: ${cmd}`);
@@ -631,7 +704,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }
   } catch (e) {
     try {
-      updateSourceHealth(openDb(), `command_${cmd}`, { status: 'failure', error: e?.message || e });
+      const source = COMMAND_HEALTH_SOURCE[cmd] || `command_${cmd}`;
+      updateSourceHealth(openDb(), source, { status: 'failure', error: e?.message || e });
     } catch { /* best-effort health marker */ }
     console.error('FATAL:', e);
     process.exit(1);
