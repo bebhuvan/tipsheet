@@ -13,8 +13,8 @@ import { PHRASE_PATTERNS, STRUCTURAL_RULES, FEEDBACK_SUBSTITUTIONS } from './ban
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PROMPT_PATH = resolve(__dirname, 'prompts/system.txt');
 const USER_PROMPT_PATH   = resolve(__dirname, 'prompts/user.txt');
-// v4 = v3 + structured editorial tone fields for article-level visual treatment
-export const PROMPT_VERSION = 'filing-note.v4';
+// v5 = v4 + explicit source-block fidelity for expanded Tijori news summaries.
+export const PROMPT_VERSION = 'filing-note.v5';
 
 // Defaults tuned for Gemini 3.1 Flash Lite (the 22-May-2026 bakeoff winner):
 //   - temperature: 1.0 per Google's explicit Gemini-3 guidance — "Changing the temperature
@@ -38,6 +38,11 @@ const CFG = {
   maxTokens:   Number(process.env.LLM_MAX_TOKENS || 3500),
   temperature: Number(process.env.LLM_TEMPERATURE || 1.0),
   timeoutMs:   Number(process.env.LLM_TIMEOUT_MS || 45000),
+};
+
+const SOURCE_LIMITS = {
+  newsSummary: Number(process.env.LLM_NEWS_SUMMARY_CHAR_BUDGET || 20000),
+  rationale:   Number(process.env.LLM_RATIONALE_CHAR_BUDGET || 8000),
 };
 
 let _systemPrompt, _userTemplate;
@@ -84,7 +89,7 @@ function buildFeedbackMessage(validation) {
   if (fab.length) {
     lines.push('');
     lines.push(`Numbers in your output that do not appear in the source: ${fab.join(', ')}`);
-    lines.push('Use only numbers verbatim from the news_summary or rationale. DO NOT perform arithmetic (e.g. adding two numbers together). If a number you cited is wrong, remove it or replace with the correct one from the source.');
+    lines.push('Use only numbers verbatim from the NEWS SUMMARY or ANALYST RATIONALE source blocks. DO NOT perform arithmetic (e.g. adding two numbers together). If a number you cited is wrong, remove it or replace with the correct one from the source.');
   }
   const issues = (validation.issues || []).filter(i => !i.startsWith('banned') && !i.startsWith('fabricated') && !i.startsWith('structural'));
   if (issues.length) {
@@ -96,12 +101,24 @@ function buildFeedbackMessage(validation) {
   return lines.join('\n');
 }
 
+function packSourceBlock(text, maxChars, label) {
+  const source = String(text || '').trim();
+  const limit = Number(maxChars);
+  if (!source || !Number.isFinite(limit) || limit <= 0 || source.length <= limit) return source;
+
+  const marker = `\n\n[... ${label} truncated by Tipsheet before LLM call: kept the beginning and end of ${source.length.toLocaleString('en-IN')} characters ...]\n\n`;
+  const budget = Math.max(0, limit - marker.length);
+  const headChars = Math.ceil(budget * 0.72);
+  const tailChars = Math.max(0, budget - headChars);
+  return `${source.slice(0, headChars).trimEnd()}${marker}${source.slice(-tailChars).trimStart()}`;
+}
+
 function buildUserMessage(template, raw) {
   // news_summary is now the primary input. Falls back to rationale if absent.
   // The rationale is included as supporting context but explicitly flagged as containing
   // scoring-system meta-commentary the model should ignore.
-  const newsSummary = (raw.news_summary || '').slice(0, 12000);
-  const rationale = (raw.rationale || '').slice(0, 12000);
+  const newsSummary = packSourceBlock(raw.news_summary, SOURCE_LIMITS.newsSummary, 'NEWS SUMMARY');
+  const rationale = packSourceBlock(raw.rationale, SOURCE_LIMITS.rationale, 'ANALYST RATIONALE');
 
   let metadata = [];
   if (raw.major_order) metadata.push(`- Major Order Size: ${raw.major_order_size || 'Not specified'}`);
@@ -117,8 +134,8 @@ function buildUserMessage(template, raw) {
     .replace('{sentiment}',      raw.sentiment || '(blank)')
     .replace('{score}',          String(raw.score ?? '?'))
     .replace('{metadata}',       metaString)
-    .replace('{news_summary}',   newsSummary || '(no news summary provided — use rationale only)')
-    .replace('{rationale}',      rationale || '(no rationale)');
+    .replace('{news_summary}',   newsSummary || '(no news summary provided — use analyst rationale only)')
+    .replace('{rationale}',      rationale || '(no analyst rationale)');
 }
 
 const responseSchema = {

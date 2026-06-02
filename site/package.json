@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "check:content": "node scripts/check-content-contracts.mjs",
     "check:links": "node scripts/check-internal-links.mjs",
     "preview": "astro preview",
     "astro": "astro"

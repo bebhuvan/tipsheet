@@ -809,16 +809,16 @@ export function getBriefingSectorStrip() {
 
 export function getBriefing(type, dateYmd) {
   if (!type || !dateYmd) return null;
-  const row = db().prepare('SELECT * FROM briefings WHERE type = ? AND date = ?').get(type, dateYmd);
+  const row = db().prepare('SELECT * FROM briefings WHERE type = ? AND date = ? AND validation_ok = 1').get(type, dateYmd);
   return shapeBriefing(row);
 }
 
 export function listBriefings(limit = 30) {
-  return db().prepare('SELECT * FROM briefings ORDER BY date DESC, type ASC LIMIT ?').all(limit).map(shapeBriefing);
+  return db().prepare('SELECT * FROM briefings WHERE validation_ok = 1 ORDER BY date DESC, type ASC LIMIT ?').all(limit).map(shapeBriefing);
 }
 
 export function listAllBriefingsForStaticPaths() {
-  return db().prepare('SELECT type, date FROM briefings').all();
+  return db().prepare('SELECT type, date FROM briefings WHERE validation_ok = 1').all();
 }
 
 // ─── Radar ──────────────────────────────────────────────────────────
