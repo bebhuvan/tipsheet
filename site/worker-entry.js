@@ -265,8 +265,9 @@ async function maybeDispatchGitHubWatchdog(env) {
 
   const sourceHealthAt = await latestPipelineDataSuccessMs(env);
   const latestSuccess = runs.find(run => run.conclusion === 'success');
-  const latestAt = sourceHealthAt || (latestSuccess?.updated_at ? Date.parse(latestSuccess.updated_at) : 0);
-  const freshness = sourceHealthAt ? 'source_health' : 'workflow_runs';
+  const latestWorkflowSuccessAt = latestSuccess?.updated_at ? Date.parse(latestSuccess.updated_at) : 0;
+  const latestAt = Math.max(sourceHealthAt || 0, latestWorkflowSuccessAt || 0);
+  const freshness = sourceHealthAt && sourceHealthAt >= latestWorkflowSuccessAt ? 'source_health' : 'workflow_runs';
   const ageMin = latestAt ? (Date.now() - latestAt) / 60000 : Infinity;
   if (ageMin < maxStaleMin) return { skipped: 'fresh', ageMin: Math.round(ageMin), freshness };
 
@@ -329,20 +330,29 @@ async function maybeDispatchBriefingWatchdog(env) {
 
   const results = [];
   for (const item of due) {
+    const page = await briefingPageExists(env, item.type, now.date);
+    if (page.exists) {
+      results.push({ type: item.type, skipped: 'published', url: page.url });
+      continue;
+    }
+
     const dueAt = istDateTimeUtcMs(now.date, item.dueHour, item.dueMinute);
     const recentSuccess = listed.runs.find(run => (
       run.conclusion === 'success' &&
       run.created_at &&
       Date.parse(run.created_at) >= dueAt
     ));
-    if (recentSuccess) {
-      results.push({ type: item.type, skipped: 'recent-success', run: recentSuccess.id });
-      continue;
-    }
-
-    const page = await briefingPageExists(env, item.type, now.date);
-    if (page.exists) {
-      results.push({ type: item.type, skipped: 'published', url: page.url });
+    const deployGraceMin = Number(env.BRIEFING_DEPLOY_GRACE_MIN || 12);
+    const successAgeMin = recentSuccess?.updated_at ? (Date.now() - Date.parse(recentSuccess.updated_at)) / 60000 : Infinity;
+    if (recentSuccess && successAgeMin < deployGraceMin) {
+      results.push({
+        type: item.type,
+        skipped: 'waiting-for-deploy',
+        run: recentSuccess.id,
+        ageMin: Math.round(successAgeMin),
+        pageStatus: page.status,
+        url: page.url,
+      });
       continue;
     }
 

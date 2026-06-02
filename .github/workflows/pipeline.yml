@@ -90,6 +90,15 @@ jobs:
       - name: Show stats
         run: cd pipeline && node --env-file=../.env.ci run.mjs stats
 
+      - name: Sync content tables to D1
+        if: always()
+        run: bash .github/scripts/sync-d1.sh
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          D1_DATABASE_ID: '4645967f-e1aa-4291-b023-5509fcddb758'
+        continue-on-error: true
+
       - name: Publish latest DB
         if: always()
         run: bash .github/scripts/publish-db.sh
