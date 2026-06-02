@@ -3,7 +3,7 @@ import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
 import BriefingBody from '../../../components/BriefingBody.astro';
-import { getBriefing, getBriefingEvents, getBriefingMarketStrip, getBriefingSectorStrip, listAllBriefingsForStaticPaths } from '../../../lib/queries.mjs';
+import { getBriefing, getBriefingEvents, getBriefingMarketStrip, getBriefingSectorStrip, listAllBriefingsForStaticPaths, resolveBriefingConcallItems } from '../../../lib/queries.mjs';
 
 export async function getStaticPaths() {
   return listAllBriefingsForStaticPaths()
@@ -18,6 +18,8 @@ if (!briefing) return Astro.redirect('/404');
 const events = getBriefingEvents(briefing.events);
 const market = getBriefingMarketStrip();
 const sectorMarket = getBriefingSectorStrip();
+const concalls = resolveBriefingConcallItems(briefing.concalls);
+const mgmtFlags = resolveBriefingConcallItems(briefing.mgmt_flags);
 
 function dateOf(ymd) {
   const d = new Date(ymd + 'T00:00:00');
@@ -68,8 +70,8 @@ const schema = {
         sectorMarket={sectorMarket}
         events={events}
         dayMap={briefing.day_map}
-        concalls={briefing.concalls}
-        mgmtFlags={briefing.mgmt_flags}
+        concalls={concalls}
+        mgmtFlags={mgmtFlags}
         calendar={briefing.calendar}
         eventsLabel="Overnight & on watch"
         calendarLabel="On the calendar today"

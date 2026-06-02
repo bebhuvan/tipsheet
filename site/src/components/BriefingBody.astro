@@ -40,9 +40,8 @@ function tone(value) {
   return 'flat';
 }
 function arrow(t) { return t === 'up' ? '▲' : t === 'down' ? '▼' : '·'; }
-function concallUrl(symbol, date) {
-  if (!symbol || !date) return null;
-  return `/concalls/${String(symbol).toLowerCase()}/${date}/`;
+function concallUrl(item) {
+  return item?.canonical_url || null;
 }
 function shortCap(value) {
   const n = Number(value);
@@ -240,8 +239,8 @@ const sectorGroups = (() => {
         {mgmtFlags.map(f => (
           <li>
             <p>{f.prose}</p>
-            {concallUrl(f.symbol, f.date) && (
-              <a href={concallUrl(f.symbol, f.date)}>{f.symbol} concall note <span aria-hidden="true">→</span></a>
+            {concallUrl(f) && (
+              <a href={concallUrl(f)}>{f.resolved_symbol || f.symbol} concall note <span aria-hidden="true">→</span></a>
             )}
           </li>
         ))}
@@ -256,8 +255,8 @@ const sectorGroups = (() => {
         {concalls.map(c => (
           <li>
             <p>{c.prose}</p>
-            {concallUrl(c.symbol, c.date) && (
-              <a href={concallUrl(c.symbol, c.date)}>{c.symbol} concall note <span aria-hidden="true">→</span></a>
+            {concallUrl(c) && (
+              <a href={concallUrl(c)}>{c.resolved_symbol || c.symbol} concall note <span aria-hidden="true">→</span></a>
             )}
           </li>
         ))}

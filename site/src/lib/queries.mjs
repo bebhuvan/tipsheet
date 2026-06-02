@@ -956,6 +956,53 @@ export function getConcall(symbolOrSlug, dateYmd) {
   return shapeConcall(row);
 }
 
+function normalizeConcallKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function resolveConcallForBriefingItem(symbolOrSlug, dateYmd) {
+  if (!symbolOrSlug || !dateYmd) return null;
+  const datePart = String(dateYmd).slice(0, 10);
+  const key = normalizeConcallKey(symbolOrSlug);
+  if (!key) return null;
+
+  const rows = db().prepare(`
+    SELECT ${CONCALL_COLS}
+    FROM concalls_raw c
+    JOIN concalls_enriched e ON e.isin = c.isin AND e.event_time = c.event_time
+    WHERE substr(c.event_time, 1, 10) = ?
+      AND e.validation_ok = 1
+  `).all(datePart);
+
+  const ranked = rows
+    .map(row => {
+      const symbol = normalizeConcallKey(row.symbol);
+      const slug = normalizeConcallKey(row.slug);
+      const company = normalizeConcallKey(row.company_name);
+      let score = 0;
+      if (symbol === key || slug === key || company === key) score = 100;
+      else if (key.length >= 3 && (symbol.startsWith(key) || slug.startsWith(key) || company.startsWith(key))) score = 50;
+      else if (key.length >= 4 && (symbol.includes(key) || slug.includes(key) || company.includes(key))) score = 20;
+      return { row, score };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return ranked[0] ? shapeConcall(ranked[0].row) : null;
+}
+
+export function resolveBriefingConcallItems(items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  return items.map(item => {
+    const resolved = resolveConcallForBriefingItem(item?.symbol, item?.date);
+    return {
+      ...item,
+      canonical_url: resolved?.canonical_url || null,
+      resolved_symbol: resolved?.symbol || null,
+    };
+  });
+}
+
 /** All Concall Note (symbol, date) tuples for static-path generation. */
 export function listAllConcallsForStaticPaths() {
   return db().prepare(`
