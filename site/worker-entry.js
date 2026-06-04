@@ -54,7 +54,7 @@ const FRESH_PAGE_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 const FRESH_PAGE_CDN_CACHE_CONTROL = 'no-store';
 const HTML_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 const HTML_CDN_CACHE_CONTROL = 'no-store';
-const WORKER_RELEASE = '2026-05-28-no-html-cache';
+const WORKER_RELEASE = '2026-06-04-markdown-negotiation';
 const IST_OFFSET_MIN = 330;
 const BRIEFING_SCHEDULES = [
   { type: 'open', dueHour: 8, dueMinute: 0, graceEnv: 'BRIEFING_OPEN_GRACE_MIN' },
@@ -70,6 +70,182 @@ function applySecurityHeaders(headers) {
 
 function applyDiscoveryHeaders(headers) {
   headers.append('Link', DISCOVERY_LINKS.join(', '));
+}
+
+function appendVary(headers, value) {
+  const existing = headers.get('Vary');
+  if (!existing) {
+    headers.set('Vary', value);
+    return;
+  }
+  if (existing.trim() === '*') return;
+  const parts = existing.split(',').map(part => part.trim().toLowerCase());
+  if (!parts.includes(value.toLowerCase())) {
+    headers.set('Vary', `${existing}, ${value}`);
+  }
+}
+
+function requestWantsMarkdown(request) {
+  return /\btext\/markdown\b/i.test(request.headers.get('Accept') || '');
+}
+
+function isHtmlResponse(headers) {
+  return /\btext\/html\b/i.test(headers.get('Content-Type') || '');
+}
+
+function decodeHtmlEntities(value) {
+  const entities = {
+    amp: '&',
+    apos: "'",
+    copy: '(c)',
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
+    reg: '(R)',
+    rsquo: "'",
+    lsquo: "'",
+    ldquo: '"',
+    rdquo: '"',
+    ndash: '-',
+    mdash: '-',
+  };
+  return String(value || '').replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]+);/gi, (match, entity) => {
+    const key = entity.toLowerCase();
+    if (key.startsWith('#x')) return String.fromCodePoint(parseInt(key.slice(2), 16));
+    if (key.startsWith('#')) return String.fromCodePoint(parseInt(key.slice(1), 10));
+    return entities[key] ?? match;
+  });
+}
+
+function stripTags(value) {
+  return decodeHtmlEntities(String(value || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[ \t\r\f\v]+/g, ' ')
+    .replace(/\s+\n/g, '\n')
+    .trim());
+}
+
+function attrValue(tag, name) {
+  const pattern = new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i');
+  const match = String(tag || '').match(pattern);
+  return match ? decodeHtmlEntities(match[2] ?? match[3] ?? match[4] ?? '') : '';
+}
+
+function absolutizeUrl(href, baseUrl) {
+  if (!href || href.startsWith('#') || /^javascript:/i.test(href)) return '';
+  try {
+    return new URL(href, baseUrl).toString();
+  } catch {
+    return href;
+  }
+}
+
+function extractMeta(html, key) {
+  const metaTags = String(html || '').match(/<meta\b[^>]*>/gi) || [];
+  for (const tag of metaTags) {
+    const name = attrValue(tag, 'name') || attrValue(tag, 'property');
+    if (name === key) return attrValue(tag, 'content');
+  }
+  return '';
+}
+
+function extractTitle(html) {
+  const title = String(html || '').match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+  return stripTags(title || extractMeta(html, 'og:title'));
+}
+
+function extractCanonical(html, baseUrl) {
+  const links = String(html || '').match(/<link\b[^>]*>/gi) || [];
+  for (const tag of links) {
+    if (attrValue(tag, 'rel').toLowerCase() === 'canonical') {
+      return absolutizeUrl(attrValue(tag, 'href'), baseUrl);
+    }
+  }
+  return baseUrl;
+}
+
+function inlineMarkdown(html, baseUrl) {
+  return stripTags(String(html || '')
+    .replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (match, attrs, text) => {
+      const label = stripTags(text);
+      const href = absolutizeUrl(attrValue(attrs, 'href'), baseUrl);
+      if (!label) return '';
+      if (!href || label === href) return label;
+      return `[${label}](${href})`;
+    })
+    .replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi, '**$2**')
+    .replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/gi, '*$2*')
+    .replace(/<code\b[^>]*>([\s\S]*?)<\/code>/gi, '`$1`'));
+}
+
+function htmlToMarkdown(html, baseUrl) {
+  const title = extractTitle(html);
+  const description = stripTags(extractMeta(html, 'description') || extractMeta(html, 'og:description'));
+  const canonical = extractCanonical(html, baseUrl);
+  const image = absolutizeUrl(extractMeta(html, 'og:image'), baseUrl);
+  const jsonLd = [];
+
+  let body = String(html || '').match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] || String(html || '');
+  body = body
+    .replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (match, attrs, scriptBody) => {
+      if (/application\/ld\+json/i.test(attrValue(attrs, 'type'))) {
+        const clean = decodeHtmlEntities(scriptBody).trim();
+        if (clean) jsonLd.push(clean);
+      }
+      return '';
+    })
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, '')
+    .replace(/<header\b[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  body = body
+    .replace(/<hr\b[^>]*>/gi, '\n\n---\n\n')
+    .replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi, (match, level, text) => {
+      return `\n\n${'#'.repeat(Number(level))} ${inlineMarkdown(text, baseUrl)}\n\n`;
+    })
+    .replace(/<dt\b[^>]*>([\s\S]*?)<\/dt>/gi, (match, text) => `\n\n**${inlineMarkdown(text, baseUrl)}**\n`)
+    .replace(/<dd\b[^>]*>([\s\S]*?)<\/dd>/gi, (match, text) => `${inlineMarkdown(text, baseUrl)}\n`)
+    .replace(/<li\b[^>]*>([\s\S]*?)<\/li>/gi, (match, text) => `\n- ${inlineMarkdown(text, baseUrl)}`)
+    .replace(/<blockquote\b[^>]*>([\s\S]*?)<\/blockquote>/gi, (match, text) => {
+      return `\n\n${inlineMarkdown(text, baseUrl).split('\n').map(line => `> ${line}`).join('\n')}\n\n`;
+    })
+    .replace(/<p\b[^>]*>([\s\S]*?)<\/p>/gi, (match, text) => `\n\n${inlineMarkdown(text, baseUrl)}\n\n`)
+    .replace(/<br\s*\/?>/gi, '\n');
+
+  let markdown = inlineMarkdown(body, baseUrl)
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const frontmatter = [
+    title && `title: ${JSON.stringify(title)}`,
+    description && `description: ${JSON.stringify(description)}`,
+    canonical && `canonical: ${JSON.stringify(canonical)}`,
+    image && `image: ${JSON.stringify(image)}`,
+  ].filter(Boolean);
+
+  if (frontmatter.length) {
+    markdown = `---\n${frontmatter.join('\n')}\n---\n\n${markdown}`;
+  }
+
+  if (jsonLd.length) {
+    markdown += `\n\n\`\`\`json\n${jsonLd.join('\n')}\n\`\`\``;
+  }
+
+  return `${markdown}\n`;
+}
+
+function estimateMarkdownTokens(markdown) {
+  const compact = String(markdown || '').trim();
+  if (!compact) return '0';
+  return String(Math.max(1, Math.ceil(compact.length / 4)));
 }
 
 function cacheControlFor(pathname) {
@@ -647,6 +823,20 @@ export default {
       headers.set('CDN-Cache-Control', cc.cdn);
       if (cc.cloudflareCdn) headers.set('Cloudflare-CDN-Cache-Control', cc.cloudflareCdn);
       if (cc.dropAssetCacheStatus) headers.delete('CF-Cache-Status');
+    }
+
+    if (request.method === 'GET' && response.ok && requestWantsMarkdown(request) && isHtmlResponse(headers)) {
+      const markdown = htmlToMarkdown(await response.text(), url.toString());
+      headers.set('Content-Type', 'text/markdown; charset=utf-8');
+      headers.set('Content-Signal', 'ai-train=yes, search=yes, ai-input=yes');
+      headers.set('x-markdown-tokens', estimateMarkdownTokens(markdown));
+      headers.delete('Content-Length');
+      appendVary(headers, 'Accept');
+      return new Response(markdown, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
     }
 
     return new Response(response.body, {
