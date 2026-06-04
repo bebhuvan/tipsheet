@@ -19,6 +19,16 @@ const CSP = [
   "form-action 'self'",
 ].join('; ');
 
+const DISCOVERY_LINKS = [
+  '</llms.txt>; rel="describedby"; type="text/plain"; title="Tipsheet guide for LLMs"',
+  '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"; title="Tipsheet API catalog"',
+  '</.well-known/agent-skills/index.json>; rel="agent-skills"; type="application/json"; title="Tipsheet Agent Skills"',
+  '</openapi.json>; rel="service-desc"; type="application/vnd.oai.openapi+json;version=3.1"; title="Tipsheet OpenAPI"',
+  '</feed.json>; rel="alternate"; type="application/feed+json"; title="Tipsheet JSON Feed"',
+  '</feed.xml>; rel="alternate"; type="application/rss+xml"; title="Tipsheet RSS Feed"',
+  '</sitemap.xml>; rel="sitemap"; type="application/xml"; title="Tipsheet sitemap"',
+];
+
 const CACHE_RULES = [
   { pattern: /^\/fonts\//,        maxAge: 31536000, immutable: true },
   { pattern: /^\/og\//,           maxAge: 86400 },
@@ -31,6 +41,10 @@ const CACHE_RULES = [
   { pattern: /^\/feed\.json$/,    maxAge: 1800 },
   { pattern: /^\/sitemap\.xml$/,  maxAge: 3600 },
   { pattern: /^\/sitemap-news\.xml$/, maxAge: 1800 },
+  { pattern: /^\/openapi\.json$/, maxAge: 3600 },
+  { pattern: /^\/\.well-known\/api-catalog$/, maxAge: 3600 },
+  { pattern: /^\/\.well-known\/agent-skills\/index\.json$/, maxAge: 3600 },
+  { pattern: /^\/\.well-known\/agent-skills\/tipsheet\/SKILL\.md$/, maxAge: 3600 },
   { pattern: /^\/article-redirects\.json$/, maxAge: 300 },
 ];
 
@@ -52,6 +66,10 @@ function applySecurityHeaders(headers) {
     headers.set(key, value);
   }
   headers.set('Content-Security-Policy', CSP);
+}
+
+function applyDiscoveryHeaders(headers) {
+  headers.append('Link', DISCOVERY_LINKS.join(', '));
 }
 
 function cacheControlFor(pathname) {
@@ -614,11 +632,13 @@ export default {
         'Content-Type': 'text/html; charset=utf-8',
       });
       applySecurityHeaders(headers);
+      applyDiscoveryHeaders(headers);
       return new Response('Not found', { status: 404, headers });
     }
 
     const headers = new Headers(response.headers);
     applySecurityHeaders(headers);
+    applyDiscoveryHeaders(headers);
     headers.set('X-Tipsheet-Worker-Release', WORKER_RELEASE);
 
     const cc = cacheControlFor(url.pathname);
