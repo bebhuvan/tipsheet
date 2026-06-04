@@ -825,6 +825,19 @@ export default {
       if (cc.dropAssetCacheStatus) headers.delete('CF-Cache-Status');
     }
 
+    if (request.method === 'HEAD' && response.ok && requestWantsMarkdown(request) && isHtmlResponse(headers)) {
+      headers.set('Content-Type', 'text/markdown; charset=utf-8');
+      headers.set('Content-Signal', 'ai-train=yes, search=yes, ai-input=yes');
+      headers.set('x-markdown-tokens', '0');
+      headers.delete('Content-Length');
+      appendVary(headers, 'Accept');
+      return new Response(null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+
     if (request.method === 'GET' && response.ok && requestWantsMarkdown(request) && isHtmlResponse(headers)) {
       const markdown = htmlToMarkdown(await response.text(), url.toString());
       headers.set('Content-Type', 'text/markdown; charset=utf-8');
