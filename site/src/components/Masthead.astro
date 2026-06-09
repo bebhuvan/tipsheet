@@ -1,5 +1,6 @@
 ---
 import { BRAND_NAME, BRAND_TAGLINE, BRAND_TELEGRAM_URL } from '../lib/brand.mjs';
+import { latestPublishedContentAt } from '../lib/queries.mjs';
 
 interface Props {
   weekday?: string;
@@ -9,7 +10,7 @@ interface Props {
   activeNav?: string;
   capTier?: string;
 }
-const today = new Date();
+const today = latestPublishedContentAt() || new Date();
 const istParts = Object.fromEntries(
   new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
