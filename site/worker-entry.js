@@ -256,7 +256,7 @@ async function maybeDispatchGitHubWatchdog(env) {
   const maxStaleMin = Number(env.WATCHDOG_MAX_STALE_MIN || 45);
   if (!token || !repo || !maxStaleMin) return { skipped: 'missing-config' };
 
-  const listed = await listWorkflowRuns({ repo, workflow, branch, token });
+  const listed = await listWorkflowRuns({ repo, workflow, branch, token, perPage: 10 });
   if (!listed.ok) return { skipped: 'runs-api-failed', status: listed.status };
   const runs = listed.runs;
   if (runs.some(run => run.status === 'queued' || run.status === 'in_progress')) {
@@ -270,6 +270,23 @@ async function maybeDispatchGitHubWatchdog(env) {
   const freshness = sourceHealthAt && sourceHealthAt >= latestWorkflowSuccessAt ? 'source_health' : 'workflow_runs';
   const ageMin = latestAt ? (Date.now() - latestAt) / 60000 : Infinity;
   if (ageMin < maxStaleMin) return { skipped: 'fresh', ageMin: Math.round(ageMin), freshness };
+
+  const cooldownMin = Number(env.WATCHDOG_COOLDOWN_MIN || 30);
+  const recentAttempt = cooldownMin > 0
+    ? runs.find(run => {
+        if (!run.created_at) return false;
+        return (Date.now() - Date.parse(run.created_at)) / 60000 < cooldownMin;
+      })
+    : null;
+  if (recentAttempt) {
+    return {
+      skipped: 'cooldown',
+      run: recentAttempt.id,
+      conclusion: recentAttempt.conclusion || recentAttempt.status || null,
+      ageMin: Math.round((Date.now() - Date.parse(recentAttempt.created_at)) / 60000),
+      freshness,
+    };
+  }
 
   const dispatch = await dispatchWorkflow({
     repo,

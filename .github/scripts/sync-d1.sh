@@ -14,4 +14,5 @@ if (( ${#missing[@]} )); then
 fi
 
 cd pipeline
-node --env-file=../.env.ci sync-to-d1.mjs
+read -r -a extra_args <<< "${D1_SYNC_ARGS:-}"
+node --env-file=../.env.ci sync-to-d1.mjs "${extra_args[@]}"
