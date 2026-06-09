@@ -7,6 +7,9 @@ name: Publish Site
 #   - the slow build no longer sits inside the DB write-lock (ingestion stays fast)
 #   - bursts of ingest completions collapse into ONE deploy (cancel-in-progress)
 #   - every deploy builds from the freshly-published canonical DB (no stale artifact)
+# Telegram notification persistence is handled by notify-telegram.yml. Keeping it
+# out of this workflow avoids cancelled-looking deploys when the shared DB write
+# lock is busy.
 on:
   workflow_run:
     workflows:
@@ -39,8 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     # A burst of ingest completions should produce ONE deploy of the latest state,
-    # not N redundant full-site rebuilds. Latest deploy wins, but the follow-up
-    # notification-state job must not be cancelled after it has sent messages.
+    # not N redundant full-site rebuilds. Latest deploy wins.
     concurrency:
       group: tipsheet-deploy
       cancel-in-progress: true
@@ -95,55 +97,3 @@ jobs:
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
           context: Publish Site (build/deploy)
-
-  notify-persist:
-    needs: build-deploy
-    if: ${{ needs.build-deploy.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      group: tipsheet-db-write
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: pipeline/package-lock.json
-
-      - name: Restore latest canonical DB
-        run: bash .github/scripts/restore-db.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-
-      - name: Install pipeline deps (for notifier)
-        run: cd pipeline && npm ci
-
-      # Idempotent (notified_at): only newly published notes/briefings are sent,
-      # so running after every deploy is safe and means ALL sources get notified
-      # (previously only Fast News + Briefings notified).
-      - name: Notify Telegram
-        run: cd pipeline && node --env-file=../.env.ci notify_telegram.mjs
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TELEGRAM_SCOPE: all
-          SITE_URL: https://tipsheet.markets
-
-      - name: Publish notification state
-        if: always()
-        run: bash .github/scripts/publish-db.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-
-      - name: Alert on failure
-        if: failure()
-        uses: ./.github/actions/notify-failure
-        with:
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          context: Publish Site (notify/persist)
