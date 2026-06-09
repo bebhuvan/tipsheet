@@ -571,6 +571,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.hostname === 'www.tipsheet.markets') {
+      url.hostname = 'tipsheet.markets';
+      return Response.redirect(url.toString(), 301);
+    }
+
     // Retired sections → permanent redirects (the Worker handles routing, so
     // a static _redirects file wouldn't apply here).
     if (url.pathname === '/smart-money' || url.pathname === '/smart-money/') {

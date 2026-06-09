@@ -25,3 +25,7 @@ database_id = "4645967f-e1aa-4291-b023-5509fcddb758"
 [[routes]]
 pattern = "tipsheet.markets"
 custom_domain = true
+
+[[routes]]
+pattern = "www.tipsheet.markets"
+custom_domain = true
