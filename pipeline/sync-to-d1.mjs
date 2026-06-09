@@ -84,6 +84,12 @@ function columnsOf(sqlite, name) {
   return sqlite.prepare(`PRAGMA table_info(${name})`).all().map(c => c.name);
 }
 
+async function remoteTableSet(env) {
+  const res = await d1Query(env, "SELECT name FROM sqlite_master WHERE type='table'");
+  const rows = res?.result?.[0]?.results || res?.results || [];
+  return new Set(rows.map(r => r.name).filter(Boolean));
+}
+
 // Persisted per-table watermark so incremental runs are cheap.
 function ensureSyncState(sqlite) {
   sqlite.exec(`CREATE TABLE IF NOT EXISTS _d1_sync_state (table_name TEXT PRIMARY KEY, watermark TEXT)`);
@@ -97,10 +103,14 @@ function setWatermark(sqlite, table, value) {
     ON CONFLICT(table_name) DO UPDATE SET watermark=excluded.watermark`).run(table, String(value));
 }
 
-async function syncTable(env, sqlite, spec, { full }) {
+async function syncTable(env, sqlite, spec, { full, remoteTables }) {
   const { name, incremental } = spec;
   if (!tableExistsLocally(sqlite, name)) {
     console.log(`[d1-sync] skip ${name} (not present locally)`);
+    return { table: name, rows: 0, skipped: true };
+  }
+  if (remoteTables && !remoteTables.has(name)) {
+    console.log(`[d1-sync] skip ${name} (not present in D1)`);
     return { table: name, rows: 0, skipped: true };
   }
   const cols = columnsOf(sqlite, name);
@@ -147,11 +157,12 @@ async function main() {
   }
   const sqlite = openDb();
   ensureSyncState(sqlite);
+  const remoteTables = dry ? null : await remoteTableSet(env);
 
   const specs = only ? TABLES.filter(t => only.has(t.name)) : TABLES;
   let total = 0;
   for (const spec of specs) {
-    const res = await syncTable(env, sqlite, spec, { full });
+    const res = await syncTable(env, sqlite, spec, { full, remoteTables });
     total += res.rows;
   }
   sqlite.close();
