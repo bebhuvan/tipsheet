@@ -26,7 +26,7 @@ on:
       enrich_limit:
         description: 'Max filings to enrich'
         type: string
-        default: '50'
+        default: '10'
 
 env:
   NODE_VERSION: '22'
@@ -85,7 +85,7 @@ jobs:
           LLM_BASE_URL: https://api.xiaomimimo.com/v1
           LLM_MODEL: mimo-v2.5
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          LIMIT: ${{ inputs.enrich_limit || '50' }}
+          LIMIT: ${{ inputs.enrich_limit || '10' }}
 
       - name: Show stats
         run: cd pipeline && node --env-file=../.env.ci run.mjs stats
