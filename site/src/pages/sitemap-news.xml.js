@@ -1,7 +1,7 @@
 // Google News–specific sitemap. Only filings from the last 48 hours per Google's spec.
 // https://developers.google.com/search/docs/specialty/news/news-sitemaps
 
-import { listFilings } from '../lib/queries.mjs';
+import { listFilings, listSyntheses } from '../lib/queries.mjs';
 
 function escapeXml(value) {
   return String(value ?? '')
@@ -28,19 +28,36 @@ export async function GET({ site }) {
     return !isNaN(t) && t >= cutoff;
   });
 
+  // Results syntheses are flagship pieces — always nominated while fresh.
+  const entries = recent.map(f => ({
+    url: new URL(f.canonical_url, siteUrl).toString(),
+    publication_date: String(f.created_on).replace(' ', 'T') + '+05:30',
+    title: f.headline,
+    keywords: [f.symbol, f.company, f.canonical_category, f.sector].filter(Boolean).join(', '),
+  }));
+  for (const p of listSyntheses({ limit: 100 })) {
+    if (!p.generated_at || p.generated_at < cutoff) continue;
+    entries.push({
+      url: new URL(p.canonical_url, siteUrl).toString(),
+      publication_date: new Date(p.generated_at).toISOString(),
+      title: p.headline,
+      keywords: [p.symbol, p.company, 'results', 'earnings call'].filter(Boolean).join(', '),
+    });
+  }
+
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
-${recent.map(f => `  <url>
-    <loc>${escapeXml(new URL(f.canonical_url, siteUrl).toString())}</loc>
+${entries.map(e => `  <url>
+    <loc>${escapeXml(e.url)}</loc>
     <news:news>
       <news:publication>
         <news:name>Tipsheet</news:name>
         <news:language>en</news:language>
       </news:publication>
-      <news:publication_date>${escapeXml(String(f.created_on).replace(' ', 'T') + '+05:30')}</news:publication_date>
-      <news:title><![CDATA[${cdata(f.headline)}]]></news:title>
-      <news:keywords>${escapeXml([f.symbol, f.company, f.canonical_category, f.sector].filter(Boolean).join(', '))}</news:keywords>
+      <news:publication_date>${escapeXml(e.publication_date)}</news:publication_date>
+      <news:title><![CDATA[${cdata(e.title)}]]></news:title>
+      <news:keywords>${escapeXml(e.keywords)}</news:keywords>
     </news:news>
   </url>`).join('\n')}
 </urlset>`;

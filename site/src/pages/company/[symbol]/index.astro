@@ -2,7 +2,7 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { distinctSymbolsWithFilings, filingsForCompany, getFundamentals, sectorSlug, tierFor, tijoriCompanyUrl, filingEyebrow, getTijoriWidget, companyPageIsStub } from '../../../lib/queries.mjs';
+import { distinctSymbolsWithFilings, filingsForCompany, getFundamentals, sectorSlug, tierFor, tijoriCompanyUrl, filingEyebrow, getTijoriWidget, companyPageIsStub, synthesesForCompany } from '../../../lib/queries.mjs';
 import { renderSnapshotHTML } from '../../../lib/snapshot.mjs';
 import '../../../styles/snapshot.css';
 
@@ -25,6 +25,7 @@ const companyName = filings[0]?.company || fund?.symbol || SYMBOL;
 const widget = getTijoriWidget(SYMBOL);
 const snapshotHTML = widget?.payload ? renderSnapshotHTML(widget.payload, SYMBOL, tijoriUrl) : '';
 const isStub = companyPageIsStub(SYMBOL);
+const syntheses = synthesesForCompany(SYMBOL, 5);
 
 if (filings.length === 0 && !fund) return Astro.redirect('/404');
 
@@ -152,6 +153,20 @@ const schemaOutput = [schema, breadcrumbSchema, timelineSchema];
 
       <hr class="rule" />
 
+      {syntheses.length > 0 && (
+        <section class="company-analysis" aria-label={`Analysis on ${companyName}`}>
+          <h2 class="analysis-title">Analysis — the numbers vs the call</h2>
+          <ul class="analysis-list">
+            {syntheses.map(p => (
+              <li>
+                <a href={p.canonical_url} class="headline-link">{p.headline}</a>
+                <p>{p.dek}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {snapshotHTML && (
         <section class="company-snapshot-block" aria-label={`Quarterly financials for ${companyName}`} set:html={snapshotHTML} />
       )}
@@ -194,3 +209,12 @@ const schemaOutput = [schema, breadcrumbSchema, timelineSchema];
 
   <SiteFooter />
 </Base>
+
+<style>
+  .company-analysis { margin-top: 40px; }
+  .analysis-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 14px; }
+  .analysis-list { list-style: none; padding: 0; margin: 0; }
+  .analysis-list li { padding: 12px 0; border-bottom: 1px solid var(--hairline, #e5e5e5); }
+  .analysis-list p { margin: 6px 0 0; color: var(--text-secondary, #555); line-height: 1.5; font-size: 15px; }
+  .company-snapshot-block { margin-top: 36px; }
+</style>

@@ -1,0 +1,21 @@
+RESULTS EVENT — {company} ({symbol})
+
+FILING NOTE (the reported numbers, as we published them):
+"""
+{filing_note}
+"""
+
+CONCALL NOTE (what management said on the call, as we published it):
+"""
+{concall_note}
+"""
+
+QUOTES (verbatim from the call — the ONLY permitted source for quoted material):
+"""
+{quotes}
+"""
+
+COMPANY CONTEXT (verified data from our database — trailing screener figures, the latest reported quarter, and our prior coverage; attribute each figure to its own period):
+"""
+{company_context}
+"""

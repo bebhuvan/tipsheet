@@ -1,0 +1,62 @@
+---
+// Analysis hub — results syntheses, newest first.
+import Base from '../../layouts/Base.astro';
+import Masthead from '../../components/Masthead.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { listSyntheses } from '../../lib/queries.mjs';
+
+const pieces = listSyntheses({ limit: 200 });
+
+function dateLabel(ms) {
+  if (!ms) return '';
+  const d = new Date(ms + 5.5 * 3600 * 1000);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+---
+<Base
+  title="Analysis — the numbers vs the call"
+  description="Results analysis that sets reported numbers against what management said on the earnings call — guidance, quotes, and the gaps between them."
+>
+  <Masthead activeNav="filings" />
+
+  <main>
+    <section class="analysis-index">
+      <header>
+        <h1>Analysis</h1>
+        <p class="standfirst">The numbers vs the call: each piece sets a company's reported results against what management said on the earnings call — and reads the gap.</p>
+      </header>
+
+      {pieces.length === 0 ? (
+        <p class="empty">No analysis pieces yet — they generate automatically when a results filing and its earnings call both land.</p>
+      ) : (
+        <ol class="piece-list">
+          {pieces.map(p => (
+            <li>
+              <span class="when mono">{dateLabel(p.generated_at)}</span>
+              <div>
+                <a href={p.canonical_url} class="headline-link"><strong>{p.headline}</strong></a>
+                <p class="dek">{p.dek}</p>
+                <span class="tag mono">{p.company} · {p.symbol}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  </main>
+
+  <SiteFooter />
+</Base>
+
+<style>
+  .analysis-index { max-width: 760px; margin: 0 auto; padding: 24px 20px 64px; }
+  .analysis-index h1 { font-size: clamp(28px, 4vw, 36px); margin: 0 0 10px; }
+  .standfirst { font-size: 17px; line-height: 1.5; color: var(--text-secondary, #444); margin: 0 0 28px; }
+  .piece-list { list-style: none; padding: 0; margin: 0; }
+  .piece-list li { display: flex; gap: 18px; padding: 18px 0; border-bottom: 1px solid var(--hairline, #e5e5e5); }
+  .when { flex: 0 0 90px; font-size: 12px; color: var(--text-muted); padding-top: 4px; }
+  .dek { margin: 6px 0; line-height: 1.5; color: var(--text-secondary, #444); }
+  .tag { font-size: 12px; color: var(--text-muted); }
+  .empty { color: var(--text-muted); }
+</style>

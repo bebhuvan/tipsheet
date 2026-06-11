@@ -1334,3 +1334,61 @@ export function listConcallNotes({ limit = 200 } = {}) {
     SELECT * FROM alphastreet_enriched WHERE validation_ok = 1 ORDER BY enriched_at DESC LIMIT ?
   `).all(limit).map(shapeConcallNote);
 }
+
+// ─── results syntheses ("the numbers vs the call") ───────────────────
+
+function shapeSynthesis(row) {
+  if (!row) return null;
+  return {
+    symbol:             row.symbol,
+    company:            row.company || row.symbol,
+    slug:               row.slug,
+    canonical_url:      `/analysis/${row.slug}/`,
+    headline:           row.headline,
+    dek:                row.dek,
+    the_numbers:        parseJsonArray(row.the_numbers),
+    managements_story:  parseJsonArray(row.managements_story),
+    divergence:         row.divergence,
+    what_were_watching: parseJsonArray(row.what_were_watching),
+    the_full_read:      row.the_full_read,
+    key_quote:          parseJsonObject(row.key_quote),
+    generated_at:       Number(row.generated_at) || null,
+    concall_event_time: row.concall_event_time,
+    concall_url:        `/concalls/${String(row.symbol).toLowerCase()}/${String(row.concall_event_time).slice(0, 10)}/`,
+    filing_record_id:   row.filing_record_id,
+  };
+}
+
+export function listSyntheses({ limit = 100 } = {}) {
+  if (!hasTable('synthesis_enriched')) return [];
+  return db().prepare(`
+    SELECT * FROM synthesis_enriched
+    WHERE validation_ok = 1 AND slug IS NOT NULL
+    ORDER BY generated_at DESC LIMIT ?
+  `).all(limit).map(shapeSynthesis);
+}
+
+export function getSynthesisBySlug(slug) {
+  if (!hasTable('synthesis_enriched')) return null;
+  const row = db().prepare(`
+    SELECT * FROM synthesis_enriched WHERE slug = ? AND validation_ok = 1
+  `).get(slug);
+  return shapeSynthesis(row);
+}
+
+export function synthesesForCompany(symbol, limit = 10) {
+  if (!hasTable('synthesis_enriched')) return [];
+  return db().prepare(`
+    SELECT * FROM synthesis_enriched
+    WHERE symbol = ? AND validation_ok = 1 AND slug IS NOT NULL
+    ORDER BY generated_at DESC LIMIT ?
+  `).all(String(symbol).toUpperCase(), limit).map(shapeSynthesis);
+}
+
+/** Canonical URL of the filing note a synthesis is based on (null if missing). */
+export function filingUrlForRecordId(recordId) {
+  const row = db().prepare(`
+    SELECT e.slug FROM filings_enriched e WHERE e.record_id = ? AND e.validation_ok = 1
+  `).get(recordId);
+  return row?.slug ? `/${row.slug}/` : null;
+}
