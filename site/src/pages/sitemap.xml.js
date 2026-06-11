@@ -21,6 +21,7 @@ export async function GET({ site }) {
     ...Array.from({ length: filingPages }, (_, i) => `/sitemaps/filings-${i + 1}.xml`),
     '/sitemaps/companies.xml',
     '/sitemaps/sectors.xml',
+    '/sitemaps/analysis.xml',
     '/sitemap-news.xml',
   ];
 

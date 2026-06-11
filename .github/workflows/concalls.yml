@@ -72,6 +72,15 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         continue-on-error: true
 
+      - name: Results synthesis (numbers vs the call)
+        run: cd pipeline && node --env-file=../.env.ci run.mjs synthesize-results 10
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        continue-on-error: true
+
       - name: Show stats
         run: cd pipeline && node --env-file=../.env.ci run.mjs stats
 

@@ -706,6 +706,84 @@ export async function pollConcalls(maxItems = 100, opts = {}) {
   return { seen: totalSeen, inserted: totalInserted };
 }
 
+/**
+ * Results synthesis — "the numbers vs the call". Generates one combined piece
+ * per (concall, nearest Earnings filing) pair that lacks one. Idempotent: the
+ * pair key is PRIMARY KEY; slug freezes on first insert.
+ */
+export async function synthesizeResults(max = 10) {
+  const startedAt = Date.now();
+  const { findSynthesisPairs, synthesizeOne, ensureSynthesisTable, SYNTHESIS_PROMPT_VERSION } = await import('./synthesis_enricher.mjs');
+  const { buildArticleSlug } = await import('./db.mjs');
+  const db = openDb();
+  ensureSynthesisTable(db);
+  const pairs = findSynthesisPairs(db, max);
+  console.log(`[synthesis] ${pairs.length} pending pair(s)`);
+  let ok = 0, fail = 0;
+  for (const pair of pairs) {
+    const tag = `${pair.concall.symbol} ${String(pair.concall.event_time).slice(0, 10)}`;
+    let result = await synthesizeOne(db, pair);
+    let retries = 0;
+    while (!result.ok && !result.error && retries < 2) {
+      retries++;
+      result = await synthesizeOne(db, pair, result.validation);
+    }
+    if (!result.parsed) {
+      fail++;
+      console.log(`  ✗ ${tag} ${result.error || 'no output'}`);
+      continue;
+    }
+    const p = result.parsed;
+    const slug = buildArticleSlug(pair.concall.symbol, p.headline, `rs${pair.filing.record_id}`);
+    db.prepare(`
+      INSERT INTO synthesis_enriched
+        (symbol, concall_event_time, filing_record_id, slug, company, headline, dek,
+         the_numbers, managements_story, divergence, what_were_watching, the_full_read,
+         key_quote, input_summary, model_used, prompt_version, generated_at,
+         validation_ok, validation_issues)
+      VALUES (@symbol, @concall_event_time, @filing_record_id, @slug, @company, @headline, @dek,
+         @the_numbers, @managements_story, @divergence, @what_were_watching, @the_full_read,
+         @key_quote, @input_summary, @model_used, @prompt_version, @generated_at,
+         @validation_ok, @validation_issues)
+      ON CONFLICT(symbol, concall_event_time) DO UPDATE SET
+        headline = excluded.headline, dek = excluded.dek,
+        the_numbers = excluded.the_numbers, managements_story = excluded.managements_story,
+        divergence = excluded.divergence, what_were_watching = excluded.what_were_watching,
+        the_full_read = excluded.the_full_read, key_quote = excluded.key_quote,
+        input_summary = excluded.input_summary, model_used = excluded.model_used,
+        prompt_version = excluded.prompt_version, generated_at = excluded.generated_at,
+        validation_ok = excluded.validation_ok, validation_issues = excluded.validation_issues,
+        slug = COALESCE(synthesis_enriched.slug, excluded.slug)
+    `).run({
+      symbol: pair.concall.symbol,
+      concall_event_time: pair.concall.event_time,
+      filing_record_id: pair.filing.record_id,
+      slug,
+      company: pair.filing.company || pair.concall.symbol,
+      headline: p.headline, dek: p.dek,
+      the_numbers: JSON.stringify(p.the_numbers || []),
+      managements_story: JSON.stringify(p.managements_story || []),
+      divergence: p.divergence || null,
+      what_were_watching: JSON.stringify(p.what_were_watching || []),
+      the_full_read: p.the_full_read || null,
+      key_quote: p.key_quote ? JSON.stringify(p.key_quote) : null,
+      input_summary: JSON.stringify({ filing_record_id: pair.filing.record_id, concall_event_time: pair.concall.event_time }),
+      model_used: result.model || '',
+      prompt_version: SYNTHESIS_PROMPT_VERSION,
+      generated_at: Date.now(),
+      validation_ok: result.ok ? 1 : 0,
+      validation_issues: result.ok ? null : JSON.stringify(result.validation?.issues || []),
+    });
+    if (result.ok) { ok++; console.log(`  ✓ ${tag} "${p.headline}"`); }
+    else { fail++; console.log(`  ✗ ${tag} stored invalid: ${result.validation?.issues?.join('; ')}`); }
+  }
+  updateSourceHealth(db, 'results_synthesis', {
+    status: 'success', startedAt, inserted: ok, items: pairs.length,
+    meta: { failed: fail },
+  });
+  return { ok, fail, pairs: pairs.length };
+}
+
 // ─── entrypoint ─────────────────────────────────────────────────────
 
 const COMMAND_HEALTH_SOURCE = {
@@ -720,6 +798,7 @@ const COMMAND_HEALTH_SOURCE = {
   concalls: 'concalls_enrichment',
   'poll-macro-calendar': 'macro_calendar',
   'briefing-open': 'briefing_open',
+  'synthesize-results': 'results_synthesis',
   'briefing-close': 'briefing_close',
 };
 
@@ -749,6 +828,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     else if (cmd === 'poll-macro-calendar')   { await pollMacroCalendar(); }
     else if (cmd === 'briefing-open')         { requireSuccessfulBriefing('open', await generateBriefing('open', process.argv[3] || null)); }
     else if (cmd === 'briefing-close')        { requireSuccessfulBriefing('close', await generateBriefing('close', process.argv[3] || null)); }
+    else if (cmd === 'synthesize-results')    { await synthesizeResults(n || 10); }
     else if (cmd === 'stats')                 { showStats(); }
     else {
       console.error(`Unknown command: ${cmd}`);
