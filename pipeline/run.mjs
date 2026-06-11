@@ -555,6 +555,24 @@ export async function generateBriefing(type, dateYmd = null) {
     const ist = new Date(now.getTime() + 5.5 * 3600 * 1000);
     dateYmd = ist.toISOString().slice(0, 10);
   }
+
+  // Editorial time gate: an edition generated before its window summarises the
+  // wrong day-state (a "Close" written at 9 AM became the day's record once —
+  // upsert means the 16:00 cron rewrites it, but readers saw it for hours).
+  // Backfills for past dates pass through; BRIEFING_FORCE=1 overrides.
+  {
+    const istNow = new Date(Date.now() + 5.5 * 3600 * 1000);
+    const todayIst = istNow.toISOString().slice(0, 10);
+    const minutesIst = istNow.getUTCHours() * 60 + istNow.getUTCMinutes();
+    const windowStart = type === 'close' ? 15 * 60 + 30 : 7 * 60; // 15:30 / 07:00 IST
+    if (dateYmd >= todayIst && minutesIst < windowStart && process.env.BRIEFING_FORCE !== '1') {
+      const hh = String(Math.floor(windowStart / 60)).padStart(2, '0');
+      const mm = String(windowStart % 60).padStart(2, '0');
+      console.log(`[briefing] ${type} for ${dateYmd} gated — before ${hh}:${mm} IST. Set BRIEFING_FORCE=1 to override.`);
+      return { ok: true, skipped: true, reason: 'before_window' };
+    }
+  }
+
   const db = openDb();
   console.log(`[briefing] gathering inputs for ${type} ${dateYmd}...`);
   const inputs = gatherBriefingInputs(db, type, dateYmd);
