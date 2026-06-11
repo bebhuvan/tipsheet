@@ -9,6 +9,8 @@
 //   SITE_URL             defaults to https://tipsheet.markets
 //   NOTIFY_SCORE_MIN     minimum score to push (default 5)
 //   TELEGRAM_DELIVERY_MODE digest | individual (default digest)
+//   TELEGRAM_STATE_FILE  JSON file tracking sent IDs outside the canonical DB
+import fs from 'node:fs';
 import { buildArticleSlug, openDb } from './db.mjs';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -19,6 +21,7 @@ const MAX_PER_RUN = 15;
 const BACKLOG_KEEP_LATEST = 20;
 const DELIVERY_MODE = (process.env.TELEGRAM_DELIVERY_MODE || 'digest').toLowerCase();
 const REQUIRE_LIVE_URL = process.env.TELEGRAM_REQUIRE_LIVE_URL !== '0';
+const STATE_FILE = process.env.TELEGRAM_STATE_FILE || '';
 
 const DEFAULT_LLM_BASE = process.env.DEEPSEEK_API_KEY
   ? 'https://api.deepseek.com'
@@ -32,6 +35,75 @@ const LLM = {
 if (!TOKEN || !CHAT) {
   console.log('[telegram] TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set — skipping');
   process.exit(0);
+}
+
+const notifyState = loadNotifyState();
+
+function loadNotifyState() {
+  if (!STATE_FILE || !fs.existsSync(STATE_FILE)) return { articles: {}, briefings: {} };
+  try {
+    const parsed = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    return {
+      articles: parsed?.articles && typeof parsed.articles === 'object' ? parsed.articles : {},
+      briefings: parsed?.briefings && typeof parsed.briefings === 'object' ? parsed.briefings : {},
+    };
+  } catch (e) {
+    console.warn(`[telegram] could not read state file ${STATE_FILE}: ${e.message}`);
+    return { articles: {}, briefings: {} };
+  }
+}
+
+function saveNotifyState() {
+  if (!STATE_FILE) return;
+  fs.writeFileSync(STATE_FILE, `${JSON.stringify(notifyState, null, 2)}\n`);
+}
+
+function rememberArticle(recordId, ts) {
+  if (!STATE_FILE) return;
+  notifyState.articles[String(recordId)] = ts;
+}
+
+function rememberBriefing(type, date, ts) {
+  if (!STATE_FILE) return;
+  notifyState.briefings[`${type}:${date}`] = ts;
+}
+
+function applyArticleState(db) {
+  if (!STATE_FILE) return;
+  const entries = Object.entries(notifyState.articles);
+  if (!entries.length) return;
+  const mark = db.prepare(`
+    UPDATE filings_enriched
+       SET notified_at = COALESCE(notified_at, ?)
+     WHERE record_id = ?
+       AND notified_at IS NULL
+  `);
+  const tx = db.transaction(() => {
+    for (const [recordId, ts] of entries) mark.run(Number(ts) || Date.now(), Number(recordId));
+  });
+  tx();
+  console.log(`[telegram] loaded ${entries.length} notified article ids from state`);
+}
+
+function applyBriefingState(db) {
+  if (!STATE_FILE) return;
+  const entries = Object.entries(notifyState.briefings);
+  if (!entries.length) return;
+  const mark = db.prepare(`
+    UPDATE briefings
+       SET notified_at = COALESCE(notified_at, ?)
+     WHERE type = ?
+       AND date = ?
+       AND notified_at IS NULL
+  `);
+  const tx = db.transaction(() => {
+    for (const [key, ts] of entries) {
+      const [type, date] = key.split(':');
+      if (type && date) mark.run(Number(ts) || Date.now(), type, date);
+    }
+  });
+  tx();
+  console.log(`[telegram] loaded ${entries.length} notified briefing ids from state`);
 }
 
 const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -247,7 +319,10 @@ async function notifyArticleDigest(db, rows, TEST) {
   if (!TEST) {
     const mark = db.prepare('UPDATE filings_enriched SET notified_at = ? WHERE record_id = ?');
     const now = Date.now();
-    for (const r of rows) mark.run(now, r.record_id);
+    for (const r of rows) {
+      mark.run(now, r.record_id);
+      rememberArticle(r.record_id, now);
+    }
   }
   console.log(`[telegram] digest sent for ${rows.length} article(s)${LLM.apiKey ? ' (AI attempted)' : ' (fallback)'}`);
 }
@@ -257,6 +332,7 @@ async function notifyArticleDigest(db, rows, TEST) {
 async function notifyBriefings(db, TEST) {
   let columnAdded = false;
   try { db.prepare('ALTER TABLE briefings ADD COLUMN notified_at INTEGER').run(); columnAdded = true; } catch { /* exists */ }
+  applyBriefingState(db);
   if (columnAdded && !TEST) {
     db.prepare(`
       UPDATE briefings
@@ -293,7 +369,11 @@ async function notifyBriefings(db, TEST) {
         continue;
       }
       await send(TEST ? `🧪 <i>Test digest</i>\n\n${text}` : text);
-      if (!TEST) mark.run(Date.now(), b.type, b.date);
+      if (!TEST) {
+        const now = Date.now();
+        mark.run(now, b.type, b.date);
+        rememberBriefing(b.type, b.date, now);
+      }
       sent++;
       await new Promise((res) => setTimeout(res, 1200));
     } catch (e) {
@@ -323,6 +403,7 @@ async function main() {
   // predates it (SQLite has no ADD COLUMN IF NOT EXISTS).
   let columnAdded = false;
   try { db.prepare('ALTER TABLE filings_enriched ADD COLUMN notified_at INTEGER').run(); columnAdded = true; } catch { /* exists */ }
+  applyArticleState(db);
 
   // First time the column appears, mark older back-catalogue as already
   // notified so we don't flood the channel, but keep the newest eligible
@@ -400,7 +481,11 @@ async function main() {
       `\n\n<a href="${escapeHtml(url)}">Read on Tipsheet →</a>`;
     try {
       await send(TEST ? `🧪 <i>Test message</i>\n\n${text}` : text);
-      if (!TEST) mark.run(Date.now(), r.record_id);
+      if (!TEST) {
+        const now = Date.now();
+        mark.run(now, r.record_id);
+        rememberArticle(r.record_id, now);
+      }
       sent++;
       await new Promise((res) => setTimeout(res, 1200)); // stay under Telegram rate limits
     } catch (e) {
@@ -411,4 +496,6 @@ async function main() {
   console.log(`[telegram] sent ${sent}/${rows.length}`);
 }
 
-main().catch((e) => { console.error('[telegram] FAIL:', e.message); process.exit(1); });
+main()
+  .then(() => saveNotifyState())
+  .catch((e) => { console.error('[telegram] FAIL:', e.message); saveNotifyState(); process.exit(1); });

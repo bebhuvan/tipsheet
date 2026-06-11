@@ -303,6 +303,43 @@ function currentIstYmd(date = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+function parseIstTimestamp(value) {
+  if (!value) return null;
+  const d = new Date(String(value).replace(' ', 'T') + '+05:30');
+  return Number.isNaN(d.valueOf()) ? null : d;
+}
+
+function briefingPublishedAt(row) {
+  if (!row?.date || !row?.type) return null;
+  const hour = row.type === 'close' ? '16:00:00' : '08:00:00';
+  return parseIstTimestamp(`${row.date} ${hour}`);
+}
+
+export function latestPublishedContentAt() {
+  const filing = db().prepare(`
+    SELECT MAX(r.created_on) AS created_on
+    FROM filings_raw r
+    JOIN filings_enriched e ON e.record_id = r.record_id
+    WHERE e.validation_ok = 1
+  `).get();
+  const briefing = hasTable('briefings')
+    ? db().prepare(`
+        SELECT type, date
+        FROM briefings
+        WHERE validation_ok = 1
+        ORDER BY date DESC, CASE type WHEN 'close' THEN 2 WHEN 'open' THEN 1 ELSE 0 END DESC
+        LIMIT 1
+      `).get()
+    : null;
+
+  const dates = [
+    parseIstTimestamp(filing?.created_on),
+    briefingPublishedAt(briefing),
+  ].filter(Boolean);
+  if (!dates.length) return null;
+  return dates.reduce((latest, d) => d > latest ? d : latest, dates[0]);
+}
+
 function compareHomepageOrder(a, b) {
   const at = String(a?.created_on || '');
   const bt = String(b?.created_on || '');

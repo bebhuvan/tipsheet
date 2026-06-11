@@ -1,0 +1,96 @@
+name: Notify Telegram
+
+# Sends Telegram notifications only after the site has been deployed. This is
+# intentionally separate from Publish Site so deploy runs do not show as
+# cancelled/incomplete while waiting for the shared DB write lock. The scheduled
+# retry catches missed sends. The notifier is idempotent via a small release
+# asset, not by publishing the canonical DB.
+on:
+  workflow_run:
+    workflows:
+      - Publish Site
+    types: [completed]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+env:
+  NODE_VERSION: '22'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tipsheet-notify
+  cancel-in-progress: false
+
+jobs:
+  notify-persist:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: pipeline/package-lock.json
+
+      - name: Restore latest canonical DB
+        run: bash .github/scripts/restore-db.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+
+      - name: Restore notification state
+        run: |
+          mkdir -p .state
+          if gh release download telegram-notify-state \
+            --pattern 'telegram-notified.json' \
+            --clobber \
+            -R "$REPO" \
+            -O .state/telegram-notified.json 2>/dev/null; then
+            echo "[telegram] restored notification state"
+          else
+            echo '{"articles":{},"briefings":{}}' > .state/telegram-notified.json
+            echo "[telegram] initialized notification state"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+
+      - name: Install pipeline deps
+        run: cd pipeline && npm ci
+
+      - name: Notify Telegram
+        run: cd pipeline && node --env-file=../.env.ci notify_telegram.mjs
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_SCOPE: all
+          TELEGRAM_STATE_FILE: ../.state/telegram-notified.json
+          SITE_URL: https://tipsheet.markets
+
+      - name: Publish notification state asset
+        if: always()
+        run: |
+          if ! gh release view telegram-notify-state -R "$REPO" >/dev/null 2>&1; then
+            gh release create telegram-notify-state -R "$REPO" \
+              --title "Telegram notification state" \
+              --notes "Mutable state used to avoid duplicate Tipsheet Telegram notifications."
+          fi
+          gh release upload telegram-notify-state .state/telegram-notified.json --clobber -R "$REPO"
+          echo "[telegram] published notification state"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+
+      - name: Alert on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          context: Notify Telegram
