@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes, filingEyebrow } from '../lib/queries.mjs';
+import { getHomepageBundle, listBriefings, listRegulation, listEconomy, listConcallNotes, listSyntheses, filingEyebrow } from '../lib/queries.mjs';
 import { BRAND_NAME, BRAND_TAGLINE } from '../lib/brand.mjs';
 
 const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalToday, totalPublished, hiScore, hiScoreToday, latestYmd } = getHomepageBundle();
@@ -10,6 +10,7 @@ const { lead, secondaries, leadCompanions, midtier, briefs, wire, dist, totalTod
 const regItems     = listRegulation({ limit: 6 });
 const econItems    = listEconomy({ limit: 5 });
 const concallNotes = listConcallNotes({ limit: 5 });
+const analyses     = listSyntheses({ limit: 5 });
 // Show every active section, ordered by editorial weight.
 const SECTION_ORDER = ['Earnings', 'Order Wins', 'M&A', 'Concalls', 'Credit', 'Regulatory', 'Capital Markets', 'Buybacks', 'Other'];
 const orderedBriefs = [...briefs].sort((a, b) => {
@@ -234,10 +235,10 @@ const schema = {
       </section>
     )}
 
-    {(regItems.length > 0 || econItems.length > 0 || concallNotes.length > 0) && (
+    {(regItems.length > 0 || econItems.length > 0 || concallNotes.length > 0 || analyses.length > 0) && (
       <section class="briefs">
         <div class="briefs-head">
-          <h2><em>Regulation · economy · concalls</em></h2>
+          <h2><em>Regulation · economy · concalls · analysis</em></h2>
           <span class="meta">SEBI · exchanges · RBI · earnings calls</span>
         </div>
         <div class="briefs-grid">
@@ -290,6 +291,23 @@ const schema = {
                 ))}
               </ol>
               <a href="/concalls/" class="brief-more">All concalls →</a>
+            </section>
+          )}
+          {analyses.length > 0 && (
+            <section class="brief">
+              <header class="brief-head"><h3>Analysis</h3><span class="ct"><span class="ct-num">{analyses.length}</span> numbers vs the call</span></header>
+              <ol class="brief-list">
+                {analyses.slice(0, 5).map((p, i) => (
+                  <li><a href={p.canonical_url} class="brief-item">
+                    <span class="bi-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                    <span class="bi-body">
+                      <span class="bi-ticker">{p.symbol}</span>
+                      <h4 class="bi-headline">{p.headline}</h4>
+                    </span>
+                  </a></li>
+                ))}
+              </ol>
+              <a href="/analysis/" class="brief-more">All analysis →</a>
             </section>
           )}
         </div>
