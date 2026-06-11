@@ -29,6 +29,25 @@ const CFG = {
   timeoutMs:   Number(process.env.LLM_TIMEOUT_MS_BRIEFING || process.env.LLM_TIMEOUT_MS || 45000),
 };
 
+const FALLBACK_CFG = {
+  baseUrl:     process.env.BRIEFING_FALLBACK_LLM_BASE_URL || process.env.LLM_FALLBACK_BASE_URL || '',
+  apiKey:      process.env.BRIEFING_FALLBACK_LLM_API_KEY  || process.env.LLM_FALLBACK_API_KEY  || '',
+  model:       process.env.BRIEFING_FALLBACK_LLM_MODEL    || process.env.LLM_FALLBACK_MODEL    || '',
+  maxTokens:   Number(process.env.BRIEFING_FALLBACK_LLM_MAX_TOKENS || process.env.LLM_MAX_TOKENS_BRIEFING || 5200),
+  temperature: Number(process.env.BRIEFING_FALLBACK_LLM_TEMPERATURE || process.env.LLM_TEMPERATURE || 1.0),
+  timeoutMs:   Number(process.env.BRIEFING_FALLBACK_LLM_TIMEOUT_MS || process.env.LLM_TIMEOUT_MS_BRIEFING || process.env.LLM_TIMEOUT_MS || 45000),
+};
+
+function hasFallbackCfg() {
+  return Boolean(FALLBACK_CFG.baseUrl && FALLBACK_CFG.apiKey && FALLBACK_CFG.model);
+}
+
+function shouldTryFallback(result) {
+  if (result?.parsed) return false;
+  const error = String(result?.error || '');
+  return error === 'timeout' || /^HTTP (429|5\d\d)\b/.test(error);
+}
+
 let _system, _user;
 async function loadPrompts() {
   if (!_system) _system = await readFile(SYSTEM_PATH, 'utf8');
@@ -324,19 +343,30 @@ export async function enrichBriefing(inputs, previousAttempt = null) {
     );
   }
 
+  let result = await callBriefingModel(CFG, messages, inputs, userMsg);
+  if (!result.ok && shouldTryFallback(result) && hasFallbackCfg()) {
+    const fallback = await callBriefingModel(FALLBACK_CFG, messages, inputs, userMsg);
+    if (fallback.parsed || fallback.ok) {
+      return { ...fallback, fallback_from: result.error || 'primary_failed' };
+    }
+  }
+  return result;
+}
+
+async function callBriefingModel(cfg, messages, inputs, userMsg) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), CFG.timeoutMs);
+  const timer = setTimeout(() => ctrl.abort(), cfg.timeoutMs);
   const t0 = Date.now();
   try {
-    const r = await fetch(`${CFG.baseUrl}/chat/completions`, {
+    const r = await fetch(`${cfg.baseUrl}/chat/completions`, {
       method: 'POST', signal: ctrl.signal,
-      headers: compatHeaders(CFG.baseUrl, CFG.apiKey),
+      headers: compatHeaders(cfg.baseUrl, cfg.apiKey),
       body: JSON.stringify({
-        model: CFG.model,
+        model: cfg.model,
         messages,
         response_format: { type: 'json_object' },
-        temperature: CFG.temperature,
-        ...tokenParam(CFG.baseUrl, CFG.maxTokens),
+        temperature: cfg.temperature,
+        ...tokenParam(cfg.baseUrl, cfg.maxTokens),
       }),
     });
     const elapsed_ms = Date.now() - t0;
@@ -363,7 +393,7 @@ export async function enrichBriefing(inputs, previousAttempt = null) {
     }
     return {
       ok: v.ok, parsed, validation: v,
-      model: CFG.model, promptVersion: BRIEFING_PROMPT_VERSION,
+      model: cfg.model, promptVersion: BRIEFING_PROMPT_VERSION,
       usage: body.usage || null, elapsed_ms,
       user_message_sent: userMsg,
     };

@@ -54,7 +54,7 @@ const FRESH_PAGE_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 const FRESH_PAGE_CDN_CACHE_CONTROL = 'no-store';
 const HTML_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 const HTML_CDN_CACHE_CONTROL = 'no-store';
-const WORKER_RELEASE = '2026-06-04-markdown-negotiation';
+const WORKER_RELEASE = '2026-06-11-markdown-cache-guard';
 const IST_OFFSET_MIN = 330;
 const BRIEFING_SCHEDULES = [
   { type: 'open', dueHour: 8, dueMinute: 0, graceEnv: 'BRIEFING_OPEN_GRACE_MIN' },
@@ -87,6 +87,16 @@ function appendVary(headers, value) {
 
 function requestWantsMarkdown(request) {
   return /\btext\/markdown\b/i.test(request.headers.get('Accept') || '');
+}
+
+// Markdown-negotiated responses must never enter a shared cache: Cloudflare's
+// CDN ignores Vary on non-image responses, so a cached markdown body under the
+// page URL would be served to HTML clients (including Googlebot). Browsers do
+// honor Vary, so private caching stays allowed.
+function forbidSharedCache(headers) {
+  headers.set('Cache-Control', 'private, max-age=300');
+  headers.set('CDN-Cache-Control', 'no-store');
+  headers.set('Cloudflare-CDN-Cache-Control', 'no-store');
 }
 
 function isHtmlResponse(headers) {
@@ -450,7 +460,7 @@ async function maybeDispatchGitHubWatchdog(env) {
   const maxStaleMin = Number(env.WATCHDOG_MAX_STALE_MIN || 45);
   if (!token || !repo || !maxStaleMin) return { skipped: 'missing-config' };
 
-  const listed = await listWorkflowRuns({ repo, workflow, branch, token });
+  const listed = await listWorkflowRuns({ repo, workflow, branch, token, perPage: 10 });
   if (!listed.ok) return { skipped: 'runs-api-failed', status: listed.status };
   const runs = listed.runs;
   if (runs.some(run => run.status === 'queued' || run.status === 'in_progress')) {
@@ -464,6 +474,23 @@ async function maybeDispatchGitHubWatchdog(env) {
   const freshness = sourceHealthAt && sourceHealthAt >= latestWorkflowSuccessAt ? 'source_health' : 'workflow_runs';
   const ageMin = latestAt ? (Date.now() - latestAt) / 60000 : Infinity;
   if (ageMin < maxStaleMin) return { skipped: 'fresh', ageMin: Math.round(ageMin), freshness };
+
+  const cooldownMin = Number(env.WATCHDOG_COOLDOWN_MIN || 30);
+  const recentAttempt = cooldownMin > 0
+    ? runs.find(run => {
+        if (!run.created_at) return false;
+        return (Date.now() - Date.parse(run.created_at)) / 60000 < cooldownMin;
+      })
+    : null;
+  if (recentAttempt) {
+    return {
+      skipped: 'cooldown',
+      run: recentAttempt.id,
+      conclusion: recentAttempt.conclusion || recentAttempt.status || null,
+      ageMin: Math.round((Date.now() - Date.parse(recentAttempt.created_at)) / 60000),
+      freshness,
+    };
+  }
 
   const dispatch = await dispatchWorkflow({
     repo,
@@ -544,6 +571,28 @@ async function maybeDispatchBriefingWatchdog(env) {
         skipped: 'waiting-for-deploy',
         run: recentSuccess.id,
         ageMin: Math.round(successAgeMin),
+        pageStatus: page.status,
+        url: page.url,
+      });
+      continue;
+    }
+
+    const cooldownMin = Number(env.BRIEFING_WATCHDOG_COOLDOWN_MIN || 30);
+    const recentAttempt = cooldownMin > 0
+      ? listed.runs.find(run => {
+          if (!run.created_at) return false;
+          const createdAt = Date.parse(run.created_at);
+          if (!Number.isFinite(createdAt) || createdAt < dueAt) return false;
+          return (Date.now() - createdAt) / 60000 < cooldownMin;
+        })
+      : null;
+    if (recentAttempt) {
+      results.push({
+        type: item.type,
+        skipped: 'cooldown',
+        run: recentAttempt.id,
+        conclusion: recentAttempt.conclusion || recentAttempt.status || null,
+        ageMin: Math.round((Date.now() - Date.parse(recentAttempt.created_at)) / 60000),
         pageStatus: page.status,
         url: page.url,
       });
@@ -765,6 +814,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.hostname === 'www.tipsheet.markets') {
+      url.hostname = 'tipsheet.markets';
+      return Response.redirect(url.toString(), 301);
+    }
+
     // Retired sections → permanent redirects (the Worker handles routing, so
     // a static _redirects file wouldn't apply here).
     if (url.pathname === '/smart-money' || url.pathname === '/smart-money/') {
@@ -831,6 +885,7 @@ export default {
       headers.set('x-markdown-tokens', '0');
       headers.delete('Content-Length');
       appendVary(headers, 'Accept');
+      forbidSharedCache(headers);
       return new Response(null, {
         status: response.status,
         statusText: response.statusText,
@@ -845,6 +900,7 @@ export default {
       headers.set('x-markdown-tokens', estimateMarkdownTokens(markdown));
       headers.delete('Content-Length');
       appendVary(headers, 'Accept');
+      forbidSharedCache(headers);
       return new Response(markdown, {
         status: response.status,
         statusText: response.statusText,
