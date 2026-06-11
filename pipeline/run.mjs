@@ -7,7 +7,7 @@
 // Run with: node --env-file=../.env run.mjs <command>
 
 import { fetchLatestFeed, flattenItem } from './poller.mjs';
-import { openDb, insertRaw, hasRecord, insertEnriched, listUnenriched, stats, upsertFundamentals, fundamentalCount, insertConcalls, concallStats, listUnenrichedConcalls, insertEnrichedConcall, insertMacroEvents, macroCalendarStats, upsertBriefing, listCompaniesNeedingTijoriSlug, setTijoriSlug, listRadarSourceRows, listRecentConcallFlags, upsertRadarItems, deactivateStaleRadarItems, listExistingRadarItems, updateSourceHealth } from './db.mjs';
+import { openDb, insertRaw, hasRecord, insertEnriched, listUnenriched, stats, upsertFundamentals, fundamentalCount, insertConcalls, concallStats, listUnenrichedConcalls, insertEnrichedConcall, insertMacroEvents, macroCalendarStats, upsertBriefing, listCompaniesNeedingTijoriSlug, setTijoriSlug, listRadarSourceRows, listRecentConcallFlags, upsertRadarItems, deactivateStaleRadarItems, listExistingRadarItems, updateSourceHealth, buildCompanyContext } from './db.mjs';
 import { enrich, PROMPT_VERSION } from './enricher.mjs';
 import { enrichConcall, CONCALL_PROMPT_VERSION } from './concalls_enricher.mjs';
 import { fetchFundamentals, flattenFundamental, resolveTijoriCompanySlug } from './fundamentals.mjs';
@@ -92,6 +92,7 @@ export async function enrichBatch(max = 50) {
         return;
       }
 
+      raw.company_context = buildCompanyContext(db, raw);
       let result = await enrich(raw);
       let retries = 0;
       
@@ -208,6 +209,7 @@ export async function enrichIds(ids = []) {
       continue;
     }
 
+    raw.company_context = buildCompanyContext(db, raw);
     let result = await enrich(raw);
     let retries = 0;
 
