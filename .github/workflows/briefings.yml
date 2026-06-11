@@ -77,13 +77,13 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.briefing == 'all' || inputs.briefing == 'open') || github.event.schedule == '30 2 * * 1-5' }}
         run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-open "$BRIEFING_DATE"
         env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: mimo-v2.5-pro
+          LLM_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          LLM_BASE_URL: https://api.deepseek.com
+          LLM_MODEL: deepseek-v4-flash
           LLM_TIMEOUT_MS_BRIEFING: 90000
-          BRIEFING_FALLBACK_LLM_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          BRIEFING_FALLBACK_LLM_BASE_URL: https://api.deepseek.com
-          BRIEFING_FALLBACK_LLM_MODEL: deepseek-v4-flash
+          BRIEFING_FALLBACK_LLM_API_KEY: ${{ secrets.MIMO_API_KEY }}
+          BRIEFING_FALLBACK_LLM_BASE_URL: https://api.xiaomimimo.com/v1
+          BRIEFING_FALLBACK_LLM_MODEL: mimo-v2.5-pro
           BRIEFING_FALLBACK_LLM_TIMEOUT_MS: 90000
           BRIEFING_DATE: ${{ github.event.inputs.date || '' }}
 
@@ -91,13 +91,13 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.briefing == 'all' || inputs.briefing == 'close') || github.event.schedule == '30 10 * * 1-5' }}
         run: cd pipeline && node --env-file=../.env.ci run.mjs briefing-close "$BRIEFING_DATE"
         env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: mimo-v2.5-pro
+          LLM_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          LLM_BASE_URL: https://api.deepseek.com
+          LLM_MODEL: deepseek-v4-flash
           LLM_TIMEOUT_MS_BRIEFING: 90000
-          BRIEFING_FALLBACK_LLM_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          BRIEFING_FALLBACK_LLM_BASE_URL: https://api.deepseek.com
-          BRIEFING_FALLBACK_LLM_MODEL: deepseek-v4-flash
+          BRIEFING_FALLBACK_LLM_API_KEY: ${{ secrets.MIMO_API_KEY }}
+          BRIEFING_FALLBACK_LLM_BASE_URL: https://api.xiaomimimo.com/v1
+          BRIEFING_FALLBACK_LLM_MODEL: mimo-v2.5-pro
           BRIEFING_FALLBACK_LLM_TIMEOUT_MS: 90000
           BRIEFING_DATE: ${{ github.event.inputs.date || '' }}
 

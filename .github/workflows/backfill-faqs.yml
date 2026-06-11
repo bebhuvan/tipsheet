@@ -47,9 +47,9 @@ jobs:
 
       - name: Backfill FAQs (FAQs-only; leaves headline/body/slug untouched)
         env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          LLM_BASE_URL: https://api.deepseek.com
+          LLM_MODEL: deepseek-v4-flash
           LIMIT: ${{ inputs.limit }}
         run: cd pipeline && node --env-file=../.env.ci backfill_faqs.mjs --limit "$LIMIT" --concurrency 5
 
