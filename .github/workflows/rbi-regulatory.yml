@@ -34,9 +34,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -61,7 +61,7 @@ jobs:
 
       - name: Setup Python (PDF extract)
         if: ${{ github.event_name == 'schedule' && (github.event.schedule == '32 2 * * 1-5' || github.event.schedule == '22 5,11 * * 6,0') || github.event_name == 'workflow_dispatch' && inputs.include_bulletin }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 

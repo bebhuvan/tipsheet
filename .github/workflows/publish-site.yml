@@ -45,9 +45,9 @@ jobs:
       group: tipsheet-deploy
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -60,7 +60,7 @@ jobs:
           REPO: ${{ github.repository }}
 
       - name: Restore + persist OG image cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: site/.og-cache
           key: og-cache-${{ github.run_id }}
@@ -80,7 +80,7 @@ jobs:
         run: cd site && npm run check:links
 
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -105,9 +105,9 @@ jobs:
       group: tipsheet-db-write
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
