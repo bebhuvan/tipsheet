@@ -311,6 +311,12 @@ function parseIstTimestamp(value) {
 
 function briefingPublishedAt(row) {
   if (!row?.date || !row?.type) return null;
+  // Prefer the real generation moment; the nominal edition hour is only a
+  // fallback for old rows. A nominal stamp can sit in the future (e.g. a Close
+  // row regenerated early), which made the masthead claim "Last updated 4:00 PM"
+  // before noon.
+  const generated = Number(row.generated_at);
+  if (Number.isFinite(generated) && generated > 0) return new Date(generated);
   const hour = row.type === 'close' ? '16:00:00' : '08:00:00';
   return parseIstTimestamp(`${row.date} ${hour}`);
 }
@@ -324,7 +330,7 @@ export function latestPublishedContentAt() {
   `).get();
   const briefing = hasTable('briefings')
     ? db().prepare(`
-        SELECT type, date
+        SELECT type, date, generated_at
         FROM briefings
         WHERE validation_ok = 1
         ORDER BY date DESC, CASE type WHEN 'close' THEN 2 WHEN 'open' THEN 1 ELSE 0 END DESC
@@ -337,7 +343,10 @@ export function latestPublishedContentAt() {
     briefingPublishedAt(briefing),
   ].filter(Boolean);
   if (!dates.length) return null;
-  return dates.reduce((latest, d) => d > latest ? d : latest, dates[0]);
+  const latest = dates.reduce((acc, d) => d > acc ? d : acc, dates[0]);
+  // Never claim an update from the future — clamp to build time.
+  const now = new Date();
+  return latest > now ? now : latest;
 }
 
 function compareHomepageOrder(a, b) {
