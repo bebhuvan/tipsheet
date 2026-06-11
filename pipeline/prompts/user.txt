@@ -15,3 +15,8 @@ ANALYST RATIONALE (additional context from the upstream scoring analyst — may 
 """
 {rationale}
 """
+
+COMPANY CONTEXT (verified data from our own database: fundamentals, the latest reported quarter, and our prior coverage of this company. Use it to ground judgments of scale and trend — how big this event is relative to the company's revenue or market cap, whether it extends or reverses something we already covered. Cite these numbers where they sharpen the read; ignore them where irrelevant. When prior coverage is directly relevant, you may reference it ("the second large order this quarter") — but never manufacture a pattern that isn't there. The blocks cover different periods (trailing screener data, a specific quarter, dated prior coverage) — attribute each figure to its own period and never blend figures from different periods into a single claim. Numbers from any source other than these three blocks are forbidden):
+"""
+{company_context}
+"""

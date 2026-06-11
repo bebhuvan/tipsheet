@@ -410,6 +410,104 @@ export function getFundamental(db, symbol) {
   return db.prepare('SELECT * FROM fundamentals WHERE symbol = ?').get(symbol);
 }
 
+// ─── company context for the enricher ───────────────────────────────
+// Compact, verified facts from our own DB injected into the enrichment prompt
+// so the model can ground scale/trend judgments (e.g. order size vs revenue,
+// "second downgrade this quarter") instead of writing from the Tijori
+// rationale alone. Plain text; every number here is also added to the
+// number-fidelity source fingerprint in enricher.mjs.
+
+function _fmtCrPlain(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  const sign = v < 0 ? '−' : '';
+  return `${sign}₹${Math.abs(Math.round(v)).toLocaleString('en-IN')} cr`;
+}
+
+function _latestQuarterLine(payloadJson) {
+  let p;
+  try { p = JSON.parse(payloadJson); } catch { return null; }
+  const st = p?.statements?.qt_c || p?.statements?.qt_s;
+  if (!st || !Array.isArray(st.metrics)) return null;
+  const pick = (names, exclude = []) => {
+    const lnames = names.map(s => s.toLowerCase());
+    const lex = exclude.map(s => s.toLowerCase());
+    for (const m of st.metrics) {
+      const n = String(m.metric_name || '').toLowerCase();
+      if (lex.some(x => n.includes(x))) continue;
+      if (!lnames.includes(n)) continue;
+      const vals = (m.values || []).filter(v => Number.isFinite(Number(v.value)));
+      if (vals.length) return vals[vals.length - 1];
+    }
+    return null;
+  };
+  const sales = pick(['net sales', 'sales', 'revenue', 'total income']);
+  const np = pick(['net profit'], ['margin', 'sale of']);
+  const opm = pick(['opm (%)', 'opm%', 'opm']);
+  if (!sales && !np) return null;
+  const parts = [];
+  if (sales) parts.push(`sales ${_fmtCrPlain(sales.value)}`);
+  if (np) parts.push(`net profit ${_fmtCrPlain(np.value)}`);
+  if (opm) parts.push(`operating margin ${Number(opm.value).toFixed(1)}%`);
+  const period = sales?.period || np?.period || '';
+  return `- Latest reported quarter${period ? ` (${period})` : ''}: ${parts.join(', ')}`;
+}
+
+export function buildCompanyContext(db, raw) {
+  const symbol = raw?.symbol;
+  if (!symbol) return '';
+  const lines = [];
+
+  let f = null;
+  try { f = getFundamental(db, symbol); } catch {}
+  if (f) {
+    const head = [];
+    if (f.sector) head.push(`Sector: ${f.sector}`);
+    if (f.market_cap != null) head.push(`Market cap: ${_fmtCrPlain(f.market_cap)}`);
+    if (head.length) lines.push(`- ${head.join(' · ')}`);
+    // Exactly-zero ROE/growth almost always means "not available" upstream, not
+    // a real zero — omit rather than let the model assert it. Debt/equity 0 is real.
+    // "Trailing" labels keep the model from blending these screener figures with
+    // period-specific numbers from the filing or prior coverage.
+    const ratios = [];
+    if (f.pe != null && Number(f.pe) !== 0) ratios.push(`P/E ${Number(f.pe).toFixed(1)}`);
+    if (f.roe != null && Number(f.roe) !== 0) ratios.push(`ROE ${Number(f.roe).toFixed(1)}%`);
+    if (f.debt_to_equity != null) ratios.push(`debt/equity ${Number(f.debt_to_equity).toFixed(2)}`);
+    if (ratios.length) lines.push(`- Trailing ratios: ${ratios.join(' · ')}`);
+    const growth = [];
+    if (f.revenue_growth != null && Number(f.revenue_growth) !== 0) growth.push(`revenue ${Number(f.revenue_growth).toFixed(1)}%`);
+    if (f.pat_growth != null && Number(f.pat_growth) !== 0) growth.push(`PAT ${Number(f.pat_growth).toFixed(1)}%`);
+    if (growth.length) lines.push(`- Trailing growth (screener basis — period may differ from the filing's): ${growth.join(' · ')}`);
+  }
+
+  try {
+    const w = db.prepare('SELECT payload_json FROM tijori_widgets WHERE symbol = ?').get(symbol);
+    const q = w ? _latestQuarterLine(w.payload_json) : null;
+    if (q) lines.push(q);
+  } catch {}
+
+  try {
+    const prior = db.prepare(`
+      SELECT e.headline, substr(r.created_on, 1, 10) AS d,
+             e.the_number_value AS v, e.the_number_label AS l
+      FROM filings_enriched e
+      JOIN filings_raw r ON r.record_id = e.record_id
+      WHERE r.symbol = ? AND e.validation_ok = 1 AND e.record_id != ?
+      ORDER BY r.created_on DESC
+      LIMIT 3
+    `).all(symbol, raw.record_id ?? -1);
+    if (prior.length) {
+      lines.push(`- Our prior coverage of ${symbol}:`);
+      for (const p of prior) {
+        const num = p.v ? ` (${p.v}${p.l ? ` ${p.l}` : ''})` : '';
+        lines.push(`  - ${p.d}: "${p.headline}"${num}`);
+      }
+    }
+  } catch {}
+
+  return lines.join('\n');
+}
+
 export function listCompaniesNeedingTijoriSlug(db, limit = 100) {
   return db.prepare(`
     SELECT r.symbol, MAX(r.company) AS company

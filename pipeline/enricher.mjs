@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SYSTEM_PROMPT_PATH = resolve(__dirname, 'prompts/system.txt');
 const USER_PROMPT_PATH   = resolve(__dirname, 'prompts/user.txt');
 // v5 = v4 + explicit source-block fidelity for expanded Tijori news summaries.
-export const PROMPT_VERSION = 'filing-note.v5';
+export const PROMPT_VERSION = 'filing-note.v6'; // v6: verified company-context block (fundamentals, latest quarter, prior coverage)
 
 // Defaults tuned for Gemini 3.1 Flash Lite (the 22-May-2026 bakeoff winner):
 //   - temperature: 1.0 per Google's explicit Gemini-3 guidance — "Changing the temperature
@@ -43,6 +43,7 @@ const CFG = {
 const SOURCE_LIMITS = {
   newsSummary: Number(process.env.LLM_NEWS_SUMMARY_CHAR_BUDGET || 20000),
   rationale:   Number(process.env.LLM_RATIONALE_CHAR_BUDGET || 8000),
+  context:     Number(process.env.LLM_COMPANY_CONTEXT_CHAR_BUDGET || 2000),
 };
 
 let _systemPrompt, _userTemplate;
@@ -119,6 +120,7 @@ function buildUserMessage(template, raw) {
   // scoring-system meta-commentary the model should ignore.
   const newsSummary = packSourceBlock(raw.news_summary, SOURCE_LIMITS.newsSummary, 'NEWS SUMMARY');
   const rationale = packSourceBlock(raw.rationale, SOURCE_LIMITS.rationale, 'ANALYST RATIONALE');
+  const companyContext = packSourceBlock(raw.company_context, SOURCE_LIMITS.context, 'COMPANY CONTEXT');
 
   let metadata = [];
   if (raw.major_order) metadata.push(`- Major Order Size: ${raw.major_order_size || 'Not specified'}`);
@@ -135,7 +137,8 @@ function buildUserMessage(template, raw) {
     .replace('{score}',          String(raw.score ?? '?'))
     .replace('{metadata}',       metaString)
     .replace('{news_summary}',   newsSummary || '(no news summary provided — use analyst rationale only)')
-    .replace('{rationale}',      rationale || '(no analyst rationale)');
+    .replace('{rationale}',      rationale || '(no analyst rationale)')
+    .replace('{company_context}', companyContext || '(no company context available)');
 }
 
 const responseSchema = {
@@ -400,8 +403,10 @@ function validate(parsed, raw) {
   }
   if (structural.length) issues.push(`structural:${structural.map(s => s.name).join('|')}`);
 
-  // Layer 3 — number fidelity (source is now news_summary + rationale + identity)
-  const src = (raw.news_summary || '') + ' ' + (raw.rationale || '') + ' ' + (raw.company || '') + ' ' + (raw.symbol || '');
+  // Layer 3 — number fidelity (source is news_summary + rationale + identity +
+  // the verified company-context block — numbers grounded in our own DB are
+  // legitimate, not fabrications)
+  const src = (raw.news_summary || '') + ' ' + (raw.rationale || '') + ' ' + (raw.company_context || '') + ' ' + (raw.company || '') + ' ' + (raw.symbol || '');
   const srcNums = sourceFingerprint(src);
   const outNums = numberFingerprint(proseText + ' ' + (parsed.the_number?.value || '') + ' ' + (parsed.the_number?.label || ''));
   const srcNumArr = [...srcNums];
