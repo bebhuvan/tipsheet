@@ -21,6 +21,25 @@ import { pathToFileURL } from 'node:url';
 const SCORE_MIN = Number(process.env.SCORE_MIN || 5);
 const PARALLEL  = Number(process.env.PARALLEL  || 4);
 
+function hasTickerSymbol(raw) {
+  return typeof raw?.symbol === 'string' && raw.symbol.trim().length > 0;
+}
+
+function insertMissingSymbolFailure(db, raw) {
+  insertEnriched(db, {
+    record_id:           raw.record_id,
+    headline:            null, dek: null,
+    the_number_value:    null, the_number_label: null,
+    whats_new:           null, why_it_matters: null, what_were_watching: null, faqs: null, the_full_read: null,
+    editorial_tone:      null, tone_score: null, tone_confidence: null, tone_reason: null,
+    canonical_category:  null, sector: null, key_entities: null,
+    model_used:          '',
+    prompt_version:      PROMPT_VERSION,
+    validation_ok:       0,
+    validation_issues:   JSON.stringify(['missing_symbol']),
+  });
+}
+
 export async function poll() {
   const startedAt = Date.now();
   console.log('[poll] fetching tijori feed...');
@@ -66,6 +85,13 @@ export async function enrichBatch(max = 50) {
   for (let i = 0; i < pending.length; i += PARALLEL) {
     const batch = pending.slice(i, i + PARALLEL);
     await Promise.all(batch.map(async (raw) => {
+      if (!hasTickerSymbol(raw)) {
+        fail++;
+        insertMissingSymbolFailure(db, raw);
+        console.log(`  ✗ ${(raw.symbol || '?').padEnd(12)} ?ms  missing_symbol`);
+        return;
+      }
+
       let result = await enrich(raw);
       let retries = 0;
       
@@ -175,6 +201,13 @@ export async function enrichIds(ids = []) {
 
   let ok = 0, fail = 0, totalIn = 0, totalOut = 0;
   for (const raw of pending) {
+    if (!hasTickerSymbol(raw)) {
+      fail++;
+      insertMissingSymbolFailure(db, raw);
+      console.log(`  ✗ ${String(raw.record_id).padEnd(8)} ${(raw.symbol || '?').padEnd(12)} ?ms  missing_symbol`);
+      continue;
+    }
+
     let result = await enrich(raw);
     let retries = 0;
 

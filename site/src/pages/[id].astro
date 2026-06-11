@@ -2,8 +2,9 @@
 import Base from '../layouts/Base.astro';
 import Masthead from '../components/Masthead.astro';
 import SiteFooter from '../components/SiteFooter.astro';
-import { listAllForStaticPaths, getFiling, priorFilingsForSymbol, recordIdFromSlug, sourceLinks, getFundamentals, getFundamentalContext, tierFor, filingsCountForSymbol, tijoriCompanyUrl } from '../lib/queries.mjs';
+import { listAllForStaticPaths, getFiling, priorFilingsForSymbol, recordIdFromSlug, sourceLinks, getFundamentals, getFundamentalContext, tierFor, filingsCountForSymbol, tijoriCompanyUrl, getTijoriWidget } from '../lib/queries.mjs';
 import { renderInline, renderProse } from '../lib/prose.mjs';
+import { renderSnapshotHTML } from '../lib/snapshot.mjs';
 import { BRAND_NAME, EDITORIAL_BYLINE, EDITORIAL_BYLINE_SLUG } from '../lib/brand.mjs';
 import '../styles/snapshot.css';
 
@@ -35,6 +36,12 @@ const primarySourceUrls = [sources.bse_announcements, sources.nse_announcements]
 const fund = getFundamentals(filing.symbol);
 const fundContext = fund?.sector ? getFundamentalContext(filing.symbol, fund.sector) : null;
 const tijoriUrl = tijoriCompanyUrl({ tijori_slug: fund?.tijori_slug });
+
+// Snapshot box, prerendered at build time so the financial data is in the
+// static HTML (crawlers see it without JS). The client script below only
+// fetches /api/widget as a fallback when no payload existed at build.
+const widget = getTijoriWidget(filing.symbol);
+const snapshotHTML = widget?.payload ? renderSnapshotHTML(widget.payload, filing.symbol, tijoriUrl) : '';
 
 function fmtCr(n) {
   if (n == null) return '—';
@@ -201,6 +208,9 @@ const schema = {
     height: 630,
   }],
   author: [{ '@type': 'Organization', '@id': PERSON_ID, name: EDITORIAL_BYLINE, url: AUTHOR_URL }],
+  // Accountable human reviewer — resolves to the founder Person node declared
+  // in the sitewide Organization schema (named on /about/).
+  editor: { '@type': 'Person', '@id': (Astro.site?.toString() || '') + 'about/#bhuvan', name: 'Bhuvan' },
   publisher: {
     '@type': 'NewsMediaOrganization',
     '@id': ORG_ID,
@@ -438,7 +448,9 @@ const schemaOutput = [schema, breadcrumbSchema, ...(faqSchema ? [faqSchema] : []
         </div>
       </div>
 
-      <div id="snapshot-mount" data-symbol={filing.symbol} data-tijori-url={tijoriUrl || ''} aria-live="polite" hidden></div>
+      {snapshotHTML
+        ? <div id="snapshot-mount" data-symbol={filing.symbol} data-tijori-url={tijoriUrl || ''} data-prerendered="1" aria-live="polite" set:html={snapshotHTML}></div>
+        : <div id="snapshot-mount" data-symbol={filing.symbol} data-tijori-url={tijoriUrl || ''} aria-live="polite" hidden></div>}
 
       {prior.length > 0 && (
         <section class="story-so-far" aria-label={`Earlier coverage of ${filing.company || filing.symbol}`}>
@@ -471,7 +483,7 @@ const schemaOutput = [schema, breadcrumbSchema, ...(faqSchema ? [faqSchema] : []
         // with createContextualFragment (no script execution) rather than
         // assigning markup directly.
         const root = document.getElementById('snapshot-mount');
-        if (root && root.dataset.symbol) {
+        if (root && root.dataset.symbol && !root.dataset.prerendered) {
           const symbol = root.dataset.symbol;
           const tijoriUrl = root.dataset.tijoriUrl || null;
           fetch('/api/widget/' + encodeURIComponent(symbol))

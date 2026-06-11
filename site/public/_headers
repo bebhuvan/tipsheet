@@ -41,6 +41,22 @@
 /sitemap-news.xml
   Cache-Control: public, max-age=1800
 
+/openapi.json
+  Content-Type: application/vnd.oai.openapi+json;version=3.1; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/.well-known/api-catalog
+  Content-Type: application/linkset+json; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/.well-known/agent-skills/index.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/.well-known/agent-skills/tipsheet/SKILL.md
+  Content-Type: text/markdown; charset=utf-8
+  Cache-Control: public, max-age=3600
+
 # Plain-text discovery files. Pin charset so non-ASCII (em-dashes, currency
 # glyphs) can't render as mojibake under X-Content-Type-Options: nosniff.
 /llms.txt
