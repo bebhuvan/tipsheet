@@ -10,6 +10,8 @@ interface Props {
   schema?: object | null;
   publishedTime?: string;
   modifiedTime?: string;
+  rssFeed?: { href: string; title: string };
+  noindex?: boolean;
 }
 
 const {
@@ -20,6 +22,8 @@ const {
   schema = null,
   publishedTime,
   modifiedTime,
+  rssFeed,
+  noindex = false,
 } = Astro.props;
 
 // Auto-append brand name to the title unless the title already contains it.
@@ -66,6 +70,20 @@ const orgSchema = {
   // Verified external identities — see BRAND_SAMEAS in lib/brand.mjs. Add the
   // Wikidata Q-id + social profiles there as they go live.
   sameAs: BRAND_SAMEAS,
+  // The accountable human behind the publication (named on /about/). YMYL
+  // rater guidance keys on "who is responsible"; this makes the answer
+  // machine-readable without changing the org byline on articles.
+  founder: {
+    '@type': 'Person',
+    '@id': (Astro.site?.toString() || '') + 'about/#bhuvan',
+    name: 'Bhuvan',
+    url: 'https://bebhuvan.com/',
+    sameAs: [
+      'https://bhuvan.substack.com/',
+      'https://twitter.com/bebhuvan',
+      'https://www.linkedin.com/in/bebhuvan/',
+    ],
+  },
 };
 ---
 <!doctype html>
@@ -86,6 +104,7 @@ const orgSchema = {
        LLM-friendly structured access. -->
   <link rel="alternate" type="application/rss+xml" title="Tipsheet — RSS" href={new URL('/feed.xml', Astro.site).toString()} />
   <link rel="alternate" type="application/feed+json" title="Tipsheet — JSON Feed" href={new URL('/feed.json', Astro.site).toString()} />
+  {rssFeed && <link rel="alternate" type="application/rss+xml" title={rssFeed.title} href={new URL(rssFeed.href, Astro.site).toString()} />}
   <link rel="describedby" type="text/plain" title="Tipsheet guide for LLMs" href={new URL('/llms.txt', Astro.site).toString()} />
   <link rel="api-catalog" type="application/linkset+json" title="Tipsheet API catalog" href={new URL('/.well-known/api-catalog', Astro.site).toString()} />
   <link rel="agent-skills" type="application/json" title="Tipsheet Agent Skills" href={new URL('/.well-known/agent-skills/index.json', Astro.site).toString()} />
@@ -104,7 +123,7 @@ const orgSchema = {
 
   <!-- Discover gate per Google's image-preview policy (300% Discover-traffic uplift in
        documented case studies). Opts the site into large-image previews in Search + Discover. -->
-  <meta name="robots" content="max-image-preview:large" />
+  <meta name="robots" content={noindex ? 'noindex, max-image-preview:large' : 'max-image-preview:large'} />
 
   <!-- Security policy via meta tags (HTTP headers set separately in Cloudflare Dashboard).
        CSP: restricts scripts to self + CF Insights, blocks framing, locks base/form targets. -->

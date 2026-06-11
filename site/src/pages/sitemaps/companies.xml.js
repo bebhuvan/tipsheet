@@ -1,4 +1,4 @@
-import { distinctSymbolsWithFilings, listAllCompanies } from '../../lib/queries.mjs';
+import { distinctSymbolsWithFilings, listAllCompanies, companyPageIsStub } from '../../lib/queries.mjs';
 import { urlset, xmlResponse } from '../../lib/sitemap.mjs';
 
 export async function GET({ site }) {
@@ -10,7 +10,9 @@ export async function GET({ site }) {
       .filter(c => c.latest)
       .map(c => [String(c.symbol).toUpperCase(), String(c.latest).replace(' ', 'T') + '+05:30'])
   );
-  const urls = distinctSymbolsWithFilings().map(s => ({
+  // Stub pages (see companyPageIsStub) are noindexed, so the sitemap must not
+  // nominate them — a sitemap that contradicts robots meta erodes trust.
+  const urls = distinctSymbolsWithFilings().filter(s => !companyPageIsStub(s.symbol)).map(s => ({
     loc: new URL(`/company/${encodeURIComponent(String(s.symbol).toLowerCase())}/`, siteUrl).toString(),
     lastmod: latestBySymbol.get(String(s.symbol).toUpperCase()),
     changefreq: 'daily',

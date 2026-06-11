@@ -18,7 +18,10 @@ function cdata(value) {
 
 export async function GET({ site }) {
   const siteUrl = site?.toString().replace(/\/$/, '') || 'https://tipsheet.markets';
-  const all = listFilings({ limit: 1000 });
+  // Alerts and Stories only (score ≥ 7): news surfaces judge the publication
+  // by what we nominate here, so we put the strongest tier forward. Updates
+  // remain in the regular sitemap and fully indexable.
+  const all = listFilings({ limit: 1000, scoreMin: 7 });
   const cutoff = Date.now() - 48 * 60 * 60 * 1000;
   const recent = all.filter(f => {
     const t = new Date(String(f.created_on).replace(' ', 'T')).valueOf();

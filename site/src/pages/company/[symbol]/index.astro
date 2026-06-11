@@ -2,7 +2,9 @@
 import Base from '../../../layouts/Base.astro';
 import Masthead from '../../../components/Masthead.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
-import { distinctSymbolsWithFilings, filingsForCompany, getFundamentals, sectorSlug, tierFor, tijoriCompanyUrl, filingEyebrow } from '../../../lib/queries.mjs';
+import { distinctSymbolsWithFilings, filingsForCompany, getFundamentals, sectorSlug, tierFor, tijoriCompanyUrl, filingEyebrow, getTijoriWidget, companyPageIsStub } from '../../../lib/queries.mjs';
+import { renderSnapshotHTML } from '../../../lib/snapshot.mjs';
+import '../../../styles/snapshot.css';
 
 export async function getStaticPaths() {
   const symbols = distinctSymbolsWithFilings();
@@ -16,6 +18,13 @@ const filings = filingsForCompany(SYMBOL, 100);
 const fund = getFundamentals(SYMBOL);
 const tijoriUrl = tijoriCompanyUrl(fund);
 const companyName = filings[0]?.company || fund?.symbol || SYMBOL;
+
+// Quarterly snapshot prerendered into the static HTML (crawlers see the data
+// without JS). Pages with <2 notes and no snapshot are noindexed as stubs —
+// see companyPageIsStub in queries.mjs.
+const widget = getTijoriWidget(SYMBOL);
+const snapshotHTML = widget?.payload ? renderSnapshotHTML(widget.payload, SYMBOL, tijoriUrl) : '';
+const isStub = companyPageIsStub(SYMBOL);
 
 if (filings.length === 0 && !fund) return Astro.redirect('/404');
 
@@ -102,6 +111,8 @@ const schemaOutput = [schema, breadcrumbSchema, timelineSchema];
   title={`${companyName} (${SYMBOL}) — notes timeline`}
   description={`Every note published about ${companyName}, newest first. Editorial reads on exchange filings with fundamentals snapshot from primary sources.`}
   schema={schemaOutput}
+  rssFeed={{ href: `/company/${symbol}/feed.xml`, title: `${companyName} (${SYMBOL}) — Tipsheet RSS` }}
+  noindex={isStub}
 >
   <Masthead activeNav="filings" />
 
@@ -140,6 +151,10 @@ const schemaOutput = [schema, breadcrumbSchema, timelineSchema];
       </header>
 
       <hr class="rule" />
+
+      {snapshotHTML && (
+        <section class="company-snapshot-block" aria-label={`Quarterly financials for ${companyName}`} set:html={snapshotHTML} />
+      )}
 
       <section class="company-timeline">
         <h2 class="timeline-title">The timeline — {filings.length} {filings.length === 1 ? 'note' : 'notes'} on {companyName}</h2>

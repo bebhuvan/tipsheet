@@ -165,7 +165,7 @@ export function renderSnapshotHTML(widget, symbol, tijoriUrl) {
   html += '</div>';
 
   html += '<footer class="cs-foot">'
-    + '<span class="cs-asof">Financials via Tijori, loaded after the article — a research aid, not investment advice.</span>';
+    + '<span class="cs-asof">Financials via Tijori — a research aid, not investment advice.</span>';
   if (tijoriUrl) html += `<a href="${esc(tijoriUrl)}" target="_blank" rel="noopener" class="cs-tijori">${sym} on Tijori</a>`;
   html += '</footer></section>';
 

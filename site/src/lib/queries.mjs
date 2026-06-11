@@ -498,6 +498,17 @@ export function distinctSymbolsWithFilings() {
   `).all();
 }
 
+// A company page is a "stub" when it has fewer than 2 published notes and no
+// Tijori snapshot payload giving it unique data. Stubs stay live for readers
+// (URLs never change) but are noindexed and left out of the companies sitemap
+// until they earn a second note or a data payload — scaled thin entity pages
+// are what Google's scaled-content policy targets on YMYL sites.
+export function companyPageIsStub(symbol) {
+  const SYMBOL = String(symbol || '').toUpperCase();
+  if (filingsCountForSymbol(SYMBOL) >= 2) return false;
+  return !getTijoriWidget(SYMBOL)?.payload;
+}
+
 /** Companies with filings + counts, joined with fundamentals for sector and market cap. */
 export function listAllCompanies() {
   return db().prepare(`
