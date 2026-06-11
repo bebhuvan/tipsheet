@@ -75,9 +75,9 @@ jobs:
       - name: Enrich + persist circulars
         run: cd pipeline && node --env-file=../.env.ci circulars_enricher.mjs run 30
         env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          LLM_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          LLM_BASE_URL: https://api.deepseek.com
+          LLM_MODEL: deepseek-v4-flash
         continue-on-error: true
 
       - name: Enrich + persist RBI

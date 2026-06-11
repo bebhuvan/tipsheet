@@ -332,7 +332,11 @@ const _upsertBriefing = (db) => db.prepare(`
     prompt_version = excluded.prompt_version,
     validation_ok = excluded.validation_ok,
     validation_issues = excluded.validation_issues
+  WHERE NOT (briefings.validation_ok = 1 AND excluded.validation_ok = 0)
 `);
+// The WHERE guard: a failed generation must never un-publish an existing valid
+// briefing (2026-06-11: an invalid Close overwrote the published row and the
+// page 404'd until the next successful run).
 export function upsertBriefing(db, row) {
   return _upsertBriefing(db).run({ generated_at: Date.now(), ...row });
 }
