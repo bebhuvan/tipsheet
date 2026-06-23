@@ -45,7 +45,10 @@ function hasFallbackCfg() {
 function shouldTryFallback(result) {
   if (result?.parsed) return false;
   const error = String(result?.error || '');
-  return error === 'timeout' || /^HTTP (429|5\d\d)\b/.test(error);
+  return error === 'timeout'
+    || error === 'no_json'
+    || error === 'json_parse'
+    || /^HTTP (429|5\d\d)\b/.test(error);
 }
 
 let _system, _user;
@@ -471,14 +474,15 @@ function validate(parsed, inputs) {
   if (inputs.top_filings.length >= 6 && dayMap.length < 3) issues.push('day_map_too_thin');
 
   // Collect all prose into one blob for the banned/structural validators.
-  const prose = [
+  const proseSegments = [
     parsed?.headline, parsed?.dek, parsed?.the_take,
     ...dayMap,
     ...(events || []).map(e => e?.prose),
     ...mgmt.map(m => m?.prose),
     ...concalls.map(c => c?.prose),
     ...calendar,
-  ].filter(Boolean).join(' ');
+  ].filter(Boolean);
+  const prose = proseSegments.join(' ');
 
   const banned = [];
   for (const pat of PHRASE_PATTERNS) {
@@ -490,7 +494,15 @@ function validate(parsed, inputs) {
   const structural = [];
   for (const rule of STRUCTURAL_RULES) {
     const hit = rule(prose, { full_read: prose });  // briefings have no the_full_read; pass whole prose
-    if (hit && hit.name !== 'monotone_sentence_lengths') structural.push(hit);
+    if (!hit || hit.name === 'monotone_sentence_lengths') continue;
+    if (hit.name === 'magnitude_mismatch') {
+      const segmentHit = proseSegments
+        .map(segment => rule(segment, { full_read: segment }))
+        .find(segmentHit => segmentHit?.name === 'magnitude_mismatch');
+      if (segmentHit) structural.push(segmentHit);
+      continue;
+    }
+    structural.push(hit);
   }
   if (structural.length) issues.push(`structural:${structural.map(s => s.name).join('|')}`);
 
