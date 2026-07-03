@@ -382,10 +382,10 @@ async function callBriefingModel(cfg, messages, inputs, userMsg) {
     try { parsed = JSON.parse(json); }
     catch (e) { return { ok: false, error: 'json_parse', raw_error: e.message, elapsed_ms }; }
 
-    let v = validate(parsed, inputs);
+    let v = validateBriefing(parsed, inputs);
     if (!v.ok && v.issues.some(i => i.startsWith('banned:') || i.startsWith('structural:'))) {
       const repaired = repairBriefingValue(parsed);
-      const repairedValidation = validate(repaired, inputs);
+      const repairedValidation = validateBriefing(repaired, inputs);
       if (repairedValidation.ok || repairedValidation.issues.length <= v.issues.length) {
         parsed = repaired;
         v = repairedValidation;
@@ -438,7 +438,7 @@ function buildFeedbackMessage(validation) {
   return lines.join('\n');
 }
 
-function validate(parsed, inputs) {
+export function validateBriefing(parsed, inputs) {
   const issues = [];
   if (typeof parsed?.headline !== 'string' || parsed.headline.length === 0) issues.push('headline_missing');
   else if (parsed.headline.length > 100) issues.push(`headline_too_long:${parsed.headline.length}`);
@@ -453,9 +453,15 @@ function validate(parsed, inputs) {
   const mgmt = Array.isArray(parsed?.mgmt_flags) ? parsed.mgmt_flags : [];
   const calendar = Array.isArray(parsed?.calendar) ? parsed.calendar : [];
   const eventIssues = [];
+  const requiresFilingEvents = inputs.top_filings.length > 0;
   if (!events || events.length === 0) {
-    issues.push('events_empty');
-    eventIssues.push('No events array. Produce 6-10 events, each tied to a filing_id.');
+    if (requiresFilingEvents) {
+      issues.push('events_empty');
+      eventIssues.push('No events array. Produce 6-10 events, each tied to a filing_id.');
+    }
+  } else if (!requiresFilingEvents) {
+    issues.push('events_without_filings');
+    eventIssues.push('No filing events are available. Keep events empty and use calendar, concalls or mgmt_flags instead.');
   } else {
     const validIds = new Set(inputs.top_filings.map(f => Number(f.record_id)));
     let badId = 0, thin = 0;

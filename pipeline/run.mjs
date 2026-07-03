@@ -6,8 +6,8 @@
 //
 // Run with: node --env-file=../.env run.mjs <command>
 
-import { fetchLatestFeed, flattenItem } from './poller.mjs';
-import { openDb, insertRaw, hasRecord, insertEnriched, listUnenriched, stats, upsertFundamentals, fundamentalCount, insertConcalls, concallStats, listUnenrichedConcalls, insertEnrichedConcall, insertMacroEvents, macroCalendarStats, upsertBriefing, listCompaniesNeedingTijoriSlug, setTijoriSlug, listRadarSourceRows, listRecentConcallFlags, upsertRadarItems, deactivateStaleRadarItems, listExistingRadarItems, updateSourceHealth, buildCompanyContext } from './db.mjs';
+import { fetchLatestFeed, flattenItem, TijoriFeedError } from './poller.mjs';
+import { openDb, insertRaw, hasRecord, latestRawCreatedOn, insertEnriched, listUnenriched, stats, upsertFundamentals, fundamentalCount, insertConcalls, concallStats, listUnenrichedConcalls, insertEnrichedConcall, insertMacroEvents, macroCalendarStats, upsertBriefing, listCompaniesNeedingTijoriSlug, setTijoriSlug, listRadarSourceRows, listRecentConcallFlags, upsertRadarItems, deactivateStaleRadarItems, listExistingRadarItems, updateSourceHealth, buildCompanyContext } from './db.mjs';
 import { enrich, PROMPT_VERSION } from './enricher.mjs';
 import { enrichConcall, CONCALL_PROMPT_VERSION } from './concalls_enricher.mjs';
 import { fetchFundamentals, flattenFundamental, resolveTijoriCompanySlug } from './fundamentals.mjs';
@@ -20,6 +20,41 @@ import { pathToFileURL } from 'node:url';
 
 const SCORE_MIN = Number(process.env.SCORE_MIN || 5);
 const PARALLEL  = Number(process.env.PARALLEL  || 4);
+const TIJORI_FEED_MAX_LOOKBACK_DAYS = Number(process.env.TIJORI_FEED_MAX_LOOKBACK_DAYS || 5);
+const TIJORI_FEED_OVERLAP_HOURS = Number(process.env.TIJORI_FEED_OVERLAP_HOURS || 6);
+
+function parseTijoriTimestamp(ts) {
+  if (!ts || typeof ts !== 'string') return null;
+  const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m.map(Number);
+  return new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+}
+
+function formatTijoriTimestamp(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return [
+    date.getUTCFullYear(),
+    pad(date.getUTCMonth() + 1),
+    pad(date.getUTCDate()),
+  ].join('-') + ' ' + [
+    pad(date.getUTCHours()),
+    pad(date.getUTCMinutes()),
+    pad(date.getUTCSeconds()),
+  ].join(':');
+}
+
+function boundedTijoriSince(db, now = new Date()) {
+  const cutoff = new Date(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() - TIJORI_FEED_MAX_LOOKBACK_DAYS);
+  cutoff.setUTCHours(0, 0, 0, 0);
+
+  const latest = parseTijoriTimestamp(latestRawCreatedOn(db));
+  if (!latest || latest < cutoff) return formatTijoriTimestamp(cutoff);
+
+  const withOverlap = new Date(latest.getTime() - TIJORI_FEED_OVERLAP_HOURS * 60 * 60 * 1000);
+  return formatTijoriTimestamp(withOverlap > cutoff ? withOverlap : cutoff);
+}
 
 function hasTickerSymbol(raw) {
   return typeof raw?.symbol === 'string' && raw.symbol.trim().length > 0;
@@ -42,11 +77,27 @@ function insertMissingSymbolFailure(db, raw) {
 
 export async function poll() {
   const startedAt = Date.now();
-  console.log('[poll] fetching tijori feed...');
-  const items = await fetchLatestFeed();
+  const db = openDb();
+  const since = boundedTijoriSince(db);
+  console.log(`[poll] fetching tijori feed since ${since}...`);
+  let items;
+  try {
+    items = await fetchLatestFeed({ since });
+  } catch (e) {
+    if (!(e instanceof TijoriFeedError) || !e.transient) throw e;
+    console.warn(`[poll] transient Tijori feed failure; continuing with no new filings: ${e.message}`);
+    updateSourceHealth(db, 'filings', {
+      status: 'failure',
+      startedAt,
+      inserted: 0,
+      items: 0,
+      error: e.message,
+      meta: { status: e.status || null, transient: true },
+    });
+    return { inserted: 0, skipped_invalid: 0, skipped_dup: 0, feed_unavailable: true };
+  }
   console.log(`[poll] received ${items.length} items`);
 
-  const db = openDb();
   // Always store all valid items in filings_raw — the score filter is applied at
   // enrich-time, not poll-time. This preserves history if we ever want to lower the
   // SCORE_MIN threshold and re-process older filings.

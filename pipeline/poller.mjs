@@ -21,6 +21,17 @@ const DEFAULT_RETRIES    = 3;
 const BACKOFF_BASE_MS    = 500;
 const BACKOFF_FACTOR     = 4;
 
+export class TijoriFeedError extends Error {
+  constructor(message, { status = 0, body = null, error = null, transient = false } = {}) {
+    super(message);
+    this.name = 'TijoriFeedError';
+    this.status = status;
+    this.body = body;
+    this.feedError = error;
+    this.transient = transient;
+  }
+}
+
 function getFeedUrl(since) {
   const base = process.env.TIJORI_FEED_URL;
   if (!base) throw new Error('TIJORI_FEED_URL is not set in environment');
@@ -73,13 +84,24 @@ export async function fetchLatestFeed({ since = null, timeoutMs, retries = DEFAU
     lastErr = r;
     // Fail fast on 4xx (except 429)
     if (r.status >= 400 && r.status < 500 && r.status !== 429) {
-      throw new Error(`Tijori feed ${r.status}: ${r.body?.slice?.(0, 200) || r.error}`);
+      throw new TijoriFeedError(`Tijori feed ${r.status}: ${r.body?.slice?.(0, 200) || r.error}`, {
+        status: r.status,
+        body: r.body,
+        error: r.error,
+        transient: false,
+      });
     }
     if (attempt === retries) break;
     const delay = r.retryAfterMs ?? BACKOFF_BASE_MS * Math.pow(BACKOFF_FACTOR, attempt);
     await new Promise(res => setTimeout(res, delay));
   }
-  throw new Error(`Tijori feed failed after ${retries + 1} attempts: ${lastErr?.status} ${lastErr?.error || lastErr?.body?.slice?.(0, 200)}`);
+  const status = lastErr?.status ?? 0;
+  throw new TijoriFeedError(`Tijori feed failed after ${retries + 1} attempts: ${status} ${lastErr?.error || lastErr?.body?.slice?.(0, 200)}`, {
+    status,
+    body: lastErr?.body,
+    error: lastErr?.error,
+    transient: status === 0 || status === 429 || status >= 500,
+  });
 }
 
 /**

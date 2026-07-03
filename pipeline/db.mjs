@@ -75,6 +75,10 @@ export function hasRecord(db, recordId) {
   return !!db.prepare('SELECT 1 FROM filings_raw WHERE record_id = ?').get(recordId);
 }
 
+export function latestRawCreatedOn(db) {
+  return db.prepare('SELECT MAX(created_on) AS latest FROM filings_raw').get().latest || null;
+}
+
 const _insertRaw = (db) => db.prepare(`
   INSERT OR IGNORE INTO filings_raw
     (record_id, symbol, scripcode, company, score, sentiment, event_type,
