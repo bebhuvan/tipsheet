@@ -54,7 +54,7 @@ const FRESH_PAGE_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 const FRESH_PAGE_CDN_CACHE_CONTROL = 'no-store';
 const HTML_BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 const HTML_CDN_CACHE_CONTROL = 'no-store';
-const WORKER_RELEASE = '2026-06-11-markdown-cache-guard';
+const WORKER_RELEASE = '2026-07-10-og-asset-cap';
 const IST_OFFSET_MIN = 330;
 const BRIEFING_SCHEDULES = [
   { type: 'open', dueHour: 8, dueMinute: 0, graceEnv: 'BRIEFING_OPEN_GRACE_MIN' },
@@ -854,6 +854,30 @@ export default {
     const response = await env.ASSETS.fetch(assetFetchRequest(request, url.pathname));
 
     if (response.status === 404 && url.pathname !== '/') {
+      // Only the newest article-specific OG cards are included in each static
+      // deployment so the Workers asset manifest stays below its hard limit.
+      // Preserve every historical /og/<slug>.png URL with the brand card.
+      if (/^\/og\/[^/]+\.png$/.test(url.pathname)) {
+        const fallbackUrl = new URL('/og/brand.png', url);
+        const fallback = await env.ASSETS.fetch(new Request(fallbackUrl.toString(), {
+          method: request.method,
+          headers: request.headers,
+        }));
+        if (fallback.ok) {
+          const headers = new Headers(fallback.headers);
+          applySecurityHeaders(headers);
+          applyDiscoveryHeaders(headers);
+          headers.set('Cache-Control', 'public, max-age=86400');
+          headers.set('X-Tipsheet-Worker-Release', WORKER_RELEASE);
+          headers.set('X-Tipsheet-OG-Fallback', 'brand');
+          return new Response(request.method === 'HEAD' ? null : fallback.body, {
+            status: fallback.status,
+            statusText: fallback.statusText,
+            headers,
+          });
+        }
+      }
+
       const articleRedirect = await maybeRedirectArticleSlug(url, env);
       if (articleRedirect) return articleRedirect;
 

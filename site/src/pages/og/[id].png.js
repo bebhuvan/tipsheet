@@ -1,11 +1,12 @@
-// Per-article OG image. Static-mode: one PNG per filing.
+// Per-article OG image. Static-mode: one PNG per recent filing.
 //
 // Scale: rendering a card costs ~140ms, and at thousands of filings that
 // dominates build time. A card is immutable for a given slug (headline + id),
 // so we render each one once into a persisted .og-cache and reuse it on every
-// later build. With the cache restored in CI (actions/cache), build time is
-// O(new filings), not O(all filings) — the archive can grow without the build
-// getting progressively slower.
+// later build. Cloudflare Workers' free tier also caps an asset manifest at
+// 20,000 entries, so only the newest cards are shipped. The Worker serves the
+// brand card for older /og/*.png URLs, keeping archived article metadata valid
+// without making the asset manifest grow once per historical article.
 import fs from 'node:fs';
 import path from 'node:path';
 import { listAllForStaticPaths, getFiling, recordIdFromSlug, tierFor } from '../../lib/queries.mjs';
@@ -13,9 +14,10 @@ import { ogSvg, renderPng } from '../../lib/og.mjs';
 
 const OG_CACHE = path.resolve('.og-cache'); // resolved against site/ (build cwd)
 const HEADERS = { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' };
+const MAX_STATIC_OG_CARDS = 1000;
 
 export async function getStaticPaths() {
-  return listAllForStaticPaths().map(item => ({ params: { id: item.id } }));
+  return listAllForStaticPaths(MAX_STATIC_OG_CARDS).map(item => ({ params: { id: item.id } }));
 }
 
 export async function GET({ params }) {

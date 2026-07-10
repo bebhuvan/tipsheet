@@ -78,6 +78,15 @@ jobs:
       - name: Build site
         run: cd site && npm run build
 
+      - name: Check Worker asset budget
+        run: |
+          asset_count=$(find site/dist -type f | wc -l)
+          echo "Worker assets: ${asset_count} / 20,000"
+          if [ "$asset_count" -gt 19000 ]; then
+            echo "Asset budget exceeded: keep at least 1,000 entries below Cloudflare's 20,000-asset limit."
+            exit 1
+          fi
+
       - name: Check internal links
         run: cd site && npm run check:links
 
